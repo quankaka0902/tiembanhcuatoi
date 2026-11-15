@@ -1,0 +1,13 @@
+{
+  "name": "tiem-banh-nha-minh",
+  "private": true,
+  "type": "module",
+  "engines": { "node": "^22.12.0 || >=24" },
+  "scripts": { "dev": "vite", "build": "vite build", "lint": "eslint resources/js vite.config.js" },
+  "dependencies": { "@inertiajs/react": "^2.2.0", "lucide-react": "^0.577.0", "react": "^19.2.0", "react-dom": "^19.2.0" },
+  "devDependencies": {
+    "@eslint/js": "^9.39.0", "@tailwindcss/vite": "^4.2.0", "@vitejs/plugin-react": "^6.0.0",
+    "eslint": "^9.39.0", "eslint-plugin-react": "^7.37.0", "eslint-plugin-react-hooks": "^7.0.0", "globals": "^17.0.0",
+    "laravel-vite-plugin": "^3.1.0", "tailwindcss": "^4.2.0", "vite": "^8.0.0"
+  }
+}
