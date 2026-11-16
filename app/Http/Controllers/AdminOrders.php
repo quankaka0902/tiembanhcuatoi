@@ -16,7 +16,7 @@ class AdminOrders extends Controller
     {
         $filters = $this->filters($request);
         $orders = $this->dateRange(DB::table('orders'), $filters, 'created_at');
-        $revenue = $this->dateRange(DB::table('orders')->where('status', 'completed')->where('payment', 'paid'), $filters, 'completed_at');
+        $revenue = $this->dateRange($this->completedSales(), $filters, 'completed_at');
         $low = DB::table('variants')->join('products', 'products.id', '=', 'variants.product_id')
             ->where('products.active', true)->where('variants.active', true)->where('variants.stock', '<=', 5);
 
@@ -38,6 +38,55 @@ class AdminOrders extends Controller
             'orders' => $this->filtered($filters)->paginate(15, ['id', 'code', 'name', 'status', 'payment', 'method', 'total', 'created_at'])->withQueryString(),
             'filters' => $filters, 'statuses' => Orders::STATUSES, 'payments' => Orders::PAYMENTS,
         ]);
+    }
+
+    public function reports(Request $request)
+    {
+        $filters = $request->validate($this->dateRules($request));
+        if (empty($filters['from']) && empty($filters['to'])) {
+            $today = now();
+            $filters = ['from' => $today->copy()->startOfMonth()->toDateString(), 'to' => $today->toDateString()];
+        }
+        $orders = $this->dateRange($this->completedSales()->whereNotNull('completed_at'), $filters, 'orders.completed_at');
+        $report = DB::transaction(function () use ($orders) {
+            $summary = (clone $orders)->selectRaw('COUNT(*) AS order_count, COALESCE(SUM(total), 0) AS revenue')->first();
+            $days = (clone $orders)->selectRaw('DATE(completed_at) AS day, COUNT(*) AS order_count, SUM(total) AS revenue')
+                ->groupByRaw('DATE(completed_at)')->orderByDesc('day')->paginate(31)->withQueryString();
+            $top = (clone $orders)->join('order_items as items', 'items.order_id', '=', 'orders.id')
+                ->join('variants', 'variants.id', '=', 'items.variant_id')
+                ->join('products', 'products.id', '=', 'variants.product_id')
+                ->groupBy('products.id', 'products.name')->orderByDesc('quantity')->orderBy('products.id')
+                ->limit(10)->selectRaw('products.id, products.name, SUM(items.quantity) AS quantity, COUNT(DISTINCT orders.id) AS order_count')->get();
+
+            return [
+                'totals' => ['order_count' => (int) $summary->order_count, 'revenue' => (int) $summary->revenue],
+                'days' => $days->through(fn ($day) => [...(array) $day, 'revenue' => (int) $day->revenue]),
+                'top' => $top->map(fn ($product) => [...(array) $product, 'quantity' => (int) $product->quantity]),
+            ];
+        });
+
+        return Inertia::render('AdminReports', ['filters' => $filters, ...$report])
+            ->toResponse($request)->header('Cache-Control', 'private, no-store');
+    }
+
+    public function reconciliation(Request $request)
+    {
+        $fields = $request->validate(['filter' => 'nullable|in:pending,overdue']);
+        $filter = $fields['filter'] ?? 'pending';
+        $now = now()->toDateTimeString();
+        $pending = Orders::scheduled()->where('method', 'bank')->where('payment', 'unpaid');
+
+        $orders = $pending->when($filter === 'overdue', fn ($query) => $query->where('bank_due_at', '<=', $now))
+            ->orderBy('bank_due_at')->orderBy('id')
+            ->paginate(15, ['id', 'code', 'total', 'created_at', 'scheduled_at', 'bank_due_at'])->withQueryString()
+            ->through(function ($order) use ($now) {
+                $order->overdue = $order->bank_due_at !== null && $order->bank_due_at <= $now;
+
+                return $order;
+            });
+
+        return Inertia::render('AdminReconciliation', ['orders' => $orders, 'filter' => $filter])
+            ->toResponse($request)->header('Cache-Control', 'private, no-store');
     }
 
     public function show(Request $request, int $order)
@@ -82,10 +131,23 @@ class AdminOrders extends Controller
     private function filters(Request $request): array
     {
         return $request->validate([
-            'from' => 'nullable|date_format:Y-m-d', 'to' => 'nullable|date_format:Y-m-d'.($request->filled('from') ? '|after_or_equal:from' : ''),
+            ...$this->dateRules($request),
             'code' => ['nullable', 'string', 'max:22', 'regex:/^[A-Za-z0-9-]+$/'],
             'status' => ['nullable', Rule::in(array_keys(Orders::STATUSES))],
         ]);
+    }
+
+    private function dateRules(Request $request): array
+    {
+        return [
+            'from' => 'nullable|date_format:Y-m-d',
+            'to' => 'nullable|date_format:Y-m-d'.($request->filled('from') ? '|after_or_equal:from' : ''),
+        ];
+    }
+
+    private function completedSales(): Builder
+    {
+        return DB::table('orders')->where('orders.status', 'completed')->where('orders.payment', 'paid');
     }
 
     private function filtered(array $filters): Builder

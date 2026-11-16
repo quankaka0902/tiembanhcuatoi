@@ -1,5 +1,5 @@
 import { Link, useForm, usePage } from '@inertiajs/react';
-import { ArrowLeft, ArrowRight, Banknote, CalendarClock, Check, Clipboard, CreditCard, MapPin, Search, ShoppingBag, Store, Trash2, Truck } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Banknote, CalendarClock, Check, Clipboard, CreditCard, MapPin, Search, ShoppingBag, ShoppingCart, Store, Trash2, Truck } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Breadcrumb, ButtonLink, dateTime, Empty, ErrorList, Field, Image, Layout, money, Pagination, Pill } from './ui';
 
@@ -55,6 +55,7 @@ export function Checkout({ lines, slots, regions, bankEnabled, keyToken }) {
     const subtotal = lines.reduce((sum, line) => sum + Number(line.subtotal), 0);
     const form = useForm({ key: keyToken, name: auth?.name ?? '', email: auth?.email ?? '', phone: '', fulfillment: 'pickup', region: '', address: '', slot: '', method: 'cod', coupon: '' });
     const { fulfillment, region } = form.data;
+    const selectedSlot = slots.includes(form.data.slot) ? form.data.slot : '';
     const [appliedCode, setAppliedCode] = useState('');
     const [quoteResult, setQuoteResult] = useState(null);
     const quoteKey = JSON.stringify({ fulfillment, region, coupon: appliedCode });
@@ -106,7 +107,7 @@ export function Checkout({ lines, slots, regions, bankEnabled, keyToken }) {
                         <Field label="Khu vực giao" error={form.errors.region}><select required value={region} onChange={e => form.setData('region', e.target.value)}><option value="">Chọn khu vực</option>{regions.map(area => <option key={area.key} value={area.key}>{area.name}</option>)}</select></Field>
                         <Field label="Địa chỉ giao bánh" error={form.errors.address}><input autoComplete="street-address" required value={form.data.address} onChange={e => form.setData('address', e.target.value)} /></Field>
                     </div>}
-                    <Field label="Giờ nhận bánh" error={form.errors.slot}><select required value={form.data.slot} onChange={e => form.setData('slot', e.target.value)}>
+                    <Field label="Giờ nhận bánh" error={form.errors.slot}><select required value={selectedSlot} onChange={e => { form.setData('slot', e.target.value); form.clearErrors('slot'); }}>
                         <option value="">Chọn một khung giờ</option>{slots.map(slot => <option value={slot} key={slot}>{dateTime(slot)}</option>)}
                     </select></Field>
                     {!slots.length && <p className="warning">Tiệm chưa có lịch nhận phù hợp trong 14 ngày tới. Vui lòng liên hệ để đặt bánh.</p>}
@@ -124,7 +125,7 @@ export function Checkout({ lines, slots, regions, bankEnabled, keyToken }) {
                 {!waitingForRegion && !displayed && <p className="muted" role="status">Đang tính tổng tiền…</p>}
                 {displayed?.error && <p className="warning" role="alert">{displayed.error} <button type="button" className="text-action" onClick={() => { setAppliedCode(''); form.setData('coupon', ''); }}>Bỏ mã</button></p>}
                 <ErrorList errors={form.errors} />
-                <button className="button" disabled={form.processing || !displayed?.data || !slots.length}><ShoppingBag size={19} />{form.processing ? 'Đang đặt bánh…' : 'Xác nhận đặt bánh'}</button>
+                <button className="button" disabled={form.processing || !displayed?.data || !selectedSlot}><ShoppingBag size={19} />{form.processing ? 'Đang đặt bánh…' : 'Xác nhận đặt bánh'}</button>
             </aside>
         </form>
     </div></Layout>;
@@ -132,12 +133,24 @@ export function Checkout({ lines, slots, regions, bankEnabled, keyToken }) {
 
 export function Tracking() {
     const form = useForm({ link: '' });
+    const recovery = useForm({ code: '', email: '' });
     return <Layout title="Tra cứu đơn"><div className="wrap page"><div className="panel auth-card">
         <span className="category-icon"><Search size={29} /></span><h1>Tra cứu đơn bánh</h1><p>Dán liên kết tra cứu trong email xác nhận để xem tiến độ đơn.</p>
         <form className="form-stack" onSubmit={e => { e.preventDefault(); form.post('/tra-cuu'); }}>
             <Field label="Liên kết tra cứu" error={form.errors.link}><input required maxLength={400} value={form.data.link} onChange={e => form.setData('link', e.target.value)} placeholder="Dán liên kết tại đây" /></Field>
             <button className="button" disabled={form.processing}><Search size={17} />{form.processing ? 'Đang tra cứu…' : 'Tra cứu đơn'}</button>
         </form>
+        <section className="form-stack tracking-recovery" aria-labelledby="recovery-heading">
+            <h2 id="recovery-heading">Gửi lại liên kết tra cứu</h2>
+            <form className="form-stack" onSubmit={e => {
+                e.preventDefault();
+                recovery.post('/tra-cuu/gui-lai', { onSuccess: () => recovery.reset() });
+            }}>
+                <Field label="Mã đơn" error={recovery.errors.code}><input required maxLength={22} value={recovery.data.code} onChange={e => recovery.setData('code', e.target.value)} /></Field>
+                <Field label="Email đã đặt đơn" error={recovery.errors.email}><input required type="email" autoComplete="email" maxLength={254} value={recovery.data.email} onChange={e => recovery.setData('email', e.target.value)} /></Field>
+                <button className="button secondary" disabled={recovery.processing}>{recovery.processing ? 'Đang gửi yêu cầu…' : 'Gửi lại liên kết'}</button>
+            </form>
+        </section>
     </div></div></Layout>;
 }
 
@@ -149,11 +162,12 @@ export function OrderEvents({ events, statuses, payments }) {
     return <ol className="timeline">{events.map((event, i) => <li key={event.id ?? i}><span></span><div><strong>{(event.kind === 'payment' ? payments : statuses)[event.value]}</strong><small>{dateTime(event.created_at)}{event.actor ? ' · ' + event.actor : ''}</small>{event.note && <p>{event.note}</p>}</div></li>)}</ol>;
 }
 
-export function Order({ order, statuses, payments, trackingLink }) {
+export function Order({ order, statuses, payments, trackingLink, canReorder }) {
     const { shop } = usePage().props;
     const [copied, setCopied] = useState(false);
+    const reorder = useForm({});
     return <Layout title={'Đơn ' + order.code}><div className="wrap page">
-        <Breadcrumb><Link href="/tra-cuu">Tra cứu đơn</Link><span aria-hidden="true">/</span><span>{order.code}</span></Breadcrumb>
+        <Breadcrumb>{canReorder ? <Link href="/don-cua-toi">Đơn của tôi</Link> : <Link href="/tra-cuu">Tra cứu đơn</Link>}<span aria-hidden="true">/</span><span>{order.code}</span></Breadcrumb>
         <div className="page-heading"><h1>Đơn bánh {order.code}</h1><div className="row-actions"><Pill value={order.status} labels={statuses} /><Pill value={order.payment} labels={payments} /></div></div>
         <div className="order-grid">
             <div className="form-stack">
@@ -161,12 +175,20 @@ export function Order({ order, statuses, payments, trackingLink }) {
                     {order.bank_snapshot.demo && <p className="warning">Thông tin chuyển khoản là dữ liệu mẫu. Vui lòng không chuyển tiền.</p>}
                     <dl className="totals"><div><dt>Ngân hàng</dt><dd>{order.bank_snapshot.name}</dd></div><div><dt>Số tài khoản</dt><dd>{order.bank_snapshot.account}</dd></div>
                         <div><dt>Chủ tài khoản</dt><dd>{order.bank_snapshot.holder}</dd></div><div><dt>Số tiền</dt><dd><strong>{money(order.total)}</strong></dd></div><div><dt>Nội dung chuyển khoản</dt><dd><strong>{order.code}</strong></dd></div></dl>
+                    {order.bank_due_at && <p className="muted">Hạn chuyển khoản · {dateTime(order.bank_due_at)}</p>}
                     <p className="muted">Tiệm cập nhật thanh toán sau khi nhân viên đối soát.</p>
                 </section>}
                 <section className="panel form-stack"><h2>Cách nhận bánh</h2><p className="icon-text"><MapPin size={19} />{order.fulfillment === 'pickup' ? 'Nhận tại tiệm · ' + shop.address : order.address + ' · ' + order.region_label}</p><p className="icon-text"><CalendarClock size={19} />{dateTime(order.scheduled_at)}</p></section>
                 <section className="panel form-stack"><h2>Lịch sử đơn</h2><OrderEvents events={order.events} statuses={statuses} payments={payments} /></section>
             </div>
             <aside className="panel order-summary"><h2>Chi tiết thanh toán</h2><OrderItems items={order.items} /><Totals {...order} />
+                {canReorder && <form className="form-stack" onSubmit={e => {
+                    e.preventDefault();
+                    reorder.post('/don-cua-toi/' + order.code + '/mua-lai');
+                }}>
+                    <button className="button" disabled={reorder.processing}><ShoppingCart size={17} />{reorder.processing ? 'Đang thêm…' : 'Mua lại bánh'}</button>
+                    <small className="muted">Thêm bánh còn bán theo giá và tồn hiện tại. Bạn có thể nhập lời chúc và ghi chú mới trong giỏ.</small>
+                </form>}
                 <Field label="Liên kết tra cứu"><input readOnly value={trackingLink} onFocus={e => e.target.select()} /></Field>
                 {navigator.clipboard && <button className="button secondary" type="button" onClick={async () => { try { await navigator.clipboard.writeText(trackingLink); setCopied(true); } catch { setCopied(false); } }}>{copied ? <Check size={17} /> : <Clipboard size={17} />}{copied ? 'Đã sao chép' : 'Sao chép liên kết'}</button>}
             </aside>

@@ -1,11 +1,18 @@
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
-import { ArrowLeft, ArrowUpRight, CakeSlice, ClipboardList, Download, LayoutDashboard, Package, Plus, Settings, Ticket, Users } from 'lucide-react';
-import { Brand, ButtonLink, dateTime, ErrorList, Field, Image, money, Pagination, Pill } from './ui';
+import { ArrowLeft, ArrowUpRight, Banknote, CakeSlice, CalendarDays, ChartNoAxesCombined, ClipboardList, Download, LayoutDashboard, Package, Plus, Settings, Ticket, Users } from 'lucide-react';
+import { Brand, ButtonLink, date as formatDate, dateTime, ErrorList, Field, Image, money, Pagination, Pill } from './ui';
 import { OrderEvents, OrderItems, Totals } from './checkout';
 
 const root = '/quan-tri';
+const scheduleUrl = root + '/lich-lam-banh';
+const reconciliationUrl = root + '/doi-soat';
+const reportsUrl = root + '/bao-cao';
+const inventoryUrl = root + '/ton-kho';
 const nav = [
     [root, 'Tổng quan', LayoutDashboard], [root + '/don-hang', 'Đơn hàng', ClipboardList],
+    [scheduleUrl, 'Lịch làm bánh', CalendarDays],
+    [reconciliationUrl, 'Đối soát', Banknote],
+    [reportsUrl, 'Báo cáo', ChartNoAxesCombined], [inventoryUrl, 'Nhật ký tồn kho', Package, true],
     [root + '/san-pham', 'Sản phẩm', CakeSlice, true], [root + '/ma-giam', 'Mã giảm giá', Ticket, true],
     [root + '/cai-dat', 'Cấu hình', Settings, true], [root + '/nhan-su', 'Nhân sự', Users, true],
 ];
@@ -69,6 +76,50 @@ export function AdminDashboard({ filters, total, revenue, working, low, lowCount
     </Admin>;
 }
 
+export function AdminReports({ filters, totals, days, top }) {
+    return <Admin title="Báo cáo kinh doanh" detail="Tính theo ngày hoàn tất của đơn đã thanh toán. Doanh thu là tổng tiền sau giảm giá, gồm phí giao hàng.">
+        <DateFilters filters={filters} url={reportsUrl} />
+        <section className="panel form-stack report-totals" aria-label="Tổng trong kỳ">
+            <div className="stat"><span>Doanh thu trong kỳ</span><strong>{money(totals.revenue)}</strong></div>
+            <div className="stat"><span>Đơn đã hoàn tất và thanh toán</span><strong>{totals.order_count}</strong></div>
+        </section>
+        <div className="admin-columns">
+            <section className="panel form-stack"><h2>Doanh thu theo ngày</h2>
+                <Table headers={['Ngày hoàn tất', 'Số đơn', 'Doanh thu']} empty="Chưa có doanh thu trong kỳ này."
+                    rows={days.data.map(day => [day.day, formatDate(day.day), day.order_count, money(day.revenue)])} />
+                <Pagination page={days} />
+            </section>
+            <section className="panel form-stack"><h2>Bánh bán chạy</h2>
+                <Table headers={['Bánh', 'Số bánh', 'Số đơn']} empty="Chưa có bánh bán thành công trong kỳ này."
+                    rows={top.map(product => [product.id, product.name, product.quantity, product.order_count])} />
+            </section>
+        </div>
+    </Admin>;
+}
+
+export function AdminInventory({ movements, filters, reasons, product }) {
+    const form = useForm({ reason: filters.reason ?? '', ...(product && { product: product.id }) });
+    return <Admin title="Nhật ký tồn kho" detail={product?.name}
+        action={product && <ButtonLink href={inventoryUrl} secondary>Tất cả sản phẩm</ButtonLink>}>
+        <form className="panel admin-filters" onSubmit={e => { e.preventDefault(); form.get(inventoryUrl); }}>
+            <Field label="Loại thay đổi" error={form.errors.reason}><select value={form.data.reason} onChange={e => form.setData('reason', e.target.value)}>
+                <option value="">Tất cả</option>{Object.entries(reasons).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select></Field>
+            <button className="button compact" disabled={form.processing}>{form.processing ? 'Đang lọc…' : 'Lọc'}</button>
+        </form>
+        <section className="panel form-stack">
+            <Table headers={['Thời điểm', 'Bánh', 'Thay đổi', 'Nguyên nhân', 'Người thực hiện']} empty="Chưa có thay đổi tồn kho theo bộ lọc."
+                rows={movements.data.map(item => [item.id, dateTime(item.created_at),
+                    <><Link className="table-link" href={root + '/san-pham/' + item.product_id}>{item.product_name}</Link><small>{item.variant_name}</small></>,
+                    <><strong>{item.stock_after > item.stock_before ? '+' : ''}{item.stock_after - item.stock_before}</strong><small>{item.stock_before} → {item.stock_after}</small></>,
+                    <>{reasons[item.reason]}{item.order_code && <small><Link className="table-link" href={root + '/don-hang/' + item.order_id}>{item.order_code}</Link></small>}{item.note && <small>{item.note}</small>}</>,
+                    item.actor ?? 'Hệ thống',
+                ])} />
+            <Pagination page={movements} />
+        </section>
+    </Admin>;
+}
+
 export function AdminOrders({ orders, filters, statuses, payments }) {
     const url = root + '/don-hang';
     const qs = new URLSearchParams(Object.entries(filters).filter(([, value]) => value != null && value !== ''));
@@ -78,6 +129,94 @@ export function AdminOrders({ orders, filters, statuses, payments }) {
             <Link className="table-link" href={url + '/' + order.id}>{order.code}</Link>, dateTime(order.created_at), order.name,
             <Pill value={order.status} labels={statuses} />, <><Pill value={order.payment} labels={payments} /><small>{order.method === 'bank' ? 'Chuyển khoản' : 'COD'}</small></>, money(order.total)])} />
             <Pagination page={orders} />
+        </div>
+    </Admin>;
+}
+
+function ScheduleSlot({ slot, statuses }) {
+    const count = slot.orders.length;
+    const full = slot.limit !== null && count >= slot.limit;
+
+    return <section className="panel form-stack schedule-slot">
+        <div className="section-head">
+            <h2>{slot.time}</h2>
+            <span className={full ? 'pill state-pending' : 'muted'}>{count}{slot.limit !== null && ' / ' + slot.limit} đơn{full && ' · Đầy'}</span>
+        </div>
+        {count > 0 && <div className="schedule-columns">
+            <div>
+                <h3>Tổng bánh theo phiên bản</h3>
+                <ul className="summary-lines">{slot.products.map(product => (
+                    <li key={JSON.stringify([product.variant_id, product.product_name, product.variant_name])}>
+                        <span>{product.product_name}<small>{product.variant_name}</small></span>
+                        <strong>{product.quantity} bánh</strong>
+                    </li>
+                ))}</ul>
+            </div>
+            <div className="form-stack">{slot.orders.map(order => (
+                <article className="schedule-order" key={order.id}>
+                    <div className="section-head">
+                        <Link className="table-link" href={root + '/don-hang/' + order.id}>{order.code}</Link>
+                        <Pill value={order.status} labels={statuses} />
+                    </div>
+                    <p className="muted">{order.fulfillment === 'delivery' ? 'Giao tận nơi' : 'Nhận tại tiệm'}</p>
+                    <ul className="summary-lines">{order.items.map(item => (
+                        <li key={item.id}>
+                            <span>
+                                <strong>{item.quantity} × {item.product_name}</strong><small>{item.variant_name}</small>
+                                {item.message && <small>Lời chúc: {item.message}</small>}
+                                {item.note && <small>Ghi chú: {item.note}</small>}
+                            </span>
+                        </li>
+                    ))}</ul>
+                </article>
+            ))}</div>
+        </div>}
+    </section>;
+}
+
+export function AdminReconciliation({ orders, filter }) {
+    return <Admin title="Đối soát chuyển khoản">
+        <section className="panel form-stack">
+            <nav className="row-actions" aria-label="Lọc đơn chuyển khoản">
+                {[[reconciliationUrl, 'pending', 'Chờ đối soát'], [reconciliationUrl + '?filter=overdue', 'overdue', 'Quá hạn']].map(([href, value, label]) => (
+                    <Link key={value} href={href} className={'button compact' + (filter === value ? '' : ' secondary')} aria-current={filter === value ? 'page' : undefined}>{label}</Link>
+                ))}
+            </nav>
+            <Table headers={['Mã đơn', 'Số tiền', 'Giờ đặt', 'Giao hoặc nhận', 'Hạn chuyển khoản']}
+                empty={filter === 'overdue' ? 'Chưa có đơn quá hạn.' : 'Chưa có đơn chuyển khoản chờ đối soát.'}
+                rows={orders.data.map(order => [
+                    order.id, <Link className="table-link" href={root + '/don-hang/' + order.id}>{order.code}</Link>,
+                    money(order.total), dateTime(order.created_at), dateTime(order.scheduled_at),
+                    <div className="row-actions">{dateTime(order.bank_due_at)}{order.overdue && <span className="pill state-pending">Quá hạn</span>}</div>,
+                ])} />
+            <Pagination page={orders} />
+        </section>
+    </Admin>;
+}
+
+export function AdminSchedule({ date, today, tomorrow, schedule, orderCount, cakeCount, statuses }) {
+    const form = useForm({});
+
+    return <Admin title="Lịch làm bánh" detail={date.split('-').reverse().join('/') + ' · ' + orderCount + ' đơn · ' + cakeCount + ' bánh'}>
+        <div className="panel schedule-filters">
+            <nav className="row-actions" aria-label="Ngày làm bánh">
+                {[[today, 'Hôm nay'], [tomorrow, 'Ngày mai']].map(([day, label]) => (
+                    <Link key={day} href={scheduleUrl + '?date=' + day} className={'button compact' + (date === day ? '' : ' secondary')} aria-current={date === day ? 'date' : undefined}>{label}</Link>
+                ))}
+            </nav>
+            <form key={date} className="admin-filters" onSubmit={e => {
+                e.preventDefault();
+                const selected = new FormData(e.currentTarget).get('date');
+                form.transform(() => ({ date: selected }));
+                form.get(scheduleUrl);
+            }}>
+                <Field label="Ngày giao hoặc nhận" error={form.errors.date}><input type="date" name="date" defaultValue={date} required /></Field>
+                <button className="button secondary compact" disabled={form.processing}>{form.processing ? 'Đang tải…' : 'Xem lịch'}</button>
+            </form>
+        </div>
+        <div className="form-stack schedule-list">
+            {orderCount === 0 && <p className="panel muted">{schedule.length ? 'Chưa có đơn giao hoặc nhận trong ngày này.' : 'Tiệm nghỉ ngày này.'}</p>}
+            {schedule.map(slot => <ScheduleSlot key={slot.time} slot={slot} statuses={statuses} />)}
         </div>
     </Admin>;
 }
@@ -110,6 +249,7 @@ export function AdminOrder({ order, statuses, payments, next, reconcile }) {
                 </section>
                 <section className="panel form-stack"><h2>Thanh toán</h2>
                     <p>{order.method === 'bank' ? 'Chuyển khoản thủ công' : 'Thanh toán khi nhận bánh'}</p>
+                    {order.bank_due_at && order.payment === 'unpaid' && order.status !== 'cancelled' && <p className="muted">Hạn chuyển khoản · {dateTime(order.bank_due_at)}</p>}
                     {order.bank_snapshot && <p className="muted">{order.bank_snapshot.demo ? 'Dữ liệu mẫu · ' : ''}Nội dung {order.code} · {money(order.total)}</p>}
                     {(canPay || canRefund) && <form className="form-stack" onSubmit={e => {
                         e.preventDefault();
@@ -175,7 +315,10 @@ export function AdminProduct({ product, categories }) {
     function variantChange(index, key, value) {
         form.setData('variants', form.data.variants.map((variant, i) => i === index ? { ...variant, [key]: value } : variant));
     }
-    return <Admin title={product ? product.name : 'Thêm sản phẩm'} action={<ButtonLink href={root + '/san-pham'} secondary><ArrowLeft size={17} />Sản phẩm</ButtonLink>}>
+    return <Admin title={product ? product.name : 'Thêm sản phẩm'} action={<div className="row-actions">
+        {product && <ButtonLink href={inventoryUrl + '?product=' + product.id} secondary><Package size={17} />Nhật ký tồn kho</ButtonLink>}
+        <ButtonLink href={root + '/san-pham'} secondary><ArrowLeft size={17} />Sản phẩm</ButtonLink>
+    </div>}>
         <form className="form-stack" onSubmit={e => { e.preventDefault(); form.post(root + '/san-pham' + (product ? '/' + product.id : ''), { forceFormData: true, preserveState: 'errors' }); }}>
             <div className="admin-columns">
                 <section className="panel form-stack"><h2>Thông tin bánh</h2><Text form={form} field="name" label="Tên bánh" required maxLength={150} />
@@ -197,6 +340,11 @@ export function AdminProduct({ product, categories }) {
                     {[['name', 'Tên phiên bản', 'text'], ['price', 'Giá (₫)', 'number'], ['stock', 'Tồn kho', 'number']].map(([field, label, type]) => <Field key={field} label={label} error={form.errors['variants.' + index + '.' + field]}><input required type={type} min={type === 'number' ? '0' : undefined} value={variant[field]} onChange={e => variantChange(index, field, e.target.value)} /></Field>)}
                     <label className="checkbox"><input type="checkbox" checked={variant.active} onChange={e => variantChange(index, 'active', e.target.checked)} />Đang bán</label>
                     {!variant.id && form.data.variants.length > 1 && <button type="button" className="text-action danger" onClick={() => form.setData('variants', form.data.variants.filter((_, i) => i !== index))}>Bỏ dòng</button>}
+                    {variant.stock !== '' && Number(variant.stock) !== Number(variant.expected_stock ?? 0) && <div className="stock-note">
+                        <Field label="Lý do thay đổi tồn (không bắt buộc)" error={form.errors['variants.' + index + '.stock_note']}>
+                            <input maxLength={250} value={variant.stock_note ?? ''} onChange={e => variantChange(index, 'stock_note', e.target.value)} />
+                        </Field>
+                    </div>}
                 </div>)}
                 <button type="button" className="button secondary compact" disabled={form.data.variants.length >= 30} onClick={() => form.setData('variants', [...form.data.variants, freshVariant()])}><Plus size={16} />Thêm phiên bản</button>
             </section>
@@ -206,16 +354,27 @@ export function AdminProduct({ product, categories }) {
 }
 
 export function AdminSettings({ settings }) {
-    const { logo, weekdays, slots, closed_dates, regions, ...fields } = settings;
-    const form = useForm({ ...fields, logo: null, remove_logo: false, weekdays, slotText: slots.join('\n'), closedText: closed_dates.join('\n'), regions });
+    const { logo, weekdays, slots, slot_limits, closed_dates, regions, ...fields } = settings;
+    const form = useForm({
+        ...fields, logo: null, remove_logo: false, weekdays, closedText: closed_dates.join('\n'), regions,
+        slotRows: slots.map(time => ({ time, limit: slot_limits[time] ?? '' })),
+    });
     const lines = value => value.split(/[\n,]+/).map(line => line.trim()).filter(Boolean);
+    function slotChange(index, key, value) {
+        form.setData('slotRows', form.data.slotRows.map((slot, i) => i === index ? { ...slot, [key]: value } : slot));
+    }
     function regionChange(index, key, value) {
         form.setData('regions', form.data.regions.map((region, i) => index === i ? { ...region, [key]: value } : region));
     }
     return <Admin title="Cấu hình cửa hàng">
         <form className="form-stack" onSubmit={e => {
             e.preventDefault();
-            form.transform(({ slotText, closedText, ...data }) => ({ ...data, slots: lines(slotText), closed_dates: lines(closedText) }));
+            form.transform(({ slotRows, closedText, ...data }) => ({
+                ...data,
+                slots: slotRows.map(slot => slot.time),
+                slot_limits: Object.fromEntries(slotRows.map(slot => [slot.time, slot.limit])),
+                closed_dates: lines(closedText),
+            }));
             form.post(root + '/cai-dat', { forceFormData: true, preserveState: 'errors' });
         }}>
             <div className="admin-columns"><section className="panel form-stack"><h2>Thông tin tiệm</h2>
@@ -225,7 +384,20 @@ export function AdminSettings({ settings }) {
                 {logo && <><img className="logo-preview" src={logo} alt="Logo hiện tại" /><Flag form={form} field="remove_logo" label="Bỏ logo hiện tại" /></>}
             </section><section className="panel form-stack"><h2>Lịch nhận bánh</h2>
                 <div className="weekdays">{[[1, 'T2'], [2, 'T3'], [3, 'T4'], [4, 'T5'], [5, 'T6'], [6, 'T7'], [7, 'CN']].map(([day, name]) => <label className="checkbox" key={day}><input type="checkbox" checked={form.data.weekdays.includes(day)} onChange={e => form.setData('weekdays', e.target.checked ? [...form.data.weekdays, day] : form.data.weekdays.filter(value => value !== day))} />{name}</label>)}</div>
-                <Field label="Khung giờ nhận bánh" hint="Mỗi giờ một dòng, định dạng HH:mm."><textarea required rows="5" value={form.data.slotText} onChange={e => form.setData('slotText', e.target.value)} /></Field>
+                <div className="form-stack">
+                    <h3>Khung giờ giao hoặc nhận</h3>
+                    <p className="muted">Mỗi giới hạn tính chung đơn giao tận nơi và nhận tại tiệm. Để trống để nhận không giới hạn.</p>
+                    {form.data.slotRows.map((slot, index) => <div key={index} className="slot-edit">
+                        <Field label="Giờ (HH:mm)" error={form.errors['slots.' + index]}>
+                            <input required placeholder="09:00" maxLength={5} pattern="([01][0-9]|2[0-3]):[0-5][0-9]" value={slot.time} onChange={e => slotChange(index, 'time', e.target.value)} />
+                        </Field>
+                        <Field label="Số đơn tối đa" error={form.errors['slot_limits.' + slot.time]}>
+                            <input type="number" min="1" max="1000" value={slot.limit} onChange={e => slotChange(index, 'limit', e.target.value)} />
+                        </Field>
+                        <button type="button" className="text-action danger" aria-label={'Bỏ khung giờ ' + (slot.time || index + 1)} disabled={form.data.slotRows.length === 1} onClick={() => form.setData('slotRows', form.data.slotRows.filter((_, i) => i !== index))}>Bỏ</button>
+                    </div>)}
+                    <button type="button" className="button secondary compact" disabled={form.data.slotRows.length >= 48} onClick={() => form.setData('slotRows', [...form.data.slotRows, { time: '', limit: '' }])}><Plus size={16} />Thêm khung giờ</button>
+                </div>
                 <Field label="Ngày nghỉ" hint="Mỗi ngày một dòng, định dạng YYYY-MM-DD."><textarea rows="4" value={form.data.closedText} onChange={e => form.setData('closedText', e.target.value)} /></Field>
             </section></div>
             <section className="panel form-stack"><h2>Giao hàng</h2>
@@ -238,6 +410,7 @@ export function AdminSettings({ settings }) {
             </section>
             <section className="panel form-stack"><h2>Chuyển khoản thủ công</h2><p className="muted">Điền cả ba trường để mở chuyển khoản. Xóa cả ba trường để tắt.</p>
                 <div className="three-fields"><Text form={form} field="bank_name" label="Ngân hàng" /><Text form={form} field="bank_account" label="Số tài khoản" /><Text form={form} field="bank_holder" label="Chủ tài khoản" /></div>
+                <Text form={form} field="bank_due_minutes" label="Thời hạn chuyển khoản (phút)" type="number" required min="1" max="1440" />
                 <Flag form={form} field="bank_demo" label="Hiển thị cảnh báo thông tin chuyển khoản mẫu" />
             </section>
             <ErrorList errors={form.errors} /><button className="button" disabled={form.processing}>{form.processing ? 'Đang lưu…' : 'Lưu cấu hình'}</button>

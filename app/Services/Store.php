@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 
 class Store
@@ -17,6 +18,12 @@ class Store
     public static function publicSettings(): array
     {
         return array_intersect_key(self::settings(), array_flip(['name', 'logo', 'phone', 'email', 'address', 'hours']));
+    }
+
+    public static function openOn(array $settings, CarbonInterface $date): bool
+    {
+        return in_array($date->dayOfWeekIso, $settings['weekdays'], true)
+            && ! in_array($date->toDateString(), $settings['closed_dates'], true);
     }
 
     public static function bank(array $settings): ?array

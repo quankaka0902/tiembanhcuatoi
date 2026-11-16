@@ -4,6 +4,7 @@ use App\Http\Controllers\Accounts;
 use App\Http\Controllers\AdminCatalog;
 use App\Http\Controllers\AdminConfig;
 use App\Http\Controllers\AdminOrders;
+use App\Http\Controllers\AdminSchedule;
 use App\Http\Controllers\Storefront;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
@@ -21,10 +22,12 @@ Route::controller(Storefront::class)->group(function () {
     Route::post('/dat-banh', 'place')->middleware('throttle:20,1')->block(30, 10);
     Route::get('/tra-cuu', 'tracking');
     Route::post('/tra-cuu', 'track')->middleware('throttle:tracking');
+    Route::post('/tra-cuu/gui-lai', 'resendTracking')->middleware('throttle:tracking-resend');
     Route::get('/tra-cuu/{token}', 'tracked')->where('token', '[a-f0-9]{64}')->middleware('throttle:tracking')->name('tracking.show');
     Route::middleware(['auth', 'can:active-account'])->group(function () {
         Route::get('/don-cua-toi', 'history');
         Route::get('/don-cua-toi/{code}', 'ownOrder');
+        Route::post('/don-cua-toi/{code}/mua-lai', 'reorder')->block();
     });
 });
 
@@ -48,16 +51,21 @@ Route::middleware('guest')->group(function () {
 Route::post('/dang-xuat', [Accounts::class, 'logout'])->middleware('auth');
 
 Route::prefix('quan-tri')->middleware(['auth', 'can:staff'])->group(function () {
+    Route::get('/lich-lam-banh', AdminSchedule::class);
+
     Route::controller(AdminOrders::class)->group(function () {
         Route::get('/', 'dashboard');
         Route::get('/don-hang', 'index');
         Route::get('/don-hang/xuat', 'export');
+        Route::get('/doi-soat', 'reconciliation');
+        Route::get('/bao-cao', 'reports');
         Route::get('/don-hang/{order}', 'show')->whereNumber('order');
         Route::patch('/don-hang/{order}', 'change')->whereNumber('order');
     });
 
     Route::middleware('can:admin')->group(function () {
         Route::controller(AdminCatalog::class)->group(function () {
+            Route::get('/ton-kho', 'inventory');
             Route::get('/san-pham', 'index');
             Route::get('/san-pham/them', 'edit');
             Route::get('/san-pham/{product}', 'edit')->whereNumber('product');

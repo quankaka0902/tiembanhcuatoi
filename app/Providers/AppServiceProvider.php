@@ -25,6 +25,15 @@ class AppServiceProvider extends ServiceProvider
             Limit::perMinute(6)->by('email:'.Str::lower(is_string($request->input('email')) ? $request->input('email') : '').'|'.$request->ip()),
         ]);
         RateLimiter::for('tracking', fn (Request $request) => Limit::perMinute(30)->by($request->ip()));
+        RateLimiter::for('tracking-resend', function (Request $request) {
+            $code = $request->input('code');
+            $code = is_string($code) ? Str::upper(trim($code)) : '';
+
+            return [
+                Limit::perMinute(10)->by('ip:'.$request->ip()),
+                Limit::perMinutes(10, 3)->by('code:'.hash('sha256', $code)),
+            ];
+        });
 
         ResetPassword::toMailUsing(fn (User $user, string $token) => (new MailMessage)
             ->subject('Đặt lại mật khẩu')

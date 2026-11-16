@@ -35,5 +35,8 @@ return [
         'region' => 'khu vực giao hàng', 'message' => 'lời chúc', 'quantity' => 'số lượng',
         'variant_id' => 'phiên bản bánh', 'status' => 'trạng thái', 'note' => 'ghi chú',
         'min' => 'giá từ', 'max' => 'giá đến', 'category_id' => 'danh mục',
+        'date' => 'ngày nhận bánh', 'slots.*' => 'khung giờ', 'slot_limits.*' => 'số đơn tối đa',
+        'code' => 'mã đơn hoặc mã giảm giá', 'bank_due_minutes' => 'thời hạn chuyển khoản',
+        'reason' => 'loại thay đổi tồn kho', 'product' => 'sản phẩm', 'variants.*.stock_note' => 'lý do thay đổi tồn',
     ],
 ];

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\Catalog;
+use App\Services\Inventory;
 use App\Services\Store;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -38,6 +39,31 @@ class AdminCatalog extends Controller
         return Inertia::render('AdminProduct', ['product' => $row, 'categories' => DB::table('categories')->orderBy('id')->get()]);
     }
 
+    public function inventory(Request $request)
+    {
+        $filters = $request->validate([
+            'reason' => ['nullable', Rule::in(array_keys(Inventory::REASONS))],
+            'product' => 'nullable|integer|exists:products,id',
+        ]);
+        $product = isset($filters['product']) ? DB::table('products')->find($filters['product'], ['id', 'name']) : null;
+        $movements = DB::table('stock_movements as moves')
+            ->join('variants', 'variants.id', '=', 'moves.variant_id')
+            ->join('products', 'products.id', '=', 'variants.product_id')
+            ->leftJoin('orders', 'orders.id', '=', 'moves.order_id')
+            ->leftJoin('users', 'users.id', '=', 'moves.actor_id')
+            ->when($product, fn ($query) => $query->where('products.id', $product->id))
+            ->when($filters['reason'] ?? null, fn ($query, $reason) => $query->where('moves.reason', $reason))
+            ->orderByDesc('moves.created_at')->orderByDesc('moves.id')
+            ->paginate(20, [
+                'moves.*', 'products.id as product_id', 'products.name as product_name', 'variants.name as variant_name',
+                'orders.code as order_code', 'users.name as actor',
+            ])->withQueryString();
+
+        return Inertia::render('AdminInventory', [
+            'movements' => $movements, 'filters' => $filters, 'reasons' => Inventory::REASONS, 'product' => $product,
+        ])->toResponse($request)->header('Cache-Control', 'private, no-store');
+    }
+
     public function save(Request $request, ?int $product = null)
     {
         $data = $request->validate([
@@ -47,14 +73,16 @@ class AdminCatalog extends Controller
             'active' => 'required|boolean', 'featured' => 'required|boolean', 'customizable' => 'required|boolean',
             'uploads' => 'nullable|array|max:5', 'uploads.*' => self::IMAGE_RULES,
             'removed' => 'nullable|array|max:5', 'removed.*' => 'string|max:255',
-            'variants' => 'required|array|min:1|max:30', 'variants.*' => 'required|array:id,name,price,stock,expected_stock,active',
+            'variants' => 'required|array|min:1|max:30', 'variants.*' => 'required|array:id,name,price,stock,expected_stock,active,stock_note',
             'variants.*.id' => 'nullable|integer|distinct', 'variants.*.name' => 'required|string|max:100',
             'variants.*.price' => 'required|integer|min:0|max:100000000',
             'variants.*.stock' => 'required|integer|min:0|max:1000000', 'variants.*.expected_stock' => 'nullable|integer|min:0',
             'variants.*.active' => 'required|boolean',
+            'variants.*.stock_note' => 'nullable|string|max:250',
         ]);
 
-        $id = DB::transaction(function () use ($data, $product) {
+        $actorId = $request->user()->id;
+        $id = DB::transaction(function () use ($data, $product, $actorId) {
             Store::settings(lock: true);
             $existing = $product ? DB::table('products')->find($product) : null;
             abort_if($product && ! $existing, 404);
@@ -95,12 +123,17 @@ class AdminCatalog extends Controller
             foreach ($data['variants'] as $variant) {
                 $fields = array_intersect_key($variant, array_flip(['name', 'price', 'active', 'stock']));
                 if (! empty($variant['id'])) {
-                    if ((int) $variant['stock'] === (int) $variant['expected_stock']) {
+                    $id = (int) $variant['id'];
+                    $after = (int) $variant['stock'];
+                    if ($after === (int) $variant['expected_stock']) {
                         unset($fields['stock']);
+                    } else {
+                        Inventory::record($id, (int) $previous->get($id)->stock, $after, 'manual', actorId: $actorId, note: $variant['stock_note'] ?? null);
                     }
-                    DB::table('variants')->where('id', $variant['id'])->update($fields);
+                    DB::table('variants')->where('id', $id)->update($fields);
                 } else {
-                    DB::table('variants')->insert($fields + ['product_id' => $product]);
+                    $id = DB::table('variants')->insertGetId($fields + ['product_id' => $product]);
+                    Inventory::record($id, 0, (int) $variant['stock'], 'initial', actorId: $actorId, note: $variant['stock_note'] ?? null);
                 }
             }
 

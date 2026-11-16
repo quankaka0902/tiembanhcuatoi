@@ -181,6 +181,7 @@ input[type=file]::file-selector-button { padding: 4px 9px; border-radius: 5px; b
 .auth-card p { color: var(--muted); }
 .auth-card .category-icon { width: 61px; height: 61px; }
 .auth-card .button { width: 100%; }
+.tracking-recovery { border-top: 1px solid var(--border); margin-top: 4px; padding-top: 16px; }
 .auth-links { display: flex; justify-content: space-between; gap: 8px; color: var(--berry); font-weight: 700; }
 .auth-back { justify-self: start; }
 .pill { display: inline-flex; width: fit-content; border-radius: 99px; padding: 3px 9px; background: #f2eaf7; color: #5f3b75; white-space: nowrap; font-size: 12px; font-weight: 700; }
@@ -228,10 +229,20 @@ td small { display: block; color: var(--muted); }
 .category-edit { margin-top: 10px; }
 .variant-edit { display: grid; grid-template-columns: minmax(130px, 1.3fr) repeat(2, minmax(90px, 1fr)) minmax(80px, auto) auto; gap: 10px; align-items: end; background: #fcf7f9; padding: 10px; border-radius: 10px; }
 .variant-edit .checkbox, .variant-edit .text-action { min-height: 42px; }
+.variant-edit .stock-note { grid-column: 1 / -1; }
+.report-totals { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .admin-images label { width: 85px; display: grid; gap: 3px; }
 .admin-images img { width: 85px; height: 75px; border-radius: 8px; }
 .logo-preview { width: 72px; height: 72px; object-fit: contain; }
 .weekdays { display: flex; flex-wrap: wrap; gap: 9px; }
+.slot-edit { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 10px; align-items: end; }
+.slot-edit button { min-height: 42px; padding-inline: 6px; }
+.schedule-filters { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px; }
+.schedule-list { margin-top: 15px; }
+.schedule-slot .section-head { flex-wrap: wrap; }
+.schedule-columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 16px; }
+.schedule-order { padding: 12px; border: 1px solid var(--border); border-radius: 12px; overflow-wrap: anywhere; }
+.schedule-order li:last-child { border-bottom: 0; padding-bottom: 0; }
 
 @media (max-width: 1000px) {
     .desktop-nav { gap: 19px; }
@@ -282,6 +293,7 @@ td small { display: block; color: var(--muted); }
     .admin-heading { flex-wrap: wrap; }
     .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .variant-edit { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .schedule-columns { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 435px) {
     .brand { font-size: 18px; gap: 7px; }

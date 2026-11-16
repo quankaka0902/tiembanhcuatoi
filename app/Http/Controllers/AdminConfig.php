@@ -27,6 +27,7 @@ class AdminConfig extends Controller
             'logo' => 'nullable|'.AdminCatalog::IMAGE_RULES, 'remove_logo' => 'required|boolean',
             'weekdays' => 'required|array|min:1|max:7', 'weekdays.*' => 'integer|distinct|between:1,7',
             'slots' => 'required|array|min:1|max:48', 'slots.*' => 'required|date_format:H:i|distinct',
+            'slot_limits' => 'nullable|array|max:48', 'slot_limits.*' => 'nullable|integer|min:1|max:1000',
             'closed_dates' => 'nullable|array|max:100', 'closed_dates.*' => 'required|date_format:Y-m-d|distinct',
             'regions' => 'nullable|array|max:50', 'regions.*' => 'required|array:key,name,fee',
             'regions.*.key' => 'required|alpha_dash:ascii|max:60|distinct', 'regions.*.name' => 'required|string|max:100',
@@ -34,14 +35,22 @@ class AdminConfig extends Controller
             'bank_name' => 'nullable|required_with:bank_holder,bank_account|string|max:100',
             'bank_account' => 'nullable|required_with:bank_name,bank_holder|string|max:40',
             'bank_holder' => 'nullable|required_with:bank_name,bank_account|string|max:100', 'bank_demo' => 'required|boolean',
+            'bank_due_minutes' => 'sometimes|required|integer|min:1|max:1440',
         ]);
-        DB::transaction(function () use ($fields, $catalog) {
+        $slotTimes = array_flip($fields['slots']);
+        if (array_diff_key($fields['slot_limits'] ?? [], $slotTimes)) {
+            throw ValidationException::withMessages(['slot_limits' => 'Chỉ đặt giới hạn cho khung giờ có trong lịch nhận bánh.']);
+        }
+        DB::transaction(function () use ($fields, $catalog, $slotTimes) {
             $current = Store::settings(lock: true);
             $logo = isset($fields['logo']) ? $catalog->uploadedImage($fields['logo']) : ($fields['remove_logo'] ? null : $current['logo']);
+            $limits = array_filter(array_intersect_key($fields['slot_limits'] ?? $current['slot_limits'], $slotTimes));
             unset($fields['remove_logo']);
             $settings = array_replace($current, $fields, [
                 'logo' => $logo, 'weekdays' => array_map('intval', $fields['weekdays']),
+                'slot_limits' => array_map('intval', $limits),
                 'closed_dates' => $fields['closed_dates'] ?? [], 'regions' => $fields['regions'] ?? [],
+                'bank_due_minutes' => (int) ($fields['bank_due_minutes'] ?? $current['bank_due_minutes']),
                 'bank_demo' => (bool) $fields['bank_demo'],
             ]);
             DB::table('store_settings')->where('id', 1)->update(['data' => json_encode($settings, JSON_THROW_ON_ERROR)]);

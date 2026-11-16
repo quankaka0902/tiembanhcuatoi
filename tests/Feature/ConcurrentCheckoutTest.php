@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Services\Store;
 use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -47,13 +48,26 @@ class ConcurrentCheckoutTest extends TestCase
         $this->assertDatabaseCount('orders', 8);
     }
 
-    private function race(?string $coupon, bool $sameKey = false): array
+    public function test_simultaneous_pickup_and_delivery_cannot_take_the_same_last_slot(): void
+    {
+        $settings = Store::settings();
+        $settings['slot_limits'] = ['09:00' => 1];
+        DB::table('store_settings')->update(['data' => json_encode($settings)]);
+        $slot = now()->addDays(2)->toDateString().' 09:00';
+
+        $this->assertSame(['created', 'slot'], $this->race(null, slot: $slot, secondFulfillment: 'delivery'));
+        $this->assertSame(1, DB::table('orders')->where('scheduled_at', $slot.':00')->count());
+        $this->assertDatabaseHas('variants', ['id' => 1, 'stock' => 14]);
+    }
+
+    private function race(?string $coupon, bool $sameKey = false, string $slot = '', string $secondFulfillment = 'pickup'): array
     {
         $key = (string) Str::uuid();
         for ($i = 0; $i < 2; $i++) {
             $inputs[$i] = new InputStream;
             $processes[$i] = new Process([
                 PHP_BINARY, 'tests/Support/checkout_worker.php', $sameKey ? $key : (string) Str::uuid(), $coupon ?? '',
+                $slot, $i === 0 ? 'pickup' : $secondFulfillment,
             ], base_path(), [
                 'APP_ENV' => 'testing', 'DB_CONNECTION' => 'mysql', 'DB_DATABASE' => DB::getDatabaseName(),
                 'DB_HOST' => config('database.connections.mysql.host'), 'DB_PORT' => config('database.connections.mysql.port'),

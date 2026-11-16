@@ -96,13 +96,15 @@ class DatabaseSeeder extends Seeder
                 $product = DB::table('products')->find($variant->product_id);
                 $fee = $status === 'shipping' ? 25000 : 0;
                 $date = now()->subDays($index);
+                $scheduledAt = $date->copy()->addDay()->setTime(14, 0)->toDateTimeString();
                 $id = DB::table('orders')->insertGetId([
                     'code' => 'NB-DEMO00'.($index + 1), 'tracking_token' => bin2hex(random_bytes(32)), 'request_key' => bin2hex(random_bytes(32)),
                     'name' => $customer->name, 'email' => $customer->email, 'phone' => '0900123456', 'user_id' => $customer->id,
                     'fulfillment' => $fee ? 'delivery' : 'pickup', 'address' => $fee ? '24 Nguyễn Thiệp' : null,
-                    'region_label' => $fee ? 'Quận 1' : null, 'scheduled_at' => $date->copy()->addDay()->setTime(14, 0),
+                    'region_label' => $fee ? 'Quận 1' : null, 'scheduled_at' => $scheduledAt,
                     'status' => $status, 'method' => $method, 'payment' => $payment,
                     'bank_snapshot' => $method === 'bank' ? json_encode(Store::bank($settings), JSON_THROW_ON_ERROR) : null,
+                    'bank_due_at' => $method === 'bank' ? Orders::bankDueAt($date, $scheduledAt, $settings['bank_due_minutes']) : null,
                     'subtotal' => $variant->price, 'delivery_fee' => $fee, 'total' => $variant->price + $fee,
                     'completed_at' => $status === 'completed' ? $date : null, 'paid_at' => $payment === 'paid' ? $date : null,
                     'stock_restored_at' => $status === 'cancelled' ? $date : null,

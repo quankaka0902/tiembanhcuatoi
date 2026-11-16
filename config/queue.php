@@ -43,6 +43,14 @@ return [
             'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 90),
             'after_commit' => false,
         ],
+        'order-mail' => [
+            'driver' => 'database',
+            // Use the same connection as orders so their updates and jobs commit together.
+            'table' => 'jobs',
+            'queue' => 'order-mail',
+            'retry_after' => 120,
+            'after_commit' => false,
+        ],
 
         'beanstalkd' => [
             'driver' => 'beanstalkd',

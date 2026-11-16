@@ -2,9 +2,14 @@
 
 namespace App\Services;
 
+use App\Jobs\SendOrderEmail;
 use App\Models\User;
+use Carbon\CarbonInterface;
+use Illuminate\Database\Query\Builder;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use RuntimeException;
 
 class Orders
 {
@@ -14,6 +19,16 @@ class Orders
     ];
 
     public const PAYMENTS = ['unpaid' => 'Chưa thanh toán', 'paid' => 'Đã thanh toán', 'refunded' => 'Đã hoàn tiền'];
+
+    public static function scheduled(): Builder
+    {
+        return DB::table('orders')->where('status', '<>', 'cancelled');
+    }
+
+    public static function bankDueAt(CarbonInterface $createdAt, string $scheduledAt, int $minutes): string
+    {
+        return min($createdAt->toImmutable()->addMinutes($minutes)->toDateTimeString(), $scheduledAt);
+    }
 
     public static function next(object $order): array
     {
@@ -64,8 +79,12 @@ class Orders
                     $update['completed_at'] = now();
                 }
                 if ($value === 'cancelled' && ! $order->stock_restored_at) {
-                    foreach (DB::table('order_items')->where('order_id', $id)->orderBy('variant_id')->get() as $item) {
-                        DB::table('variants')->where('id', $item->variant_id)->increment('stock', $item->quantity);
+                    $quantities = DB::table('order_items')->where('order_id', $id)->groupBy('variant_id')->orderBy('variant_id')
+                        ->selectRaw('variant_id, SUM(quantity) AS quantity')->get();
+                    foreach ($quantities as $item) {
+                        if (! Inventory::move($item->variant_id, (int) $item->quantity, 'cancel', actorId: $actor->id, orderId: $id)) {
+                            throw new RuntimeException('Cannot restore inventory for variant '.$item->variant_id);
+                        }
                     }
                     if ($order->coupon_id) {
                         DB::table('coupons')->where('id', $order->coupon_id)->where('used', '>', 0)->decrement('used');
@@ -75,6 +94,9 @@ class Orders
                 DB::table('orders')->where('id', $id)->update($update);
             }
             self::event($id, $actor->id, $fields['kind'], $value, $fields['note'] ?? null);
+            if ($fields['kind'] === 'status' && in_array($value, SendOrderEmail::STATUS_UPDATES, true)) {
+                Bus::dispatch(new SendOrderEmail($id, $value));
+            }
         }, 5);
     }
 
@@ -98,7 +120,7 @@ class Orders
         if (! $internal) {
             $data = array_intersect_key($data, array_flip([
                 'code', 'fulfillment', 'address', 'region_label', 'scheduled_at',
-                'method', 'payment', 'status', 'subtotal', 'discount', 'delivery_fee', 'total',
+                'method', 'payment', 'status', 'subtotal', 'discount', 'delivery_fee', 'total', 'bank_due_at',
             ]));
         }
         $data['bank_snapshot'] = $order->bank_snapshot ? json_decode($order->bank_snapshot, true, flags: JSON_THROW_ON_ERROR) : null;

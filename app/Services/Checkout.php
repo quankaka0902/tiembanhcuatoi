@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -10,11 +11,7 @@ class Checkout
 {
     public function cart(array $cart): array
     {
-        $variants = DB::table('variants')->join('products', 'products.id', '=', 'variants.product_id')
-            ->whereIn('variants.id', array_column($cart, 'variant_id'))
-            ->select('variants.*', 'products.name as product_name', 'products.active as product_active',
-                'products.slug', 'products.images', 'products.prep_minutes', 'products.customizable', 'products.message_fee')
-            ->get()->keyBy('id');
+        $variants = $this->cartVariants(array_column($cart, 'variant_id'));
 
         $choices = DB::table('variants')->whereIn('product_id', $variants->pluck('product_id'))
             ->where('active', true)->orderBy('id')->get(['id', 'name', 'price', 'stock', 'product_id'])->groupBy('product_id');
@@ -43,6 +40,43 @@ class Checkout
         })->values()->all();
     }
 
+    public function reorder(array $cart, Collection $items): array
+    {
+        $variants = $this->cartVariants($items->pluck('variant_id')->all());
+        $inCart = collect($cart)->groupBy('variant_id')->map(fn ($lines) => $lines->sum('quantity'));
+        $added = 0;
+
+        foreach ($items as $item) {
+            $variant = $variants->get($item->variant_id);
+            if (! $variant?->active || ! $variant->product_active || count($cart) >= 30) {
+                continue;
+            }
+
+            $alreadyInCart = $inCart->get($item->variant_id, 0);
+            $quantity = min($item->quantity, 30, $variant->stock - $alreadyInCart);
+            if ($quantity <= 0) {
+                continue;
+            }
+
+            $cart[(string) Str::uuid()] = [
+                'variant_id' => (int) $item->variant_id, 'quantity' => $quantity, 'message' => null, 'note' => null,
+            ];
+            $inCart->put($item->variant_id, $alreadyInCart + $quantity);
+            $added += $quantity;
+        }
+
+        return [$cart, $added, $items->sum('quantity') - $added];
+    }
+
+    private function cartVariants(array $ids): Collection
+    {
+        return DB::table('variants')->join('products', 'products.id', '=', 'variants.product_id')
+            ->whereIn('variants.id', $ids)
+            ->select('variants.*', 'products.name as product_name', 'products.active as product_active',
+                'products.slug', 'products.images', 'products.prep_minutes', 'products.customizable', 'products.message_fee')
+            ->get()->keyBy('id');
+    }
+
     public function slots(array $settings, int $prepMinutes): array
     {
         $now = now();
@@ -53,7 +87,7 @@ class Checkout
 
         for ($days = 0; $days < 14; $days++) {
             $day = $now->copy()->startOfDay()->addDays($days);
-            if (! in_array($day->dayOfWeekIso, $settings['weekdays'], true) || in_array($day->toDateString(), $settings['closed_dates'], true)) {
+            if (! Store::openOn($settings, $day)) {
                 continue;
             }
 
@@ -66,6 +100,30 @@ class Checkout
         }
 
         return $result;
+    }
+
+    public function availableSlots(array $settings, int $prepMinutes): array
+    {
+        $slots = $this->slots($settings, $prepMinutes);
+        $limits = $settings['slot_limits'];
+        $limitedTimes = [];
+        foreach ($slots as $slot) {
+            if (isset($limits[substr($slot, 11)])) {
+                $limitedTimes[] = $slot.':00';
+            }
+        }
+        if (! $limitedTimes) {
+            return $slots;
+        }
+
+        $booked = Orders::scheduled()->whereIn('scheduled_at', $limitedTimes)
+            ->groupBy('scheduled_at')->selectRaw('scheduled_at, COUNT(*) AS booked')->pluck('booked', 'scheduled_at');
+
+        return array_values(array_filter($slots, function (string $slot) use ($booked, $limits) {
+            $limit = $limits[substr($slot, 11)] ?? null;
+
+            return $limit === null || ($booked[$slot.':00'] ?? 0) < $limit;
+        }));
     }
 
     public function quote(array $lines, array $fields, array $settings, bool $lock = false): array
@@ -125,8 +183,14 @@ class Checkout
             $lines = $this->cart($cart);
             $quote = $this->quote($lines, $fields, $settings, lock: true);
 
-            if (! in_array($fields['slot'], $this->slots($settings, max(array_column($lines, 'prep_minutes'))), true)) {
+            $slot = $fields['slot'];
+            if (! in_array($slot, $this->slots($settings, max(array_column($lines, 'prep_minutes'))), true)) {
                 $this->invalid('slot', 'Giờ nhận không còn phù hợp với lịch mở cửa hoặc thời gian làm bánh.');
+            }
+            $scheduledAt = $slot.':00';
+            $limit = $settings['slot_limits'][substr($slot, 11)] ?? null;
+            if ($limit !== null && Orders::scheduled()->where('scheduled_at', $scheduledAt)->count() >= $limit) {
+                $this->invalid('slot', 'Khung giờ vừa hết chỗ. Vui lòng chọn giờ khác.');
             }
 
             $bank = $fields['method'] === 'bank' ? Store::bank($settings) : null;
@@ -134,24 +198,27 @@ class Checkout
                 $this->invalid('method', 'Cửa hàng chưa mở thanh toán chuyển khoản.');
             }
 
-            $code = 'NB-'.now()->format('ymd').'-'.strtoupper(bin2hex(random_bytes(5)));
+            $createdAt = now();
+            $code = 'NB-'.$createdAt->format('ymd').'-'.strtoupper(bin2hex(random_bytes(5)));
             $id = DB::table('orders')->insertGetId([
                 ...$quote,
                 'code' => $code, 'request_key' => $requestKey, 'tracking_token' => bin2hex(random_bytes(32)),
                 'user_id' => $userId, 'name' => $fields['name'], 'email' => $fields['email'], 'phone' => $fields['phone'],
                 'fulfillment' => $fields['fulfillment'], 'address' => $fields['fulfillment'] === 'delivery' ? $fields['address'] : null,
-                'scheduled_at' => $fields['slot'].':00', 'method' => $fields['method'],
+                'scheduled_at' => $scheduledAt, 'method' => $fields['method'],
                 'bank_snapshot' => $bank ? json_encode($bank, JSON_THROW_ON_ERROR) : null,
-                'created_at' => now(), 'updated_at' => now(),
+                'bank_due_at' => $bank ? Orders::bankDueAt($createdAt, $scheduledAt, $settings['bank_due_minutes']) : null,
+                'created_at' => $createdAt, 'updated_at' => $createdAt,
             ]);
 
-            foreach ($lines as $line) {
-                $reserved = DB::table('variants')->where('id', $line['variant_id'])->where('stock', '>=', $line['quantity'])
-                    ->decrement('stock', $line['quantity']);
-                if (! $reserved) {
+            $quantities = collect($lines)->groupBy('variant_id')->map(fn (Collection $items) => $items->sum('quantity'));
+            foreach ($quantities->sortKeys() as $variantId => $quantity) {
+                if (! Inventory::move($variantId, -$quantity, 'order', orderId: $id)) {
                     $this->invalid('cart', 'Bánh đã hết hoặc không còn đủ số lượng.');
                 }
+            }
 
+            foreach ($lines as $line) {
                 DB::table('order_items')->insert([
                     ...array_intersect_key($line, array_flip(['variant_id', 'product_name', 'variant_name', 'unit_price', 'option_fee', 'quantity', 'message', 'note'])),
                     'order_id' => $id,

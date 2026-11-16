@@ -8,11 +8,16 @@ use App\Services\Store;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Mail\Events\MessageSending;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Exceptions;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
+use RuntimeException;
 use Tests\TestCase;
 
 class BakeryTest extends TestCase
@@ -95,6 +100,70 @@ class BakeryTest extends TestCase
         $this->assertDatabaseCount('orders', $count);
     }
 
+    public function test_pickup_and_delivery_share_a_slot_limit_and_cancellation_reopens_it(): void
+    {
+        $settings = Store::settings();
+        $settings['slot_limits'] = ['11:00' => 1];
+        DB::table('store_settings')->update(['data' => json_encode($settings)]);
+
+        $variant = $this->variant();
+        $pickup = $this->cartAndFields($variant);
+        $first = $this->post('/dat-banh', $pickup)->assertSessionHasNoErrors();
+        $order = DB::table('orders')->latest('id')->first();
+        $this->assertSame('2026-11-15 11:00:00', $order->scheduled_at);
+        $this->post('/dat-banh', $pickup)->assertRedirect($first->headers->get('Location'));
+
+        $delivery = array_replace($this->cartAndFields($variant), [
+            'fulfillment' => 'delivery', 'region' => 'quan-1', 'address' => 'Địa chỉ giao thử nghiệm',
+        ]);
+        $this->get('/dat-banh')->assertInertia(fn (Assert $page) => $page->where('slots', fn ($slots) => ! $slots->contains($pickup['slot'])
+            && $slots->contains('2026-11-15 14:00') && $slots->contains('2026-11-16 11:00')));
+        $this->from('/dat-banh')->post('/dat-banh', $delivery)->assertRedirect('/dat-banh')->assertSessionHasErrors('slot');
+        $this->assertDatabaseHas('variants', ['id' => $variant->id, 'stock' => $variant->stock - 1]);
+
+        $this->actingAs($this->account('nhanvien'))->patch('/quan-tri/don-hang/'.$order->id, ['kind' => 'status', 'value' => 'cancelled'])
+            ->assertSessionHasNoErrors();
+        $this->actingAs($this->account('khach'))->get('/dat-banh')->assertInertia(fn (Assert $page) => $page
+            ->where('slots', fn ($slots) => $slots->contains($pickup['slot'])));
+        $this->post('/dat-banh', $delivery)->assertSessionHasNoErrors();
+        $this->assertSame(1, DB::table('orders')->where('scheduled_at', $order->scheduled_at)->where('status', '!=', 'cancelled')->count());
+        $this->assertDatabaseHas('orders', ['scheduled_at' => $order->scheduled_at, 'fulfillment' => 'delivery']);
+    }
+
+    public function test_staff_schedule_uses_fulfillment_date_and_keeps_order_details(): void
+    {
+        $variant = $this->variant();
+        foreach ([['Chúc mừng sinh nhật', 2], ['Mừng tốt nghiệp', 1]] as [$message, $quantity]) {
+            $fields = $this->cartAndFields($variant, $message, $quantity);
+            $this->post('/dat-banh', $fields)->assertSessionHasNoErrors();
+        }
+        $secondOrder = DB::table('orders')->where('request_key', hash('sha256', $fields['key']))->first();
+        DB::table('order_items')->where('order_id', $secondOrder->id)->update(['note' => 'Gói hộp riêng']);
+        DB::table('orders')->where('code', 'NB-DEMO007')->update(['scheduled_at' => '2026-11-15 11:00:00']);
+        DB::table('variants')->where('id', $variant->id)->update(['name' => 'Đã đổi tên']);
+        $settings = Store::settings();
+        $settings['closed_dates'] = ['2026-11-15'];
+        $settings['slot_limits'] = ['11:00' => 2];
+        DB::table('store_settings')->update(['data' => json_encode($settings)]);
+
+        $url = '/quan-tri/lich-lam-banh';
+        $this->get($url)->assertRedirect('/dang-nhap');
+        $this->actingAs($this->account('khach'))->get($url)->assertForbidden();
+        $this->actingAs($this->account('nhanvien'))->get($url)
+            ->assertHeader('Cache-Control', 'no-store, private')
+            ->assertInertia(fn (Assert $page) => $page->component('AdminSchedule')
+                ->where('date', '2026-11-15')->where('tomorrow', '2026-11-16')
+                ->where('orderCount', 3)->where('cakeCount', 4)->has('schedule', 2)
+                ->where('schedule.0.time', '11:00')->where('schedule.0.limit', 2)
+                ->has('schedule.0.products', 1)->where('schedule.0.products.0.quantity', 3)
+                ->where('schedule.0.products.0.variant_name', $variant->name)
+                ->has('schedule.0.orders', 2)->where('schedule.0.orders.0.items.0.message', 'Chúc mừng sinh nhật')
+                ->where('schedule.0.orders.1.items.0.note', 'Gói hộp riêng')
+                ->missing('schedule.0.orders.0.phone')->where('schedule.1.orders.0.code', 'NB-DEMO002'));
+        $this->get($url.'?date=2026-11-16')->assertInertia(fn (Assert $page) => $page
+            ->where('date', '2026-11-16')->where('orderCount', 1));
+    }
+
     public function test_cancel_restores_stock_and_coupon_exactly_once(): void
     {
         DB::table('coupons')->where('code', 'NHAMINH10')->update(['usage_limit' => 1]);
@@ -138,6 +207,114 @@ class BakeryTest extends TestCase
         }
         $this->get('/tra-cuu/'.$order->tracking_token)->assertInertia(fn (Assert $page) => $page->where('order.status', 'completed')->where('order.payment', 'paid'));
         $this->assertDatabaseHas('order_events', ['order_id' => $order->id, 'actor_id' => $this->account('doisoat')->id, 'kind' => 'payment', 'value' => 'paid']);
+        $this->assertDatabaseCount('jobs', 2);
+    }
+
+    public function test_bank_deadlines_filter_and_allow_late_reconciliation(): void
+    {
+        $variant = $this->variant();
+        $createBankOrder = function () use ($variant) {
+            $fields = array_replace($this->cartAndFields($variant), ['method' => 'bank']);
+            $this->post('/dat-banh', $fields)->assertSessionHasNoErrors();
+
+            return DB::table('orders')->latest('id')->first();
+        };
+        $first = $createBankOrder();
+        $this->assertSame('2026-11-15 09:00:00', $first->bank_due_at);
+        $this->get('/tra-cuu/'.$first->tracking_token)->assertInertia(fn (Assert $page) => $page->where('order.bank_due_at', $first->bank_due_at));
+
+        $settings = array_replace(Store::settings(), ['bank_due_minutes' => 240]);
+        DB::table('store_settings')->where('id', 1)->update(['data' => json_encode($settings, JSON_THROW_ON_ERROR)]);
+        $second = $createBankOrder();
+        $this->assertSame($second->scheduled_at, $second->bank_due_at);
+        $this->assertSame($first->bank_due_at, DB::table('orders')->where('id', $first->id)->value('bank_due_at'));
+
+        DB::table('orders')->where('code', 'NB-DEMO001')->update(['status' => 'cancelled']);
+        $this->travel(1)->hour();
+        $queue = '/quan-tri/doi-soat';
+        $this->get($queue)->assertRedirect('/dang-nhap');
+        $this->actingAs($this->account('khach'))->get($queue)->assertForbidden();
+        $this->actingAs($this->account('nhanvien'))->get($queue)->assertInertia(fn (Assert $page) => $page
+            ->component('AdminReconciliation')->where('orders.total', 2)
+            ->where('orders.data.0.code', $first->code)->where('orders.data.0.overdue', true)
+            ->where('orders.data.1.code', $second->code)->where('orders.data.1.overdue', false));
+        $overdue = $queue.'?filter=overdue';
+        $this->get($overdue)->assertInertia(fn (Assert $page) => $page
+            ->where('filter', 'overdue')->where('orders.total', 1)->where('orders.data.0.code', $first->code));
+        $payment = ['kind' => 'payment', 'value' => 'paid'];
+        $order = '/quan-tri/don-hang/'.$first->id;
+        $this->patch($order, $payment)->assertForbidden();
+        $this->actingAs($this->account('doisoat'))->patch($order, $payment)->assertSessionHasNoErrors();
+        $this->get($overdue)->assertInertia(fn (Assert $page) => $page->where('orders.total', 0));
+    }
+
+    public function test_status_email_is_queued_transactionally_and_retried_after_mail_failure(): void
+    {
+        $order = DB::table('orders')->where('code', 'NB-DEMO001')->first();
+        $this->actingAs($this->account('nhanvien'));
+        $url = '/quan-tri/don-hang/'.$order->id;
+        $change = ['kind' => 'status', 'value' => 'confirmed'];
+        DB::beginTransaction();
+        try {
+            $this->patch($url, $change)->assertSessionHasNoErrors();
+            $this->assertDatabaseCount('jobs', 1);
+        } finally {
+            DB::rollBack();
+        }
+        $this->assertDatabaseHas('orders', ['id' => $order->id, 'status' => 'pending']);
+        $this->assertDatabaseCount('jobs', 0);
+
+        $this->patch($url, $change)->assertSessionHasNoErrors();
+        $this->patch($url, $change)->assertSessionHasErrors('value');
+        $this->assertDatabaseCount('jobs', 1);
+        Exceptions::fake();
+        Event::listen(MessageSending::class, fn () => throw new RuntimeException('Lỗi mail mẫu'));
+        $this->runOrderMailWorker();
+        $this->assertDatabaseHas('jobs', ['queue' => 'order-mail', 'attempts' => 1]);
+        $this->assertDatabaseHas('orders', ['id' => $order->id, 'status' => 'confirmed']);
+        $messages = Mail::mailer('array')->getSymfonyTransport()->messages();
+        $this->assertCount(0, $messages);
+
+        Event::forget(MessageSending::class);
+        $this->travel(31)->seconds();
+        $this->runOrderMailWorker();
+        $this->assertDatabaseCount('jobs', 0);
+        $mail = $messages->sole()->getOriginalMessage();
+        $this->assertSame($order->email, $mail->getTo()[0]->getAddress());
+        $this->assertStringContainsString('Đã xác nhận', $mail->getTextBody());
+        $this->assertStringContainsString(route('tracking.show', $order->tracking_token), $mail->getTextBody());
+
+        $this->patch($url, ['kind' => 'status', 'value' => 'preparing'])->assertSessionHasNoErrors();
+        $this->assertDatabaseCount('jobs', 0);
+        $this->patch($url, ['kind' => 'status', 'value' => 'ready'])->assertSessionHasNoErrors();
+        $this->runOrderMailWorker();
+        $this->assertCount(2, $messages);
+        $this->assertStringContainsString('Sẵn sàng nhận', $messages->last()->getOriginalMessage()->getTextBody());
+    }
+
+    public function test_resend_tracking_is_neutral_rate_limited_and_uses_stored_recipient(): void
+    {
+        $order = DB::table('orders')->where('code', 'NB-DEMO001')->first();
+        $route = '/tra-cuu/gui-lai';
+        $notice = 'Nếu mã đơn và email trùng khớp, tiệm sẽ gửi liên kết tra cứu đến email đã đặt đơn.';
+        foreach ([
+            [$order->code, 'different@example.test'],
+            ['NB-NOORDR', $order->email],
+            [strtolower($order->code), strtoupper($order->email)],
+            [$order->code, 'wrong@example.test'],
+        ] as [$code, $email]) {
+            $this->post($route, compact('code', 'email'))->assertRedirect('/tra-cuu')->assertSessionHas('notice', $notice);
+        }
+        $this->assertDatabaseCount('jobs', 1);
+        $this->withServerVariables(['REMOTE_ADDR' => '192.0.2.1'])
+            ->post($route, ['code' => $order->code, 'email' => $order->email])->assertTooManyRequests();
+        $this->assertDatabaseCount('jobs', 1);
+
+        $this->runOrderMailWorker();
+        $this->assertDatabaseCount('jobs', 0);
+        $mail = Mail::mailer('array')->getSymfonyTransport()->messages()->sole()->getOriginalMessage();
+        $this->assertSame($order->email, $mail->getTo()[0]->getAddress());
+        $this->assertStringContainsString(route('tracking.show', $order->tracking_token), $mail->getTextBody());
     }
 
     public function test_owner_only_history_and_admin_export_filter(): void
@@ -153,6 +330,123 @@ class BakeryTest extends TestCase
         $export = $this->get('/quan-tri/don-hang/xuat?status=completed')->assertDownload('don-banh-2026-11-15.csv');
         $this->assertStringContainsString('NB-DEMO006', $export->streamedContent());
         $this->assertStringNotContainsString('NB-DEMO005', $export->streamedContent());
+    }
+
+    public function test_reorder_requires_ownership_and_adds_only_available_stock_at_current_price(): void
+    {
+        $order = DB::table('orders')->where('code', 'NB-DEMO001')->first();
+        $url = '/don-cua-toi/'.$order->code;
+        $this->post($url.'/mua-lai')->assertRedirect('/dang-nhap');
+        $this->actingAs(User::factory()->create())->post($url.'/mua-lai')->assertNotFound();
+        $this->get('/tra-cuu/'.$order->tracking_token)->assertInertia(fn (Assert $page) => $page->where('canReorder', false));
+
+        $variant = $this->variant();
+        $unavailable = DB::table('variants')->where('product_id', $variant->product_id)->where('id', '<>', $variant->id)->first();
+        DB::table('variants')->where('id', $variant->id)->update(['stock' => 3, 'price' => 415000]);
+        DB::table('variants')->where('id', $unavailable->id)->update(['active' => false]);
+        DB::table('order_items')->where('order_id', $order->id)->update(['quantity' => 3, 'message' => 'Lời chúc đơn cũ']);
+        DB::table('order_items')->insert([
+            'order_id' => $order->id, 'variant_id' => $unavailable->id, 'quantity' => 1,
+            'product_name' => 'Bánh Kem Dâu', 'variant_name' => $unavailable->name, 'unit_price' => 490000,
+        ]);
+
+        $this->actingAs($this->account('khach'))->get($url)->assertInertia(fn (Assert $page) => $page->where('canReorder', true));
+        $this->post('/gio-hang', ['variant_id' => $variant->id, 'quantity' => 1, 'message' => 'Lời chúc trong giỏ'])->assertSessionHasNoErrors();
+        $key = session('checkout_key');
+        $this->post($url.'/mua-lai')->assertRedirect('/gio-hang')
+            ->assertSessionHas('notice', fn ($notice) => str_starts_with($notice, 'Đã thêm 2 bánh vào giỏ') && str_contains($notice, '2 bánh chưa thể thêm'));
+        $this->assertNotSame($key, session('checkout_key'));
+        $this->get('/gio-hang')->assertInertia(fn (Assert $page) => $page->has('lines', 2)
+            ->where('lines.0.quantity', 1)->where('lines.0.message', 'Lời chúc trong giỏ')->where('lines.0.available', true)
+            ->where('lines.1.quantity', 2)->where('lines.1.variant_id', $variant->id)->where('lines.1.unit_price', 415000)
+            ->where('lines.1.message', null)->where('lines.1.option_fee', 0)->where('lines.1.available', true));
+        $key = session('checkout_key');
+        $this->from($url)->post($url.'/mua-lai')->assertRedirect($url)->assertSessionHas('notice');
+        $this->assertSame($key, session('checkout_key'));
+        $this->assertDatabaseHas('variants', ['id' => $variant->id, 'stock' => 3]);
+    }
+
+    public function test_inventory_tracks_order_cancellation_and_manual_change_without_overwriting_stock_from_stale_forms(): void
+    {
+        $variant = $this->variant();
+        $product = DB::table('products')->find($variant->product_id);
+        $checkout = $this->cartAndFields($variant, quantity: 2);
+        $this->post('/gio-hang', ['variant_id' => $variant->id, 'quantity' => 1, 'note' => 'Gói riêng'])->assertSessionHasNoErrors();
+        $checkout['key'] = session('checkout_key');
+        $this->post('/dat-banh', $checkout)->assertSessionHasNoErrors();
+        $this->post('/dat-banh', $checkout)->assertSessionHasNoErrors();
+        $order = DB::table('orders')->latest('id')->first();
+        $balance = $variant->stock - 3;
+        $this->assertDatabaseHas('stock_movements', [
+            'variant_id' => $variant->id, 'order_id' => $order->id, 'reason' => 'order',
+            'stock_before' => $variant->stock, 'stock_after' => $balance,
+        ]);
+        $this->assertSame(1, DB::table('stock_movements')->where('variant_id', $variant->id)->count());
+        $this->actingAs($this->account('nhanvien'))->get('/quan-tri/ton-kho')->assertForbidden();
+
+        $edit = '/quan-tri/san-pham/'.$product->id;
+        $admin = $this->account('admin');
+        $this->actingAs($admin);
+        $fields = (array) $product + ['variants' => []];
+        $fields['variants'][] = array_intersect_key((array) $variant, array_flip(['id', 'name', 'price', 'stock', 'active']))
+            + ['expected_stock' => $variant->stock];
+        $this->post($edit, $fields)->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('variants', ['id' => $variant->id, 'stock' => $balance]);
+        $fields['variants'][0]['stock'] = $balance + 5;
+        $fields['variants'][0]['stock_note'] = 'Kiểm kê cuối ca';
+        $this->post($edit, $fields)->assertSessionHasErrors('variants.0.stock');
+        $this->assertSame(1, DB::table('stock_movements')->where('variant_id', $variant->id)->count());
+        $fields['variants'][0]['expected_stock'] = $balance;
+        $this->post($edit, $fields)->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('stock_movements', [
+            'variant_id' => $variant->id, 'actor_id' => $admin->id, 'reason' => 'manual',
+            'stock_before' => $balance, 'stock_after' => $balance + 5, 'note' => 'Kiểm kê cuối ca',
+        ]);
+
+        $this->actingAs($this->account('nhanvien'));
+        $cancel = ['kind' => 'status', 'value' => 'cancelled'];
+        $this->patch('/quan-tri/don-hang/'.$order->id, $cancel)->assertSessionHasNoErrors();
+        $this->patch('/quan-tri/don-hang/'.$order->id, $cancel)->assertSessionHasErrors('value');
+        $this->assertDatabaseHas('variants', ['id' => $variant->id, 'stock' => $variant->stock + 5]);
+        $this->assertSame(3, DB::table('stock_movements')->where('variant_id', $variant->id)->count());
+        $this->actingAs($admin)->get('/quan-tri/ton-kho?reason=cancel&product='.$product->id)
+            ->assertInertia(fn (Assert $page) => $page->component('AdminInventory')->where('movements.total', 1)
+                ->where('movements.data.0.order_code', $order->code)->where('movements.data.0.stock_before', $balance + 5)
+                ->where('movements.data.0.stock_after', $variant->stock + 5)->where('movements.data.0.actor', $this->account('nhanvien')->name));
+    }
+
+    public function test_sales_report_uses_completion_date_and_aggregates_cakes_across_variants(): void
+    {
+        $order = DB::table('orders')->where('code', 'NB-DEMO001')->first();
+        $variant = $this->variant();
+        $secondSize = DB::table('variants')->where('product_id', $variant->product_id)->where('id', '<>', $variant->id)->value('id');
+        DB::table('order_items')->insert([
+            'order_id' => $order->id, 'variant_id' => $secondSize, 'quantity' => 4,
+            'product_name' => 'Tên bánh tại lúc đặt', 'variant_name' => 'Phiên bản cũ', 'unit_price' => 490000,
+        ]);
+        foreach ([
+            ['NB-DEMO001', 'completed', 'paid', '2026-11-15 00:00:00', 345000],
+            ['NB-DEMO002', 'shipping', 'paid', '2026-11-15 12:00:00', 90000],
+            ['NB-DEMO003', 'completed', 'unpaid', '2026-11-15 12:00:00', 100000],
+            ['NB-DEMO004', 'completed', 'paid', '2026-11-16 00:00:00', 390000],
+            ['NB-DEMO005', 'completed', 'paid', '2026-11-15 23:59:59', 125000],
+        ] as [$code, $status, $payment, $date, $total]) {
+            DB::table('orders')->where('code', $code)->update([
+                'status' => $status, 'payment' => $payment, 'completed_at' => $date, 'total' => $total, 'created_at' => '2026-11-14 11:00:00',
+            ]);
+        }
+
+        $url = '/quan-tri/bao-cao';
+        $this->get($url)->assertRedirect('/dang-nhap');
+        $this->actingAs($this->account('khach'))->get($url)->assertForbidden();
+        $this->actingAs($this->account('nhanvien'))->get($url.'?from=2026-11-15&to=2026-11-15')
+            ->assertInertia(fn (Assert $page) => $page->component('AdminReports')
+                ->where('totals.revenue', 470000)->where('totals.order_count', 2)
+                ->where('days.total', 1)->where('days.data.0.day', '2026-11-15')->where('days.data.0.revenue', 470000)
+                ->has('top', 2)->where('top.0.id', $variant->product_id)->where('top.0.quantity', 5)->where('top.0.order_count', 1));
+        $this->get($url.'?from=2026-11-18&to=2026-11-18')->assertInertia(fn (Assert $page) => $page
+            ->where('totals.revenue', 0)->where('totals.order_count', 0)->where('days.total', 0)->has('top', 0));
+        $this->get($url.'?from=2026-11-18&to=2026-11-15')->assertSessionHasErrors('to');
     }
 
     public function test_registration_never_assigns_staff_and_password_reset_uses_local_notification(): void
@@ -191,6 +485,7 @@ class BakeryTest extends TestCase
         $this->post('/quan-tri/san-pham', $fields + ['uploads' => [UploadedFile::fake()->image('valid.jpg')]])->assertSessionHasNoErrors();
         $uploaded = DB::table('products')->where('name', 'Bánh QA')->value('images');
         $this->get(json_decode($uploaded, true)[0])->assertOk()->assertHeader('X-Content-Type-Options', 'nosniff');
+        $this->assertDatabaseHas('stock_movements', ['actor_id' => $this->account('admin')->id, 'reason' => 'initial', 'stock_before' => 0, 'stock_after' => 5]);
     }
 
     public function test_admin_can_save_shop_config_and_disable_online_bank(): void
@@ -201,17 +496,26 @@ class BakeryTest extends TestCase
         $fields['logo'] = UploadedFile::fake()->image('logo.png');
         $fields['remove_logo'] = false;
         $fields['slots'] = ['10:00', '17:00'];
+        $fields['slot_limits'] = ['10:00' => '3', '17:00' => null];
         $fields['closed_dates'] = ['2026-11-16'];
         $fields['bank_name'] = $fields['bank_account'] = $fields['bank_holder'] = null;
         $fields['bank_demo'] = false;
+        $fields['bank_due_minutes'] = '90';
 
         $this->actingAs($this->account('admin'))->post('/quan-tri/cai-dat', $fields)->assertSessionHasNoErrors();
         $stored = Store::settings();
         $this->assertSame(['10:00', '17:00'], $stored['slots']);
+        $this->assertSame(['10:00' => 3], $stored['slot_limits']);
         $this->assertSame(['2026-11-16'], $stored['closed_dates']);
+        $this->assertSame(90, $stored['bank_due_minutes']);
         $this->assertNull(Store::bank($stored));
         $this->get('/')->assertInertia(fn (Assert $page) => $page->where('shop.name', 'Tiệm Bánh QA')->where('shop.logo', $stored['logo']));
         $this->get($stored['logo'])->assertOk();
+        $fields['logo'] = null;
+        $this->post('/quan-tri/cai-dat', array_replace($fields, ['slot_limits' => ['18:00' => 3]]))->assertSessionHasErrors('slot_limits');
+        $this->post('/quan-tri/cai-dat', array_replace($fields, ['slot_limits' => ['10:00' => 0]]))->assertSessionHasErrors('slot_limits.10:00');
+        $this->post('/quan-tri/cai-dat', array_replace($fields, ['slot_limits' => ['10:00' => '', '17:00' => '']]))->assertSessionHasNoErrors();
+        $this->assertSame([], Store::settings()['slot_limits']);
         $fields['bank_name'] = 'Chỉ tên ngân hàng';
         $this->post('/quan-tri/cai-dat', $fields)->assertSessionHasErrors(['bank_holder', 'bank_account']);
     }
@@ -221,6 +525,11 @@ class BakeryTest extends TestCase
         $productId = DB::table('products')->where('slug', 'banh-kem-dau')->value('id');
 
         return DB::table('variants')->where('product_id', $productId)->orderBy('id')->first();
+    }
+
+    private function runOrderMailWorker(): void
+    {
+        $this->artisan('queue:work', ['connection' => 'order-mail', '--once' => true, '--sleep' => 0])->assertSuccessful();
     }
 
     private function account(string $prefix): User

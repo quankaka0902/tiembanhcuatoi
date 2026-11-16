@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\SendOrderEmail;
 use App\Services\Catalog;
 use App\Services\Checkout;
 use App\Services\Orders;
 use App\Services\Store;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
@@ -135,7 +137,7 @@ class Storefront extends Controller
         $request->session()->put('checkout_key', $key);
 
         return Inertia::render('Checkout', [
-            'lines' => $lines, 'slots' => $checkout->slots($settings, max(array_column($lines, 'prep_minutes'))),
+            'lines' => $lines, 'slots' => $checkout->availableSlots($settings, max(array_column($lines, 'prep_minutes'))),
             'regions' => $settings['regions'], 'bankEnabled' => Store::bank($settings) !== null, 'keyToken' => $key,
         ]);
     }
@@ -188,6 +190,24 @@ class Storefront extends Controller
         return redirect()->route('tracking.show', ['token' => $matches[1]]);
     }
 
+    public function resendTracking(Request $request)
+    {
+        $fields = $request->validate([
+            'code' => 'required|string|max:22|regex:/^[a-zA-Z0-9-]+$/',
+            'email' => 'required|email|max:254',
+        ]);
+        $order = DB::table('orders')->where('code', Str::upper($fields['code']))->first(['id', 'email']);
+        if ($order && hash_equals(Str::lower(trim($order->email)), Str::lower($fields['email']))) {
+            try {
+                Bus::dispatch(new SendOrderEmail($order->id));
+            } catch (Throwable $exception) {
+                report($exception);
+            }
+        }
+
+        return redirect('/tra-cuu')->with('notice', 'Nếu mã đơn và email trùng khớp, tiệm sẽ gửi liên kết tra cứu đến email đã đặt đơn.');
+    }
+
     public function tracked(string $token)
     {
         $order = DB::table('orders')->where('tracking_token', $token)->first();
@@ -206,17 +226,40 @@ class Storefront extends Controller
 
     public function ownOrder(Request $request, string $code)
     {
+        return $this->orderResponse($this->ownedOrder($request, $code), canReorder: true);
+    }
+
+    public function reorder(Request $request, string $code, Checkout $checkout)
+    {
+        $order = $this->ownedOrder($request, $code);
+        $items = DB::table('order_items')->where('order_id', $order->id)->orderBy('id')->get(['variant_id', 'quantity']);
+        [$cart, $added, $skipped] = $checkout->reorder($request->session()->get('cart', []), $items);
+        if ($added === 0) {
+            return back()->with('notice', 'Giỏ đã đầy hoặc các bánh trong đơn này hiện không còn đủ tồn để thêm.');
+        }
+
+        $request->session()->put(['cart' => $cart, 'checkout_key' => (string) Str::uuid()]);
+        $notice = "Đã thêm {$added} bánh vào giỏ theo giá hiện tại.";
+        if ($skipped > 0) {
+            $notice .= " Còn {$skipped} bánh chưa thể thêm do tồn kho, trạng thái bán hoặc giới hạn giỏ hàng.";
+        }
+
+        return redirect('/gio-hang')->with('notice', $notice);
+    }
+
+    private function ownedOrder(Request $request, string $code): object
+    {
         $order = DB::table('orders')->where('user_id', $request->user()->id)->where('code', $code)->first();
         abort_unless($order, 404);
 
-        return $this->orderResponse($order);
+        return $order;
     }
 
-    private function orderResponse(object $order)
+    private function orderResponse(object $order, bool $canReorder = false)
     {
         return Inertia::render('Order', [
             'order' => Orders::detail($order), 'statuses' => Orders::STATUSES, 'payments' => Orders::PAYMENTS,
-            'trackingLink' => Orders::link($order),
+            'trackingLink' => Orders::link($order), 'canReorder' => $canReorder,
         ])->toResponse(request())->header('Cache-Control', 'private, no-store')
             ->header('Referrer-Policy', 'no-referrer')->header('X-Robots-Tag', 'noindex, nofollow');
     }

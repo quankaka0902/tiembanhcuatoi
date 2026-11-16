@@ -2,7 +2,8 @@ import { Head, Link, usePage } from '@inertiajs/react';
 import { ArrowRight, CakeSlice, Check, Clock3, Cookie, Croissant, CupSoda, LayoutDashboard, MapPin, Menu, Phone, Search, ShoppingBag, UserRound } from 'lucide-react';
 
 export const money = value => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(value));
-export const dateTime = value => value ? `${value.slice(8, 10)}/${value.slice(5, 7)}/${value.slice(0, 4)} · ${value.slice(11, 16)}` : '';
+export const date = value => value ? `${value.slice(8, 10)}/${value.slice(5, 7)}/${value.slice(0, 4)}` : '';
+export const dateTime = value => value ? `${date(value)} · ${value.slice(11, 16)}` : '';
 export const categoriesIcons = { cake: CakeSlice, croissant: Croissant, cupcake: CupSoda, cookie: Cookie };
 
 export function Brand({ shop }) {
