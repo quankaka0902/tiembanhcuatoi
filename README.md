@@ -116,6 +116,8 @@ Dùng `DB_HOST`, `DB_USERNAME`, `DB_PASSWORD` trong môi trường hoặc trong 
 
 Chặng 5 đạt 29 bài trên MySQL với 875 assertions và 24 bài trên SQLite với 840 assertions. Nghiệm thu qua HTTPS trên loopback dùng chứng chỉ thử được máy khách kiểm tra và MySQL staging riêng. Đã kiểm tra cookie Secure, trạng thái tạm ngừng ban đầu, đăng nhập TOTP, đổi giờ, tra cứu và danh sách chờ hoàn tiền. Hộp thư SMTP trên loopback nhận thư báo đơn, thư trạng thái và thư đặt lại mật khẩu. Liên kết đặt lại mật khẩu mở đúng trên HTTPS staging. Tên miền và SMTP của cửa hàng cần được xác minh bằng cấu hình thật.
 
+Chặng 6 đạt 32 bài trên MySQL với 894 assertions và 27 bài trên SQLite với 859 assertions. Ca bán staging riêng đã hoàn tất một đơn COD và một đơn chuyển khoản giả lập, cùng thư qua SMTP local. Đã chạy sao lưu theo lịch, xác minh SHA-256 ở cả hai thư mục và phục hồi hai đơn cùng ảnh vào schema và thư mục ảnh riêng. Hộp nhận thử đã ghi cảnh báo và thông báo phục hồi khi worker ngừng phản hồi, bản sao quá hạn và bản phát hành trả HTTP 503. Quay lui trả web về HTTP 200 và giữ cả hai đơn. Các đầu vào cần cấu hình của tiệm được liệt kê trong hướng dẫn vận hành.
+
 ## Cấu hình cửa hàng thật
 
 Xem [hướng dẫn vận hành, kiểm tra cấu hình và phục hồi bản sao lưu](docs/van-hanh.md).
@@ -126,6 +128,7 @@ Xem [hướng dẫn vận hành, kiểm tra cấu hình và phục hồi bản s
 - Đăng nhập quản trị để thiết lập tên, logo, liên hệ, lịch nhận, ngày nghỉ, khu vực và phí giao, giá và tồn thực tế. Điền thông tin ngân hàng thật và tắt cảnh báo mẫu nếu sử dụng chuyển khoản thủ công.
 - Sao lưu MySQL và thư mục ảnh `storage/app/public/bakery`. Đơn đã ghi nhận giữ bản chụp tên, giá và các tùy chọn tại thời điểm đặt.
 - Môi trường thật mới dựng bắt đầu ở trạng thái tạm ngừng nhận đơn. Chạy `php artisan bakery:preflight` và dùng **Đơn cần xử lý** để chủ động bật nhận đơn khi cấu hình đã sẵn sàng.
+- Dùng `php artisan bakery:monitor` để kiểm tra vận hành, `php artisan bakery:backup` để tạo bản sao và `php artisan bakery:backup --verify=THU_MUC` để đối chiếu. Bật lịch và khai báo nơi lưu, kênh cảnh báo theo hướng dẫn vận hành. Dùng `ops/release.php` để kiểm tra, chọn hoặc quay về phiên bản ứng dụng đã chuẩn bị.
 
 ## Git và ảnh minh họa
 

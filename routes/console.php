@@ -4,6 +4,7 @@ use App\Models\User;
 use App\Services\Totp;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 
@@ -55,3 +56,6 @@ Artisan::command('bakery:mfa {email}', function () {
 
     return 0;
 })->purpose('Cấp hoặc đổi khóa TOTP và thu hồi phiên quản trị cũ');
+
+Schedule::command('bakery:monitor')->everyMinute()->when(fn () => config('operations.monitor.enabled'))->evenInMaintenanceMode();
+Schedule::command('bakery:backup')->dailyAt(config('operations.backup.time'))->when(fn () => config('operations.backup.enabled'));

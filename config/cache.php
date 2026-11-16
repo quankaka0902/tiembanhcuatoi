@@ -53,6 +53,11 @@ return [
             'lock_path' => storage_path('framework/cache/locks'),
         ],
 
+        'bakery-operations' => [
+            'driver' => 'file',
+            'path' => env('BAKERY_OPS_ROOT') ?: storage_path('app/private/bakery-ops'),
+        ],
+
         'storage' => [
             'driver' => 'storage',
             'disk' => env('CACHE_STORAGE_DISK'),
