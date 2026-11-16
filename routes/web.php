@@ -6,6 +6,7 @@ use App\Http\Controllers\AdminConfig;
 use App\Http\Controllers\AdminOrders;
 use App\Http\Controllers\AdminSchedule;
 use App\Http\Controllers\Storefront;
+use App\Http\Middleware\VerifyStaffFactor;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 
@@ -45,13 +46,15 @@ Route::middleware('guest')->group(function () {
     Route::get('/quen-mat-khau', fn (Accounts $accounts) => $accounts->form('forgot'));
     Route::get('/dat-lai-mat-khau/{token}', fn (Accounts $accounts, string $token) => $accounts->form('reset', $token))->name('password.reset');
     Route::post('/dang-nhap', [Accounts::class, 'login'])->middleware('throttle:login');
+    Route::get('/xac-thuc-hai-buoc', [Accounts::class, 'challenge']);
+    Route::post('/xac-thuc-hai-buoc', [Accounts::class, 'verifyChallenge'])->middleware('throttle:staff-factor')->block();
     Route::post('/dang-ky', [Accounts::class, 'register'])->middleware('throttle:8,1');
     Route::post('/quen-mat-khau', [Accounts::class, 'forgot'])->middleware('throttle:5,1');
     Route::post('/dat-lai-mat-khau', [Accounts::class, 'reset'])->middleware('throttle:10,1');
 });
 Route::post('/dang-xuat', [Accounts::class, 'logout'])->middleware('auth');
 
-Route::prefix('quan-tri')->middleware(['auth', 'can:staff'])->group(function () {
+Route::prefix('quan-tri')->middleware(['auth', 'can:staff', VerifyStaffFactor::class])->group(function () {
     Route::get('/lich-lam-banh', AdminSchedule::class);
 
     Route::controller(AdminOrders::class)->group(function () {
@@ -63,6 +66,7 @@ Route::prefix('quan-tri')->middleware(['auth', 'can:staff'])->group(function () 
         Route::get('/bao-cao', 'reports');
         Route::get('/don-hang/{order}', 'show')->whereNumber('order');
         Route::patch('/don-hang/{order}', 'change')->whereNumber('order');
+        Route::patch('/don-hang/{order}/doi-gio', 'reschedule')->whereNumber('order');
     });
 
     Route::middleware('can:admin')->group(function () {

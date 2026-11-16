@@ -12,7 +12,11 @@ class Store
         $query = DB::table('store_settings')->where('id', 1);
         $data = ($lock ? $query->lockForUpdate() : $query)->value('data');
 
-        return array_replace(config('bakery.defaults'), $data ? json_decode($data, true, flags: JSON_THROW_ON_ERROR) : []);
+        return array_replace(
+            config('bakery.defaults'),
+            ['accepting_orders' => ! LaunchReadiness::required()],
+            $data ? json_decode($data, true, flags: JSON_THROW_ON_ERROR) : [],
+        );
     }
 
     public static function publicSettings(): array

@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Jobs\SendOrderEmail;
+use App\Services\LaunchReadiness;
 use App\Services\Store;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -20,7 +21,8 @@ class BakeryPreflight extends Command
         $staging = $this->option('staging');
         $url = (string) config('app.url');
         $host = strtolower((string) parse_url($url, PHP_URL_HOST));
-        $loopback = in_array($host, ['localhost', '127.0.0.1', '[::1]'], true);
+        $loopback = LaunchReadiness::loopback($host);
+        $rehearsal = $staging && config('bakery.rehearsal');
         $failures = [];
 
         if ($staging) {
@@ -30,22 +32,13 @@ class BakeryPreflight extends Command
 
                 return self::FAILURE;
             }
-            if (! in_array(config('mail.default'), ['log', 'array'], true)) {
+            if ($rehearsal) {
+                array_push($failures, ...LaunchReadiness::configurationIssues(rehearsal: true));
+            } elseif (! in_array(config('mail.default'), ['log', 'array'], true)) {
                 $failures[] = 'Dùng mailer log hoặc array cho nghiệm thu local.';
             }
         } else {
-            if (! app()->environment('production') || config('app.debug') || config('bakery.demo_seed')) {
-                $failures[] = 'Đặt APP_ENV=production, APP_DEBUG=false và BAKERY_DEMO_SEED=false.';
-            }
-            if (! filter_var($url, FILTER_VALIDATE_URL) || parse_url($url, PHP_URL_SCHEME) !== 'https'
-                || $loopback || ! config('session.secure') || ! config('session.encrypt')) {
-                $failures[] = 'Cấu hình APP_URL HTTPS, SESSION_SECURE_COOKIE=true và SESSION_ENCRYPT=true.';
-            }
-            $sender = (string) config('mail.from.address');
-            if (config('mail.default') !== 'smtp' || ! filter_var($sender, FILTER_VALIDATE_EMAIL)
-                || preg_match('/(?:\.(?:test|example|invalid)|@example\.(?:com|net|org))$/i', $sender)) {
-                $failures[] = 'Cấu hình SMTP và địa chỉ gửi thư của cửa hàng.';
-            }
+            array_push($failures, ...LaunchReadiness::configurationIssues());
             if (is_file(public_path('hot'))) {
                 $failures[] = 'Gỡ chế độ Vite dev trước khi mở bán.';
             }
@@ -68,7 +61,7 @@ class BakeryPreflight extends Command
         if (config('database.default') !== 'mysql') {
             $failures[] = 'Chọn kết nối MySQL riêng cho môi trường này.';
         } else {
-            array_push($failures, ...$this->databaseChecks($staging));
+            array_push($failures, ...$this->databaseChecks(! $staging || $rehearsal));
         }
 
         foreach ($failures as $failure) {
@@ -83,7 +76,7 @@ class BakeryPreflight extends Command
         return self::SUCCESS;
     }
 
-    private function databaseChecks(bool $staging): array
+    private function databaseChecks(bool $checkLaunchData): array
     {
         try {
             $migrator = app('migrator');
@@ -104,16 +97,8 @@ class BakeryPreflight extends Command
             if (! DB::table('users')->where('role', 'admin')->where('active', true)->exists()) {
                 $errors[] = 'Tạo tài khoản quản trị đang hoạt động bằng bakery:admin.';
             }
-            if (! $staging) {
-                $settings = Store::settings();
-                if ($settings['bank_demo'] || DB::table('users')->whereIn('email', [
-                    'admin@tiembanh.test', 'nhanvien@tiembanh.test', 'doisoat@tiembanh.test', 'khach@tiembanh.test',
-                ])->exists()) {
-                    $errors[] = 'Gỡ tài khoản mẫu và dữ liệu chuyển khoản mẫu trước khi mở bán.';
-                }
-                if (! ($settings['phone'] || $settings['email']) || ! $settings['address'] || ! $settings['order_policy']) {
-                    $errors[] = 'Điền liên hệ, địa chỉ và chính sách đặt bánh trong quản trị.';
-                }
+            if ($checkLaunchData) {
+                array_push($errors, ...LaunchReadiness::dataIssues(Store::settings()));
             }
 
             return $errors;

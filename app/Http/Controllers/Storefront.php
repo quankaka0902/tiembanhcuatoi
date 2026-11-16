@@ -143,6 +143,7 @@ class Storefront extends Controller
             'lines' => $lines, 'slots' => $checkout->availableSlots($settings, max(array_column($lines, 'prep_minutes'))),
             'regions' => $settings['regions'], 'bankEnabled' => Store::bank($settings) !== null, 'keyToken' => $key,
             'policy' => $settings['order_policy'],
+            'privacy' => $settings['privacy_notice'],
         ]);
     }
 
@@ -173,7 +174,9 @@ class Storefront extends Controller
 
     public function policy()
     {
-        return Inertia::render('OrderPolicy', ['policy' => Store::settings()['order_policy']]);
+        $settings = Store::settings();
+
+        return Inertia::render('OrderPolicy', ['policy' => $settings['order_policy'], 'privacy' => $settings['privacy_notice']]);
     }
 
     public function tracking()
@@ -257,7 +260,7 @@ class Storefront extends Controller
     private function orderResponse(object $order, bool $canReorder = false)
     {
         return Inertia::render('Order', [
-            'order' => Orders::detail($order), 'statuses' => Orders::STATUSES, 'payments' => Orders::PAYMENTS,
+            'order' => Orders::detail($order, owner: $canReorder), 'statuses' => Orders::STATUSES, 'payments' => Orders::PAYMENTS,
             'trackingLink' => Orders::link($order), 'canReorder' => $canReorder,
         ])->toResponse(request())->header('Cache-Control', 'private, no-store')
             ->header('Referrer-Policy', 'no-referrer')->header('X-Robots-Tag', 'noindex, nofollow');

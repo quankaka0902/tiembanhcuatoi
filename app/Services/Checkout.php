@@ -189,15 +189,7 @@ class Checkout
             $lines = $this->cart($cart);
             $quote = $this->quote($lines, $fields, $settings, lock: true);
 
-            $slot = $fields['slot'];
-            if (! in_array($slot, $this->slots($settings, max(array_column($lines, 'prep_minutes'))), true)) {
-                $this->invalid('slot', 'Giờ nhận không còn phù hợp với lịch mở cửa hoặc thời gian làm bánh.');
-            }
-            $scheduledAt = $slot.':00';
-            $limit = $settings['slot_limits'][substr($slot, 11)] ?? null;
-            if ($limit !== null && Orders::scheduled()->where('scheduled_at', $scheduledAt)->count() >= $limit) {
-                $this->invalid('slot', 'Khung giờ vừa hết chỗ. Vui lòng chọn giờ khác.');
-            }
+            $scheduledAt = $this->assertSlot($fields['slot'], $settings, max(array_column($lines, 'prep_minutes')));
 
             $bank = $fields['method'] === 'bank' ? Store::bank($settings) : null;
             if ($fields['method'] === 'bank' && ! $bank) {
@@ -238,6 +230,21 @@ class Checkout
 
             return [DB::table('orders')->find($id), true];
         }, 5);
+    }
+
+    // The caller holds the shop settings lock until the booking or reschedule commits.
+    public function assertSlot(string $slot, array $settings, int $prepMinutes): string
+    {
+        if (! in_array($slot, $this->slots($settings, $prepMinutes), true)) {
+            $this->invalid('slot', 'Giờ nhận không còn phù hợp với lịch mở cửa hoặc thời gian làm bánh.');
+        }
+        $scheduledAt = $slot.':00';
+        $limit = $settings['slot_limits'][substr($slot, 11)] ?? null;
+        if ($limit !== null && Orders::scheduled()->where('scheduled_at', $scheduledAt)->count() >= $limit) {
+            $this->invalid('slot', 'Khung giờ vừa hết chỗ. Vui lòng chọn giờ khác.');
+        }
+
+        return $scheduledAt;
     }
 
     private function invalid(string $field, string $message): never

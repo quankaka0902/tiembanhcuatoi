@@ -5,7 +5,9 @@ namespace Tests\Feature;
 use App\Models\User;
 use App\Services\Checkout;
 use App\Services\Store;
+use App\Services\Totp;
 use Illuminate\Auth\Notifications\ResetPassword;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Mail\Events\MessageSending;
@@ -24,12 +26,110 @@ class BakeryTest extends TestCase
 {
     use RefreshDatabase;
 
+    private const FACTOR_FIXTURE = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->travelTo(now()->setDate(2026, 11, 15)->setTime(8, 0));
         config(['bakery.demo_seed' => true, 'inertia.testing.ensure_pages_exist' => false]);
         $this->seed();
+        User::whereIn('role', ['admin', 'staff'])->each(fn (User $user) => $user->forceFill(['two_factor_secret' => self::FACTOR_FIXTURE])->save());
+    }
+
+    public function actingAs(Authenticatable $user, $guard = null)
+    {
+        $this->withSession(['staff_mfa_verified' => $user instanceof User ? $user->staffProof() : null]);
+
+        return parent::actingAs($user, $guard);
+    }
+
+    public function test_staff_factor_requires_password_and_fresh_unused_code(): void
+    {
+        $this->travelTo(now()->setTimestamp(59));
+        $user = $this->account('admin');
+        $this->assertSame(1, Totp::matchingStep(self::FACTOR_FIXTURE, '287082', 59));
+        $this->assertNotSame(self::FACTOR_FIXTURE, $user->getRawOriginal('two_factor_secret'));
+        $this->assertArrayNotHasKey('two_factor_secret', $user->toArray());
+        $credentials = ['email' => $user->email, 'password' => 'BanhDemo2026!'];
+        $this->post('/xac-thuc-hai-buoc', ['code' => '287082'])->assertRedirect('/dang-nhap');
+        $this->post('/dang-nhap', $credentials)->assertRedirect('/xac-thuc-hai-buoc');
+        $this->assertGuest();
+        $this->get('/quan-tri')->assertRedirect('/dang-nhap');
+        $this->get('/xac-thuc-hai-buoc')->assertOk();
+        $this->post('/xac-thuc-hai-buoc', ['code' => '123456'])->assertSessionHasErrors('code');
+        $this->post('/xac-thuc-hai-buoc', ['code' => '287082'])->assertRedirect('/quan-tri');
+        $this->get('/quan-tri')->assertOk();
+        $this->post('/dang-xuat')->assertRedirect('/');
+        $this->post('/dang-nhap', $credentials)->assertRedirect('/xac-thuc-hai-buoc');
+        $this->post('/xac-thuc-hai-buoc', ['code' => '287082'])->assertSessionHasErrors('code');
+        $this->assertGuest();
+        $this->travel(6)->minutes();
+        $this->post('/xac-thuc-hai-buoc', ['code' => '287082'])->assertRedirect('/dang-nhap');
+        $this->artisan('bakery:mfa', ['email' => $user->email])->assertSuccessful();
+        $this->assertNotSame($user->staffProof(), $user->fresh()->staffProof());
+        $this->be($user->fresh())->withSession(['staff_mfa_verified' => $user->staffProof()])->get('/quan-tri')->assertRedirect('/dang-nhap');
+    }
+
+    public function test_launch_requires_explicit_open_and_complete_production_data(): void
+    {
+        config([
+            'bakery.rehearsal' => true, 'bakery.demo_seed' => false, 'app.debug' => false,
+            'app.url' => 'https://localhost:18847', 'session.secure' => true, 'session.encrypt' => true,
+            'mail.default' => 'smtp', 'mail.from.address' => 'qa@example.test', 'mail.mailers.smtp.host' => '127.0.0.1',
+        ]);
+        $this->assertFalse(Store::settings()['accepting_orders']);
+        $this->get('/dat-banh')->assertRedirect('/gio-hang');
+        $admin = $this->account('admin');
+        $this->actingAs($admin)->post('/quan-tri/nhan-don', ['accepting_orders' => true])->assertSessionHasErrors('accepting_orders');
+        User::where('email', 'like', '%@tiembanh.test')->each(fn (User $user) => $user->forceFill(['email' => 'qa-'.$user->email])->save());
+        $settings = array_replace(Store::settings(), [
+            'bank_name' => '', 'bank_account' => '', 'bank_holder' => '', 'bank_demo' => false,
+            'order_policy' => 'Chính sách nghiệm thu.', 'privacy_notice' => 'Dữ liệu dùng để xử lý đơn.',
+        ]);
+        DB::table('store_settings')->where('id', 1)->update(['data' => json_encode($settings)]);
+        $this->assertFalse(Store::settings()['accepting_orders']);
+        $this->actingAs($admin->fresh())->post('/quan-tri/nhan-don', ['accepting_orders' => true])->assertSessionHasNoErrors();
+        $this->assertTrue(Store::settings()['accepting_orders']);
+    }
+
+    public function test_reschedule_checks_capacity_and_refund_remains_in_inbox_until_recorded(): void
+    {
+        $variant = $this->variant();
+        $customer = $this->account('khach');
+        $fields = array_replace($this->actingAs($customer)->cartAndFields($variant, 'Lời chúc riêng'), [
+            'method' => 'bank', 'fulfillment' => 'delivery', 'region' => 'quan-1', 'address' => 'Địa chỉ riêng',
+        ]);
+        $this->post('/dat-banh', $fields)->assertSessionHasNoErrors();
+        $order = DB::table('orders')->latest('id')->first();
+        $settings = array_replace(Store::settings(), ['slot_limits' => ['11:00' => 1, '16:00' => 1, '18:00' => 1]]);
+        DB::table('store_settings')->where('id', 1)->update(['data' => json_encode($settings)]);
+        DB::table('orders')->where('code', 'NB-DEMO002')->update(['scheduled_at' => '2026-11-15 16:00:00']);
+        $url = '/quan-tri/don-hang/'.$order->id;
+        $change = ['previous_slot' => $fields['slot'], 'slot' => '2026-11-15 16:00', 'note' => 'Khách cần dời giờ'];
+        $this->patch($url.'/doi-gio', $change)->assertForbidden();
+        $this->actingAs($this->account('nhanvien'))->patch($url.'/doi-gio', $change)->assertSessionHasErrors('slot');
+        $change['slot'] = '2026-11-15 18:00';
+        $this->patch($url.'/doi-gio', $change)->assertSessionHasNoErrors();
+        $this->patch($url.'/doi-gio', $change)->assertSessionHasErrors('slot');
+        $this->assertDatabaseHas('orders', [
+            'id' => $order->id, 'scheduled_at' => '2026-11-15 18:00:00', 'bank_due_at' => $order->bank_due_at, 'total' => $order->total,
+        ]);
+        $this->assertDatabaseHas('variants', ['id' => $variant->id, 'stock' => $variant->stock - 1]);
+        $this->assertContains($fields['slot'], app(Checkout::class)->availableSlots(Store::settings(), 120));
+        $this->get('/tra-cuu/'.$order->tracking_token)->assertInertia(fn (Assert $page) => $page
+            ->where('order.scheduled_at', '2026-11-15 18:00:00')->missing('order.address')
+            ->missing('order.items.0.message')->missing('order.events.1.note')->where('order.events.1.kind', 'schedule'));
+        $this->actingAs($customer)->get('/don-cua-toi/'.$order->code)->assertInertia(fn (Assert $page) => $page
+            ->where('order.address', 'Địa chỉ riêng')->where('order.items.0.message', 'Lời chúc riêng'));
+
+        $this->actingAs($this->account('doisoat'))->patch($url, ['kind' => 'payment', 'value' => 'paid'])->assertSessionHasNoErrors();
+        $this->patch($url, ['kind' => 'status', 'value' => 'cancelled'])->assertSessionHasNoErrors();
+        $inbox = '/quan-tri/viec-can-xu-ly?filter=refund';
+        $this->get($inbox)->assertInertia(fn (Assert $page) => $page->where('refundCount', 1)->where('orders.data.0.code', $order->code));
+        $this->actingAs($this->account('nhanvien'))->patch($url, ['kind' => 'payment', 'value' => 'refunded'])->assertForbidden();
+        $this->actingAs($this->account('doisoat'))->patch($url, ['kind' => 'payment', 'value' => 'refunded'])->assertSessionHasNoErrors();
+        $this->get($inbox)->assertInertia(fn (Assert $page) => $page->where('refundCount', 0));
     }
 
     public function test_home_catalog_search_prices_pagination_and_sold_out(): void

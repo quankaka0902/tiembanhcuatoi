@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Jobs\SendOrderEmail;
+use App\Services\Checkout;
 use App\Services\Orders;
 use App\Services\Store;
 use Carbon\CarbonImmutable;
@@ -44,18 +45,22 @@ class AdminOrders extends Controller
 
     public function inbox(Request $request)
     {
-        $fields = $request->validate(['filter' => 'nullable|in:new,overdue']);
+        $fields = $request->validate(['filter' => 'nullable|in:new,overdue,refund']);
         $filter = $fields['filter'] ?? 'new';
         $new = DB::table('orders')->where('status', 'pending');
         $overdue = $this->unpaidTransfers()->where('bank_due_at', '<=', now()->toDateTimeString());
-        $orders = $filter === 'overdue'
-            ? (clone $overdue)->orderBy('bank_due_at')
-            : (clone $new)->orderBy('scheduled_at');
+        $refund = DB::table('orders')->where('status', 'cancelled')->where('payment', 'paid');
+        $orders = match ($filter) {
+            'overdue' => (clone $overdue)->orderBy('bank_due_at'),
+            'refund' => (clone $refund)->orderBy('updated_at'),
+            default => (clone $new)->orderBy('scheduled_at'),
+        };
         $settings = Store::settings();
 
         return Inertia::render('AdminInbox', [
             'filter' => $filter, 'newCount' => $new->count(), 'overdueCount' => $overdue->count(),
-            'orders' => $orders->orderBy('id')->paginate(15, ['id', 'code', 'method', 'total', 'created_at', 'scheduled_at', 'bank_due_at'])->withQueryString(),
+            'refundCount' => $refund->count(),
+            'orders' => $orders->orderBy('id')->paginate(15, ['id', 'code', 'method', 'total', 'created_at', 'scheduled_at', 'bank_due_at', 'updated_at'])->withQueryString(),
             'intake' => ['accepting_orders' => $settings['accepting_orders'], 'pause_message' => $settings['pause_message']],
         ])->toResponse($request)->header('Cache-Control', 'private, no-store');
     }
@@ -131,7 +136,7 @@ class AdminOrders extends Controller
         return Orders::scheduled()->where('method', 'bank')->where('payment', 'unpaid');
     }
 
-    public function show(Request $request, int $order)
+    public function show(Request $request, int $order, Checkout $checkout)
     {
         $row = DB::table('orders')->find($order);
         abort_unless($row, 404);
@@ -139,6 +144,9 @@ class AdminOrders extends Controller
         return Inertia::render('AdminOrder', [
             'order' => Orders::detail($row, internal: true), 'statuses' => Orders::STATUSES, 'payments' => Orders::PAYMENTS,
             'next' => Orders::next($row), 'reconcile' => Orders::canReconcile($request->user()),
+            'rescheduleSlots' => Orders::canReschedule($row)
+                ? array_values(array_diff($checkout->availableSlots(Store::settings(), Orders::prepMinutes($order)), [substr($row->scheduled_at, 0, 16)]))
+                : null,
         ])->toResponse($request)->header('Cache-Control', 'private, no-store');
     }
 
@@ -150,6 +158,17 @@ class AdminOrders extends Controller
         Orders::change($order, $request->user(), $fields);
 
         return back()->with('notice', 'Đã cập nhật đơn.');
+    }
+
+    public function reschedule(Request $request, int $order, Checkout $checkout)
+    {
+        $fields = $request->validate([
+            'slot' => 'required|date_format:Y-m-d H:i', 'previous_slot' => 'required|date_format:Y-m-d H:i',
+            'note' => 'required|string|max:200',
+        ]);
+        Orders::reschedule($order, $request->user(), $fields, $checkout);
+
+        return back()->with('notice', 'Đã lưu giờ giao hoặc nhận mới.');
     }
 
     public function export(Request $request)

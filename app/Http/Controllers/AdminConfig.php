@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Services\LaunchReadiness;
 use App\Services\Store;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -29,6 +30,15 @@ class AdminConfig extends Controller
         ]);
         DB::transaction(function () use ($fields) {
             $current = Store::settings(lock: true);
+            if ($fields['accepting_orders'] && ! $current['accepting_orders'] && LaunchReadiness::required()) {
+                $errors = [
+                    ...LaunchReadiness::configurationIssues(rehearsal: ! app()->environment('production')),
+                    ...LaunchReadiness::dataIssues($current),
+                ];
+                if ($errors) {
+                    throw ValidationException::withMessages(['accepting_orders' => $errors]);
+                }
+            }
             $settings = array_replace($current, [
                 'accepting_orders' => (bool) $fields['accepting_orders'],
                 'pause_message' => $fields['pause_message'] ?? null,
@@ -45,6 +55,7 @@ class AdminConfig extends Controller
             'name' => 'required|string|max:100', 'phone' => 'nullable|string|max:30', 'email' => 'nullable|email|max:254',
             'address' => 'nullable|string|max:250', 'hours' => 'required|string|max:100',
             'order_policy' => 'nullable|string|max:4000',
+            'privacy_notice' => 'nullable|string|max:4000',
             'logo' => 'nullable|'.AdminCatalog::IMAGE_RULES, 'remove_logo' => 'required|boolean',
             'weekdays' => 'required|array|min:1|max:7', 'weekdays.*' => 'integer|distinct|between:1,7',
             'slots' => 'required|array|min:1|max:48', 'slots.*' => 'required|date_format:H:i|distinct',
@@ -121,7 +132,7 @@ class AdminConfig extends Controller
         $record = $user ? User::whereIn('role', ['admin', 'staff'])->findOrFail($user) : null;
 
         return Inertia::render('AdminUsers', [
-            'selected' => $record?->only('id', 'name', 'email', 'role', 'active', 'can_reconcile'),
+            'selected' => $record ? $record->only('id', 'name', 'email', 'role', 'active', 'can_reconcile') + ['mfa_ready' => (bool) $record->staffProof()] : null,
             'users' => User::whereIn('role', ['admin', 'staff'])->latest('id')->paginate(20, ['id', 'name', 'email', 'role', 'active', 'can_reconcile']),
         ]);
     }

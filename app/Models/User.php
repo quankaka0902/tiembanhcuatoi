@@ -10,7 +10,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
 #[Fillable(['name', 'email', 'password'])]
-#[Hidden(['password', 'remember_token'])]
+#[Hidden(['password', 'remember_token', 'two_factor_secret', 'two_factor_last_step'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
@@ -34,6 +34,22 @@ class User extends Authenticatable
             'password' => 'hashed',
             'active' => 'boolean',
             'can_reconcile' => 'boolean',
+            'two_factor_secret' => 'encrypted',
+            'two_factor_last_step' => 'integer',
         ];
+    }
+
+    public function isStaff(): bool
+    {
+        return in_array($this->role, ['admin', 'staff'], true);
+    }
+
+    public function staffProof(): ?string
+    {
+        $encryptedSecret = $this->getRawOriginal('two_factor_secret');
+
+        return $this->active && $this->isStaff() && $encryptedSecret
+            ? hash('sha256', implode('|', [$this->id, $this->role, $this->email, $this->getAuthPassword(), $encryptedSecret]))
+            : null;
     }
 }

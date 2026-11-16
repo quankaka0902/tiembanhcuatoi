@@ -96,24 +96,29 @@ function IntakeControl({ intake }) {
     </section>;
 }
 
-export function AdminInbox({ filter, newCount, overdueCount, orders, intake }) {
+export function AdminInbox({ filter, newCount, overdueCount, refundCount, orders, intake }) {
     const { auth } = usePage().props;
     const isAdmin = auth.role === 'admin';
-    const latest = filter === 'new';
+    const tabs = [
+        ['new', 'Chưa xác nhận', newCount, 'Giờ đặt', 'created_at', 'Hiện không có đơn chờ xác nhận.'],
+        ['overdue', 'Chuyển khoản quá hạn', overdueCount, 'Hạn chuyển khoản', 'bank_due_at', 'Hiện không có chuyển khoản quá hạn.'],
+        ['refund', 'Chờ hoàn tiền', refundCount, 'Giờ hủy', 'updated_at', 'Hiện không có đơn chờ hoàn tiền.'],
+    ];
+    const [, , , dateLabel, dateField, empty] = tabs.find(([key]) => key === filter);
     return <Admin title="Đơn cần xử lý"
         action={isAdmin && <ButtonLink href={mailUrl} secondary>Email đơn hàng</ButtonLink>}>
         {!intake.accepting_orders && <p className="warning" role="status">Tiệm đang tạm ngừng nhận đơn mới.</p>}
         <section className="panel form-stack">
             <nav className="row-actions" aria-label="Loại đơn cần xử lý">
-                <Link className={'button compact' + (!latest ? ' secondary' : '')} aria-current={latest ? 'page' : undefined} href={inboxUrl}>Chưa xác nhận ({newCount})</Link>
-                <Link className={'button compact' + (latest ? ' secondary' : '')} aria-current={!latest ? 'page' : undefined} href={inboxUrl + '?filter=overdue'}>Chuyển khoản quá hạn ({overdueCount})</Link>
+                {tabs.map(([key, label, count]) => <Link key={key} className={'button compact' + (key === filter ? '' : ' secondary')}
+                    aria-current={key === filter ? 'page' : undefined} href={inboxUrl + (key === 'new' ? '' : '?filter=' + key)}>{label} ({count})</Link>)}
             </nav>
-            <Table headers={['Mã đơn', 'Thanh toán', 'Tổng tiền', 'Giờ giao hoặc nhận', latest ? 'Giờ đặt' : 'Hạn chuyển khoản']}
-                empty={latest ? 'Hiện không có đơn chờ xác nhận.' : 'Hiện không có chuyển khoản quá hạn.'}
+            <Table headers={['Mã đơn', 'Thanh toán', 'Tổng tiền', 'Giờ giao hoặc nhận', dateLabel]}
+                empty={empty}
                 rows={orders.data.map(order => [order.id,
                     <Link className="table-link" href={root + '/don-hang/' + order.id}>{order.code}</Link>,
                     order.method === 'bank' ? 'Chuyển khoản' : 'COD', money(order.total), dateTime(order.scheduled_at),
-                    dateTime(latest ? order.created_at : order.bank_due_at),
+                    dateTime(order[dateField]),
                 ])} />
             <Pagination page={orders} />
         </section>
@@ -286,7 +291,24 @@ export function AdminSchedule({ date, today, tomorrow, schedule, orderCount, cak
     </Admin>;
 }
 
-export function AdminOrder({ order, statuses, payments, next, reconcile }) {
+function RescheduleOrder({ schedule, slots, url }) {
+    const form = useForm({ slot: '', previous_slot: schedule.slice(0, 16), note: '' });
+    return <section className="panel form-stack"><h2>Đổi giờ giao hoặc nhận</h2>
+        {slots.length ? <form className="form-stack" onSubmit={event => {
+            event.preventDefault();
+            form.patch(url + '/doi-gio', { preserveScroll: true });
+        }}>
+            <Field label="Giờ mới" error={form.errors.slot}><select required value={form.data.slot} onChange={event => form.setData('slot', event.target.value)}>
+                <option value="">Chọn giờ</option>
+                {slots.map(slot => <option key={slot} value={slot}>{dateTime(slot)}</option>)}
+            </select></Field>
+            <Text form={form} field="note" label="Lý do đổi giờ" required maxLength={200} />
+            <button className="button secondary" disabled={form.processing}>Lưu giờ mới</button>
+        </form> : <p className="muted">Hiện chưa có khung giờ khác còn chỗ.</p>}
+    </section>;
+}
+
+export function AdminOrder({ order, statuses, payments, next, reconcile, rescheduleSlots }) {
     const transition = useForm({ kind: 'status', value: '', note: '' });
     const payment = useForm({ kind: 'payment', value: '', note: '' });
     const url = root + '/don-hang/' + order.id;
@@ -312,6 +334,7 @@ export function AdminOrder({ order, statuses, payments, next, reconcile }) {
                         <ErrorList errors={transition.errors} /><button className="button" disabled={transition.processing}>Cập nhật trạng thái</button>
                     </form> : <p className="muted">Đơn đã kết thúc.</p>}
                 </section>
+                {rescheduleSlots && <RescheduleOrder key={order.scheduled_at} schedule={order.scheduled_at} slots={rescheduleSlots} url={url} />}
                 <section className="panel form-stack"><h2>Thanh toán</h2>
                     <p>{order.method === 'bank' ? 'Chuyển khoản thủ công' : 'Thanh toán khi nhận bánh'}</p>
                     {order.bank_due_at && order.payment === 'unpaid' && order.status !== 'cancelled' && <p className="muted">Hạn chuyển khoản · {dateTime(order.bank_due_at)}</p>}
@@ -446,6 +469,7 @@ export function AdminSettings({ settings }) {
                 <Text form={form} field="name" label="Tên cửa hàng" required maxLength={100} /><Text form={form} field="address" label="Địa chỉ" maxLength={250} />
                 <div className="two-fields"><Text form={form} field="phone" label="Số điện thoại" /><Text form={form} field="email" label="Email liên hệ" type="email" /></div>
                 <TextArea form={form} field="order_policy" label="Chính sách đổi giờ, hủy đơn và hoàn tiền" maxLength={4000} />
+                <TextArea form={form} field="privacy_notice" label="Thông báo xử lý dữ liệu khách hàng" maxLength={4000} />
                 <Text form={form} field="hours" label="Giờ mở cửa hiển thị" required /><Field label="Logo" hint="JPEG, PNG hoặc WebP, tối đa 4 MB"><input type="file" accept="image/jpeg,image/png,image/webp" onChange={e => form.setData('logo', e.target.files?.[0] ?? null)} /></Field>
                 {logo && <><img className="logo-preview" src={logo} alt="Logo hiện tại" /><Flag form={form} field="remove_logo" label="Bỏ logo hiện tại" /></>}
             </section><section className="panel form-stack"><h2>Lịch nhận bánh</h2>
@@ -514,6 +538,7 @@ export function AdminUsers({ selected, users }) {
             <Link className="table-link" href={url + '/' + user.id}>{user.name}<small>{user.email}</small></Link>, user.role === 'admin' ? 'Quản trị viên' : user.can_reconcile ? 'Nhân viên · Đối soát' : 'Nhân viên', user.active ? 'Hoạt động' : 'Đã khóa'])} /><Pagination page={users} /></div>
             <form className="panel form-stack" onSubmit={e => { e.preventDefault(); form.post(url + (selected ? '/' + selected.id : ''), { preserveState: 'errors', onFinish: () => form.reset('password') }); }}>
                 <div className="section-head"><h2>{selected ? 'Sửa tài khoản' : 'Tạo tài khoản'}</h2>{selected && <Link className="subtle-link" href={url}>Tạo mới</Link>}</div>
+                {selected && <p className="muted">{selected.mfa_ready ? 'Đã cấp khóa xác thực hai bước.' : 'Cấp khóa xác thực hai bước bằng lệnh bakery:mfa trên máy chủ.'}</p>}
                 <Text form={form} field="name" label="Họ và tên" required /><Text form={form} field="email" label="Email" type="email" required />
                 <Text form={form} field="password" label={selected ? 'Mật khẩu mới (tùy chọn)' : 'Mật khẩu'} type="password" autoComplete="new-password" required={!selected} minLength={10} maxLength={72} />
                 <Field label="Vai trò"><select value={form.data.role} onChange={e => form.setData('role', e.target.value)}><option value="staff">Nhân viên</option><option value="admin">Quản trị viên</option></select></Field>

@@ -51,7 +51,7 @@ export function Cart({ lines }) {
     </div></Layout>;
 }
 
-export function Checkout({ lines, slots, regions, bankEnabled, keyToken, policy }) {
+export function Checkout({ lines, slots, regions, bankEnabled, keyToken, policy, privacy }) {
     const { auth, shop } = usePage().props;
     const subtotal = lines.reduce((sum, line) => sum + Number(line.subtotal), 0);
     const form = useForm({ key: keyToken, name: auth?.name ?? '', email: auth?.email ?? '', phone: '', fulfillment: 'pickup', region: '', address: '', slot: '', method: 'cod', coupon: '' });
@@ -98,6 +98,7 @@ export function Checkout({ lines, slots, regions, bankEnabled, keyToken, policy 
                         <Field label="Số điện thoại" error={form.errors.phone}><input type="tel" autoComplete="tel" required value={form.data.phone} onChange={e => form.setData('phone', e.target.value)} /></Field>
                         <Field label="Email nhận mã đơn" error={form.errors.email}><input type="email" autoComplete="email" required value={form.data.email} onChange={e => form.setData('email', e.target.value)} /></Field>
                     </div>
+                    {privacy && <details className="fold"><summary>Tiệm sử dụng thông tin của bạn thế nào?</summary><p className="policy-text">{privacy}</p></details>}
                 </section>
                 <section className="panel form-stack"><h2>Cách nhận bánh</h2>
                     <div className="choices">
@@ -133,7 +134,7 @@ export function Checkout({ lines, slots, regions, bankEnabled, keyToken, policy 
     </div></Layout>;
 }
 
-export function OrderPolicy({ policy }) {
+export function OrderPolicy({ policy, privacy }) {
     const { shop } = usePage().props;
     return <Layout title="Chính sách đặt bánh"><div className="wrap page">
         <Breadcrumb><span>Chính sách đặt bánh</span></Breadcrumb>
@@ -143,6 +144,7 @@ export function OrderPolicy({ policy }) {
             {shop.phone && <p><a className="subtle-link" href={`tel:${shop.phone.replace(/[^+\d]/g, '')}`}>Gọi tiệm {shop.phone}</a></p>}
             {shop.email && <p><a className="subtle-link" href={`mailto:${shop.email}`}>{shop.email}</a></p>}
         </section>
+        {privacy && <section className="panel form-stack"><h2>Xử lý dữ liệu khách hàng</h2><p className="policy-text">{privacy}</p></section>}
     </div></Layout>;
 }
 
@@ -174,7 +176,10 @@ export function OrderItems({ items }) {
 }
 
 export function OrderEvents({ events, statuses, payments }) {
-    return <ol className="timeline">{events.map((event, i) => <li key={event.id ?? i}><span></span><div><strong>{(event.kind === 'payment' ? payments : statuses)[event.value]}</strong><small>{dateTime(event.created_at)}{event.actor ? ' · ' + event.actor : ''}</small>{event.note && <p>{event.note}</p>}</div></li>)}</ol>;
+    return <ol className="timeline">{events.map((event, i) => <li key={event.id ?? i}><span></span><div>
+        <strong>{event.kind === 'schedule' ? 'Đổi giờ sang ' + dateTime(event.value) : (event.kind === 'payment' ? payments : statuses)[event.value]}</strong>
+        <small>{dateTime(event.created_at)}{event.actor ? ' · ' + event.actor : ''}</small>{event.note && <p>{event.note}</p>}
+    </div></li>)}</ol>;
 }
 
 export function Order({ order, statuses, payments, trackingLink, canReorder }) {
@@ -193,7 +198,7 @@ export function Order({ order, statuses, payments, trackingLink, canReorder }) {
                     {order.bank_due_at && <p className="muted">Hạn chuyển khoản · {dateTime(order.bank_due_at)}</p>}
                     <p className="muted">Tiệm cập nhật thanh toán sau khi nhân viên đối soát.</p>
                 </section>}
-                <section className="panel form-stack"><h2>Cách nhận bánh</h2><p className="icon-text"><MapPin size={19} />{order.fulfillment === 'pickup' ? 'Nhận tại tiệm · ' + shop.address : order.address + ' · ' + order.region_label}</p><p className="icon-text"><CalendarClock size={19} />{dateTime(order.scheduled_at)}</p></section>
+                <section className="panel form-stack"><h2>Cách nhận bánh</h2><p className="icon-text"><MapPin size={19} />{order.fulfillment === 'pickup' ? 'Nhận tại tiệm · ' + shop.address : (order.address || 'Giao tận nơi') + ' · ' + order.region_label}</p><p className="icon-text"><CalendarClock size={19} />{dateTime(order.scheduled_at)}</p></section>
                 <section className="panel form-stack"><h2>Lịch sử đơn</h2><OrderEvents events={order.events} statuses={statuses} payments={payments} /></section>
             </div>
             <aside className="panel order-summary"><h2>Chi tiết thanh toán</h2><OrderItems items={order.items} /><Totals {...order} />

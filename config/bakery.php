@@ -2,6 +2,8 @@
 
 return [
     'demo_seed' => env('BAKERY_DEMO_SEED', false),
+    'rehearsal' => env('BAKERY_REHEARSAL', false),
+    'trusted_proxies' => array_values(array_filter(array_map('trim', explode(',', (string) env('BAKERY_TRUSTED_PROXIES', ''))))),
     'mail_wait_minutes' => 5,
     'defaults' => [
         'name' => 'Tiệm Bánh Nhà Mình',
@@ -10,9 +12,9 @@ return [
         'email' => '',
         'address' => '',
         'hours' => '08:00 – 19:00',
-        'accepting_orders' => true,
         'pause_message' => null,
         'order_policy' => null,
+        'privacy_notice' => null,
         'weekdays' => [1, 2, 3, 4, 5, 6, 7],
         'slots' => ['09:00', '11:00', '14:00', '16:00', '18:00'],
         'slot_limits' => [],

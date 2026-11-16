@@ -119,7 +119,27 @@ export function Error({ status }) {
     return <Layout title={titles[status]}><div className="wrap page"><Empty title={titles[status]} text={status === 404 ? 'Nếu đang tra cứu đơn, hãy kiểm tra liên kết trong email xác nhận.' : 'Vui lòng thử lại sau hoặc trở về trang chủ.'} href="/" label="Về trang chủ" /></div></Layout>;
 }
 
-export function Auth({ mode, email, token }) {
+function StaffChallenge() {
+    const form = useForm({ code: '' });
+    const title = 'Xác thực hai bước';
+    return <Layout title={title}><div className="wrap page">
+        <div className="panel auth-card"><h1>{title}</h1><p>Nhập mã 6 số trên ứng dụng xác thực của tài khoản nội bộ.</p>
+            <form className="form-stack" onSubmit={event => {
+                event.preventDefault();
+                form.post('/xac-thuc-hai-buoc', { onFinish: () => form.reset('code') });
+            }}>
+                <Field label="Mã xác thực" error={form.errors.code}>
+                    <input inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} value={form.data.code}
+                        onChange={event => form.setData('code', event.target.value)} required />
+                </Field>
+                <button className="button" disabled={form.processing}>{form.processing ? 'Đang kiểm tra…' : 'Xác thực'}<ArrowRight size={18} /></button>
+            </form>
+            <Link className="subtle-link auth-back" href="/dang-nhap"><ArrowLeft size={16} />Về đăng nhập</Link>
+        </div>
+    </div></Layout>;
+}
+
+function AuthForm({ mode, email, token }) {
     const form = useForm({ name: '', email: email ?? '', password: '', password_confirmation: '', token: token ?? '' });
     const titles = { login: 'Đăng nhập', register: 'Đăng ký', forgot: 'Khôi phục mật khẩu', reset: 'Đặt lại mật khẩu' };
     const paths = { login: '/dang-nhap', register: '/dang-ky', forgot: '/quen-mat-khau', reset: '/dat-lai-mat-khau' };
@@ -135,4 +155,8 @@ export function Auth({ mode, email, token }) {
             {mode === 'login' ? <div className="auth-links"><Link href="/quen-mat-khau">Quên mật khẩu?</Link><Link href="/dang-ky">Đăng ký</Link></div> : <Link className="subtle-link auth-back" href="/dang-nhap"><ArrowLeft size={16} />Đăng nhập</Link>}
         </div>
     </div></Layout>;
+}
+
+export function Auth(props) {
+    return props.mode === 'two-factor' ? <StaffChallenge /> : <AuthForm {...props} />;
 }

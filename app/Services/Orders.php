@@ -46,6 +46,41 @@ class Orders
         return $actor->active && ($actor->role === 'admin' || ($actor->role === 'staff' && $actor->can_reconcile));
     }
 
+    public static function canReschedule(object $order): bool
+    {
+        return in_array($order->status, ['pending', 'confirmed'], true);
+    }
+
+    public static function prepMinutes(int $orderId): int
+    {
+        return (int) DB::table('order_items')->join('variants', 'variants.id', '=', 'order_items.variant_id')
+            ->join('products', 'products.id', '=', 'variants.product_id')->where('order_id', $orderId)->max('products.prep_minutes');
+    }
+
+    public static function reschedule(int $id, User $actor, array $fields, Checkout $checkout): void
+    {
+        DB::transaction(function () use ($id, $actor, $fields, $checkout) {
+            $settings = Store::settings(lock: true);
+            $actor = $actor->fresh();
+            abort_unless($actor?->active && $actor->isStaff(), 403);
+            $order = DB::table('orders')->lockForUpdate()->find($id);
+            abort_unless($order, 404);
+            if (! self::canReschedule($order) || $order->scheduled_at !== $fields['previous_slot'].':00') {
+                throw ValidationException::withMessages(['slot' => 'Đơn đã thay đổi hoặc đã vào khâu chuẩn bị. Vui lòng tải lại trang.']);
+            }
+            if ($fields['slot'] === $fields['previous_slot']) {
+                return;
+            }
+            $scheduledAt = $checkout->assertSlot($fields['slot'], $settings, self::prepMinutes($id));
+            $update = ['scheduled_at' => $scheduledAt, 'updated_at' => now()];
+            if ($order->method === 'bank' && $order->payment === 'unpaid' && $order->bank_due_at !== null) {
+                $update['bank_due_at'] = min($order->bank_due_at, $scheduledAt);
+            }
+            DB::table('orders')->where('id', $id)->update($update);
+            self::event($id, $actor->id, 'schedule', $fields['slot'], 'Giờ cũ '.$fields['previous_slot'].'. '.$fields['note']);
+        }, 5);
+    }
+
     public static function change(int $id, User $actor, array $fields): void
     {
         DB::transaction(function () use ($id, $actor, $fields) {
@@ -110,10 +145,10 @@ class Orders
 
     public static function link(object $order): string
     {
-        return route('tracking.show', ['token' => $order->tracking_token]);
+        return rtrim(config('app.url'), '/').route('tracking.show', ['token' => $order->tracking_token], absolute: false);
     }
 
-    public static function detail(object $order, bool $internal = false): array
+    public static function detail(object $order, bool $internal = false, bool $owner = false): array
     {
         $data = (array) $order;
         unset($data['tracking_token'], $data['request_key'], $data['user_id'], $data['stock_restored_at']);
@@ -122,9 +157,14 @@ class Orders
                 'code', 'fulfillment', 'address', 'region_label', 'scheduled_at',
                 'method', 'payment', 'status', 'subtotal', 'discount', 'delivery_fee', 'total', 'bank_due_at',
             ]));
+            if (! $owner) {
+                unset($data['address']);
+            }
         }
-        $data['bank_snapshot'] = $order->bank_snapshot ? json_decode($order->bank_snapshot, true, flags: JSON_THROW_ON_ERROR) : null;
-        $data['items'] = DB::table('order_items')->where('order_id', $order->id)->get();
+        $showBank = $internal || ($order->status !== 'cancelled' && $order->payment === 'unpaid');
+        $data['bank_snapshot'] = $showBank && $order->bank_snapshot ? json_decode($order->bank_snapshot, true, flags: JSON_THROW_ON_ERROR) : null;
+        $data['items'] = DB::table('order_items')->where('order_id', $order->id)->orderBy('id')
+            ->get($internal || $owner ? ['*'] : ['id', 'product_name', 'variant_name', 'quantity', 'unit_price', 'option_fee']);
         $events = DB::table('order_events')->where('order_id', $order->id)->orderBy('order_events.id');
         if ($internal) {
             $events->leftJoin('users', 'users.id', '=', 'order_events.actor_id')->select('order_events.*', 'users.name as actor');

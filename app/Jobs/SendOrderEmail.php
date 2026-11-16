@@ -7,6 +7,8 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use RuntimeException;
+use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 
 class SendOrderEmail implements ShouldQueue
 {
@@ -53,7 +55,11 @@ class SendOrderEmail implements ShouldQueue
             ],
         };
 
-        Mail::raw($body."\n\nXem tình trạng đơn tại ".Orders::link($order),
-            fn ($message) => $message->to($order->email)->subject($subject));
+        try {
+            Mail::raw($body."\n\nXem tình trạng đơn tại ".Orders::link($order),
+                fn ($message) => $message->to($order->email)->subject($subject));
+        } catch (TransportExceptionInterface $exception) {
+            throw new RuntimeException('SMTP từ chối hoặc không nhận được email đơn hàng ('.class_basename($exception).').');
+        }
     }
 }

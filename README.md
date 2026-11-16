@@ -66,6 +66,8 @@ Tất cả tài khoản mẫu dùng mật khẩu `BanhDemo2026!` và chỉ đư�
 | `doisoat@tiembanh.test` | Quyền nhân viên, đối soát chuyển khoản và ghi nhận hoàn tiền |
 | `khach@tiembanh.test` | Tài khoản khách và lịch sử các đơn mẫu |
 
+Tài khoản nội bộ cần khóa TOTP. Sau khi chạy migration, dùng `php artisan bakery:mfa admin@tiembanh.test` để cấp khóa riêng cho quản trị viên mẫu và làm tương tự cho từng nhân viên cần kiểm thử. Nhập khóa vào ứng dụng xác thực theo chế độ dựa trên thời gian, 6 số, chu kỳ 30 giây. [Hướng dẫn cấp và thay khóa](docs/van-hanh.md#xác-thực-hai-bước-cho-tài-khoản-nội-bộ).
+
 1. Chọn bánh, phiên bản, số lượng và lời chúc nếu có. Mở giỏ để cập nhật món hoặc tiếp tục đặt bánh.
 2. Chọn giao hàng hoặc nhận tại tiệm và chọn giờ. Dùng thử `NHAMINH10` cho đơn từ 200.000 ₫ hoặc `NGOT30000` cho đơn từ 300.000 ₫.
 3. Đặt thử COD hoặc chuyển khoản mẫu. Lưu liên kết tra cứu từ trang xác nhận hoặc lấy trong `storage/logs/laravel.log`. Yêu cầu quên mật khẩu cũng ghi email vào tệp này.
@@ -77,7 +79,7 @@ Nhân viên mở **Đối soát** để xem đơn chuyển khoản chờ thanh t
 
 Hệ thống đưa email báo nhận đơn vào hàng đợi khi tạo đơn và gửi thêm email khi đơn chuyển sang **Đã xác nhận**, **Sẵn sàng nhận** hoặc **Đang giao**. Khách có thể mở **Tra cứu**, nhập mã đơn và email đã dùng khi đặt để yêu cầu nhận lại liên kết riêng. Hệ thống hiển thị cùng một thông báo sau khi tiếp nhận và sẽ gửi liên kết khi thông tin trùng khớp.
 
-**Đơn cần xử lý** gom đơn chưa xác nhận và chuyển khoản quá hạn. Quản trị viên có thể tạm ngừng nhận đơn mới, nhập thông báo cho khách và xem email đang chờ hoặc thất bại. Khách vẫn được tra cứu đơn đã đặt khi tiệm tạm ngừng. Nội dung chính sách đổi giờ, hủy và hoàn tiền được chỉnh trong **Cấu hình** và hiển thị ở cửa hàng.
+**Đơn cần xử lý** gom đơn chưa xác nhận, chuyển khoản quá hạn và đơn chờ hoàn tiền. Quản trị viên có thể tạm ngừng nhận đơn mới, nhập thông báo cho khách và xem email đang chờ hoặc thất bại. Nhân viên có thể đổi giờ giao hoặc nhận đối với đơn chưa vào khâu chuẩn bị. Khách vẫn tra cứu được đơn đã nhận khi tiệm tạm ngừng. Chỉnh chính sách đặt bánh và thông báo xử lý dữ liệu trong **Cấu hình**.
 
 Khách đã đăng nhập mở **Đơn của tôi**, chọn đơn cũ rồi bấm **Mua lại bánh**. Giỏ giữ các món đã có và thêm số bánh còn bán theo giá hiện tại. Nếu chỉ đủ một phần, hệ thống báo số bánh đã thêm và số bánh chưa thêm được. Khách nhập lời chúc và ghi chú mới trong giỏ. Đơn mới giữ tồn khi được đặt thành công.
 
@@ -98,7 +100,7 @@ php vendor/bin/pint --test
 php artisan test
 ```
 
-Lệnh test mặc định dùng SQLite trong bộ nhớ. Bốn bài kiểm tra hai tiến trình được chạy khi chọn MySQL. Tạo schema mới có hậu tố `_test`, ví dụ `tiembanh_test`, và cấp quyền cho tài khoản kiểm thử. Bộ test tạo lại schema được chỉ định và chặn cấu hình trỏ đến cơ sở dữ liệu phát triển.
+Lệnh test mặc định dùng SQLite trong bộ nhớ. Năm bài kiểm tra hai tiến trình được chạy khi chọn MySQL. Tạo schema mới có hậu tố `_test`, ví dụ `tiembanh_test`, và cấp quyền cho tài khoản kiểm thử. Bộ test tạo lại schema được chỉ định và chặn cấu hình trỏ đến cơ sở dữ liệu phát triển.
 
 ```powershell
 $env:DB_CONNECTION = 'mysql'
@@ -108,9 +110,11 @@ php artisan test
 Remove-Item Env:DB_CONNECTION, Env:DB_DATABASE, Env:DB_PORT
 ```
 
-Dùng `DB_HOST`, `DB_USERNAME`, `DB_PASSWORD` trong môi trường hoặc trong `.env.testing` nếu thông tin riêng khác `.env`. Bài test HTTP bao phủ giá bị gửi sai từ phía khách, tồn kho, hạn mức mã giảm, gửi đơn lặp, giờ nhận, hoàn kho khi hủy, quyền xem đơn và đối soát, lọc CSV, email khôi phục và ảnh tải lên. Bộ test còn kiểm tra hạn đối soát, thử lại email lỗi, quyền mua lại và giá hiện tại, nhật ký tồn khi đặt và hủy, cùng doanh thu theo ngày hoàn tất. Các bài test MySQL dùng hai tiến trình để tranh tồn cuối, lượt mã cuối, chỗ cuối của một khung giờ và gửi cùng khóa yêu cầu.
+Dùng `DB_HOST`, `DB_USERNAME`, `DB_PASSWORD` trong môi trường hoặc trong `.env.testing` nếu thông tin riêng khác `.env`. Bài test HTTP bao phủ tính giá, tồn kho, hạn mức mã giảm, gửi đơn lặp, giờ nhận, hoàn kho, quyền xem đơn và đối soát, lọc CSV, email khôi phục và ảnh tải lên. Bộ test còn kiểm tra hạn đối soát, gửi lại email lỗi, quyền mua lại, nhật ký tồn, báo cáo, TOTP, điều kiện mở nhận đơn, quyền đổi giờ và đơn chờ hoàn tiền. MySQL kiểm tra hai tiến trình tranh tồn cuối, lượt mã cuối, khung giờ cuối, cùng khóa yêu cầu và thao tác đặt đơn tranh chỗ với thao tác đổi giờ.
 
 Đã chạy lint PHP/JS và build Vite. MySQL đạt 25 bài với 767 assertions. SQLite đạt 21 bài với 738 assertions và bỏ qua bốn bài kiểm tra đồng thời dành cho MySQL. Chặng 4 dùng schema MySQL staging riêng. Trên trình duyệt đã kiểm tra đặt COD ở 390 px, tạm ngừng nhận đơn từ checkout cũ, hoàn tất COD, đối soát chuyển khoản mẫu và tra cứu. Email báo nhận đơn được kiểm tra bằng mailer log khi worker khởi động lại. Đã phục hồi 9 đơn và ảnh sản phẩm mẫu vào schema và thư mục ảnh riêng, đối chiếu mã băm ảnh và xem lại đơn trên trình duyệt. SMTP thật và tiền chuyển khoản thật cần cấu hình cửa hàng để xác minh.
+
+Chặng 5 đạt 29 bài trên MySQL với 875 assertions và 24 bài trên SQLite với 840 assertions. Nghiệm thu qua HTTPS trên loopback dùng chứng chỉ thử được máy khách kiểm tra và MySQL staging riêng. Đã kiểm tra cookie Secure, trạng thái tạm ngừng ban đầu, đăng nhập TOTP, đổi giờ, tra cứu và danh sách chờ hoàn tiền. Hộp thư SMTP trên loopback nhận thư báo đơn, thư trạng thái và thư đặt lại mật khẩu. Liên kết đặt lại mật khẩu mở đúng trên HTTPS staging. Tên miền và SMTP của cửa hàng cần được xác minh bằng cấu hình thật.
 
 ## Cấu hình cửa hàng thật
 
@@ -118,9 +122,10 @@ Xem [hướng dẫn vận hành, kiểm tra cấu hình và phục hồi bản s
 
 - Tạo cơ sở dữ liệu trống, cấu hình `APP_ENV=production`, `APP_DEBUG=false`, `APP_URL` HTTPS, `SESSION_SECURE_COOKIE=true`, `BAKERY_DEMO_SEED=false`, khóa ứng dụng và tài khoản DB riêng.
 - Cấu hình thư SMTP và địa chỉ gửi qua biến môi trường. Dùng trình quản lý tiến trình để duy trì `php artisan queue:work order-mail --sleep=2`. Kiểm tra thư gửi thất bại bằng `php artisan queue:failed`. Giới hạn truy cập nhật ký vì liên kết tra cứu và đặt lại mật khẩu là thông tin riêng.
-- Chạy `php artisan migrate --force`, `php artisan bakery:admin` và build frontend. Đặt document root máy chủ ở `public/`. Cấp quyền ghi cho `storage/` và `bootstrap/cache/`.
+- Chạy `php artisan migrate --force`, `php artisan bakery:admin`, `php artisan bakery:mfa EMAIL` và build frontend. Đặt document root máy chủ ở `public/`. Cấp quyền ghi cho `storage/` và `bootstrap/cache/`.
 - Đăng nhập quản trị để thiết lập tên, logo, liên hệ, lịch nhận, ngày nghỉ, khu vực và phí giao, giá và tồn thực tế. Điền thông tin ngân hàng thật và tắt cảnh báo mẫu nếu sử dụng chuyển khoản thủ công.
 - Sao lưu MySQL và thư mục ảnh `storage/app/public/bakery`. Đơn đã ghi nhận giữ bản chụp tên, giá và các tùy chọn tại thời điểm đặt.
+- Môi trường thật mới dựng bắt đầu ở trạng thái tạm ngừng nhận đơn. Chạy `php artisan bakery:preflight` và dùng **Đơn cần xử lý** để chủ động bật nhận đơn khi cấu hình đã sẵn sàng.
 
 ## Git và ảnh minh họa
 

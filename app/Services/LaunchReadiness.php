@@ -1,0 +1,78 @@
+<?php
+
+namespace App\Services;
+
+use Illuminate\Support\Facades\DB;
+
+class LaunchReadiness
+{
+    public static function required(): bool
+    {
+        return app()->environment('production') || config('bakery.rehearsal');
+    }
+
+    public static function loopback(string $host): bool
+    {
+        return in_array(strtolower($host), ['localhost', '127.0.0.1', '::1', '[::1]'], true);
+    }
+
+    public static function configurationIssues(bool $rehearsal = false): array
+    {
+        $issues = [];
+        $url = (string) config('app.url');
+        $loopback = self::loopback((string) parse_url($url, PHP_URL_HOST));
+        if (config('app.debug') || config('bakery.demo_seed')
+            || ($rehearsal ? ! app()->environment(['local', 'testing']) : ! app()->environment('production') || config('bakery.rehearsal'))) {
+            $issues[] = 'Chọn đúng môi trường và tắt debug, dữ liệu mẫu.';
+        }
+        if (! filter_var($url, FILTER_VALIDATE_URL) || parse_url($url, PHP_URL_SCHEME) !== 'https'
+            || ($rehearsal !== $loopback) || ! config('session.secure') || ! config('session.encrypt')) {
+            $issues[] = 'Cấu hình APP_URL HTTPS, SESSION_SECURE_COOKIE=true và SESSION_ENCRYPT=true.';
+        }
+        $sender = (string) config('mail.from.address');
+        $smtpHost = (string) config('mail.mailers.smtp.host');
+        $smtpUrl = config('mail.mailers.smtp.url');
+        if (config('mail.default') !== 'smtp' || ! filter_var($sender, FILTER_VALIDATE_EMAIL)
+            || ($rehearsal && (! self::loopback($smtpHost) || $smtpUrl))
+            || (! $rehearsal && preg_match('/(?:\.(?:test|example|invalid)|@example\.(?:com|net|org))$/i', $sender))) {
+            $issues[] = $rehearsal ? 'SMTP nghiệm thu phải gửi vào hộp thư bắt tại loopback.' : 'Cấu hình SMTP và địa chỉ gửi thư của cửa hàng.';
+        }
+
+        return $issues;
+    }
+
+    public static function dataIssues(array $settings): array
+    {
+        $issues = [];
+        if (! ($settings['phone'] || $settings['email']) || ! $settings['address'] || ! $settings['order_policy'] || ! $settings['privacy_notice']) {
+            $issues[] = 'Điền liên hệ, địa chỉ, chính sách đặt bánh và thông báo xử lý dữ liệu.';
+        }
+        $prepMinutes = DB::table('products')->join('variants', 'variants.product_id', '=', 'products.id')
+            ->where('products.active', true)->where('variants.active', true)->where('variants.stock', '>', 0)->min('products.prep_minutes');
+        if ($prepMinutes === null) {
+            $issues[] = 'Cần ít nhất một phiên bản bánh đang bán, còn tồn.';
+        }
+        if (! app(Checkout::class)->slots($settings, (int) $prepMinutes)) {
+            $issues[] = 'Cần ít nhất một giờ nhận trong 14 ngày tới.';
+        }
+        foreach ($settings['regions'] as $region) {
+            if (empty($region['key']) || empty($region['name']) || ! isset($region['fee'])
+                || filter_var($region['fee'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => 10000000]]) === false) {
+                $issues[] = 'Kiểm tra tên khu vực và phí giao hàng.';
+                break;
+            }
+        }
+        $bankStarted = $settings['bank_name'] || $settings['bank_account'] || $settings['bank_holder'];
+        if ($settings['bank_demo'] || ($bankStarted && (! Store::bank($settings) || preg_match('/^0+$/', trim($settings['bank_account']))))
+            || DB::table('users')->whereIn('email', ['admin@tiembanh.test', 'nhanvien@tiembanh.test', 'doisoat@tiembanh.test', 'khach@tiembanh.test'])->exists()) {
+            $issues[] = 'Gỡ tài khoản mẫu và kiểm tra thông tin ngân hàng trước khi mở nhận đơn.';
+        }
+        $staff = DB::table('users')->whereIn('role', ['staff', 'admin'])->where('active', true);
+        if (! (clone $staff)->where('role', 'admin')->whereNotNull('two_factor_secret')->exists()
+            || $staff->whereNull('two_factor_secret')->exists()) {
+            $issues[] = 'Cấp khóa xác thực hai bước cho tài khoản nội bộ đang hoạt động.';
+        }
+
+        return $issues;
+    }
+}

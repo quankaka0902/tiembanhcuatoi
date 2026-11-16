@@ -61,14 +61,26 @@ class ConcurrentCheckoutTest extends TestCase
         $this->assertDatabaseHas('variants', ['id' => 1, 'stock' => 14]);
     }
 
-    private function race(?string $coupon, bool $sameKey = false, string $slot = '', string $secondFulfillment = 'pickup'): array
+    public function test_checkout_and_reschedule_cannot_take_the_same_last_slot(): void
+    {
+        $settings = array_replace(Store::settings(), ['slot_limits' => ['09:00' => 1]]);
+        DB::table('store_settings')->update(['data' => json_encode($settings)]);
+        $orderId = DB::table('orders')->where('code', 'NB-DEMO001')->value('id');
+        $slot = now()->addDays(2)->toDateString().' 09:00';
+
+        $result = $this->race(null, slot: $slot, rescheduleOrderId: $orderId);
+        $this->assertContains($result, [['created', 'slot'], ['rescheduled', 'slot']]);
+        $this->assertSame(1, DB::table('orders')->where('scheduled_at', $slot.':00')->count());
+    }
+
+    private function race(?string $coupon, bool $sameKey = false, string $slot = '', string $secondFulfillment = 'pickup', ?int $rescheduleOrderId = null): array
     {
         $key = (string) Str::uuid();
         for ($i = 0; $i < 2; $i++) {
             $inputs[$i] = new InputStream;
             $processes[$i] = new Process([
                 PHP_BINARY, 'tests/Support/checkout_worker.php', $sameKey ? $key : (string) Str::uuid(), $coupon ?? '',
-                $slot, $i === 0 ? 'pickup' : $secondFulfillment,
+                $slot, $i === 0 ? 'pickup' : $secondFulfillment, $i === 0 ? '' : (string) $rescheduleOrderId,
             ], base_path(), [
                 'APP_ENV' => 'testing', 'DB_CONNECTION' => 'mysql', 'DB_DATABASE' => DB::getDatabaseName(),
                 'DB_HOST' => config('database.connections.mysql.host'), 'DB_PORT' => config('database.connections.mysql.port'),
