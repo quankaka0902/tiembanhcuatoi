@@ -17,7 +17,16 @@ class Store
 
     public static function publicSettings(): array
     {
-        return array_intersect_key(self::settings(), array_flip(['name', 'logo', 'phone', 'email', 'address', 'hours']));
+        $settings = self::settings();
+
+        return array_intersect_key($settings, array_flip([
+            'name', 'logo', 'phone', 'email', 'address', 'hours', 'accepting_orders',
+        ])) + ['pause_message' => self::pauseMessage($settings)];
+    }
+
+    public static function pauseMessage(array $settings): string
+    {
+        return $settings['pause_message'] ?: 'Tiệm đang tạm ngừng nhận đơn mới. Vui lòng quay lại sau.';
     }
 
     public static function openOn(array $settings, CarbonInterface $date): bool

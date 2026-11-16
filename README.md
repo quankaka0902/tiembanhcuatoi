@@ -36,7 +36,7 @@ php artisan serve --host=127.0.0.1 --port=18842
 - Có thể chạy `npm run dev` trong terminal thứ hai khi sửa giao diện. Nếu đổi cổng Laravel, cập nhật `APP_URL` cho khớp.
 - Composer CLI đang được lưu ở `work/composer.phar` trong workspace đã thiết lập. Nếu máy chưa có lệnh `composer`, có thể dùng `php work/composer.phar install` tại đây.
 
-Chạy worker trong terminal riêng để gửi email trạng thái và gửi lại liên kết tra cứu. Nếu dùng cấu hình PHP riêng trên Windows, đặt `PHPRC` như ở ví dụ khởi động Laravel bên dưới. Với cấu hình local, email có trong `storage/logs/laravel.log`.
+Chạy worker trong terminal riêng để gửi email báo nhận đơn, email trạng thái và gửi lại liên kết tra cứu. Nếu dùng cấu hình PHP riêng trên Windows, đặt `PHPRC` như ở ví dụ khởi động Laravel bên dưới. Với cấu hình local, email có trong `storage/logs/laravel.log`.
 
 ```powershell
 php artisan queue:work order-mail --sleep=2
@@ -75,7 +75,9 @@ Nhân viên mở **Lịch làm bánh** trong quản trị để xem đơn theo n
 
 Nhân viên mở **Đối soát** để xem đơn chuyển khoản chờ thanh toán hoặc lọc các đơn quá hạn. Hạn mặc định là 60 phút từ khi đặt và tối đa đến giờ giao hoặc nhận đã hẹn. Đổi thời hạn cho đơn mới trong **Cấu hình → Chuyển khoản thủ công**. Đơn phát sinh trước migration được tính hạn theo mốc mặc định. Đơn quá hạn vẫn chờ người có quyền đối soát kiểm tra và cập nhật thủ công.
 
-Hệ thống đưa email vào hàng đợi khi đơn chuyển sang **Đã xác nhận**, **Sẵn sàng nhận** hoặc **Đang giao**. Khách có thể mở **Tra cứu**, nhập mã đơn và email đã dùng khi đặt để yêu cầu nhận lại liên kết riêng. Hệ thống hiển thị cùng một thông báo sau khi tiếp nhận và sẽ gửi liên kết khi thông tin trùng khớp.
+Hệ thống đưa email báo nhận đơn vào hàng đợi khi tạo đơn và gửi thêm email khi đơn chuyển sang **Đã xác nhận**, **Sẵn sàng nhận** hoặc **Đang giao**. Khách có thể mở **Tra cứu**, nhập mã đơn và email đã dùng khi đặt để yêu cầu nhận lại liên kết riêng. Hệ thống hiển thị cùng một thông báo sau khi tiếp nhận và sẽ gửi liên kết khi thông tin trùng khớp.
+
+**Đơn cần xử lý** gom đơn chưa xác nhận và chuyển khoản quá hạn. Quản trị viên có thể tạm ngừng nhận đơn mới, nhập thông báo cho khách và xem email đang chờ hoặc thất bại. Khách vẫn được tra cứu đơn đã đặt khi tiệm tạm ngừng. Nội dung chính sách đổi giờ, hủy và hoàn tiền được chỉnh trong **Cấu hình** và hiển thị ở cửa hàng.
 
 Khách đã đăng nhập mở **Đơn của tôi**, chọn đơn cũ rồi bấm **Mua lại bánh**. Giỏ giữ các món đã có và thêm số bánh còn bán theo giá hiện tại. Nếu chỉ đủ một phần, hệ thống báo số bánh đã thêm và số bánh chưa thêm được. Khách nhập lời chúc và ghi chú mới trong giỏ. Đơn mới giữ tồn khi được đặt thành công.
 
@@ -108,9 +110,11 @@ Remove-Item Env:DB_CONNECTION, Env:DB_DATABASE, Env:DB_PORT
 
 Dùng `DB_HOST`, `DB_USERNAME`, `DB_PASSWORD` trong môi trường hoặc trong `.env.testing` nếu thông tin riêng khác `.env`. Bài test HTTP bao phủ giá bị gửi sai từ phía khách, tồn kho, hạn mức mã giảm, gửi đơn lặp, giờ nhận, hoàn kho khi hủy, quyền xem đơn và đối soát, lọc CSV, email khôi phục và ảnh tải lên. Bộ test còn kiểm tra hạn đối soát, thử lại email lỗi, quyền mua lại và giá hiện tại, nhật ký tồn khi đặt và hủy, cùng doanh thu theo ngày hoàn tất. Các bài test MySQL dùng hai tiến trình để tranh tồn cuối, lượt mã cuối, chỗ cuối của một khung giờ và gửi cùng khóa yêu cầu.
 
-Đã chạy migration trên MySQL dev, lint PHP/JS và build Vite. MySQL đạt 22 bài với 615 assertions. SQLite đạt 18 bài với 587 assertions và bỏ qua bốn bài kiểm tra đồng thời dành cho MySQL. Trên trình duyệt đã kiểm tra COD, chuyển khoản mẫu, lịch làm bánh, bộ lọc quá hạn và gửi lại liên kết tra cứu. Chặng 3 đã kiểm tra mua lại ở 390 px, đặt rồi hủy đơn COD mẫu, đối chiếu nhật ký hoàn tồn và lọc báo cáo theo ngày ở 1280 px. Email đặt bánh, khôi phục mật khẩu và liên kết tra cứu đã xuất hiện trong mailer log. SMTP thật và tiền chuyển khoản thật cần cấu hình cửa hàng để xác minh.
+Đã chạy lint PHP/JS và build Vite. MySQL đạt 25 bài với 767 assertions. SQLite đạt 21 bài với 738 assertions và bỏ qua bốn bài kiểm tra đồng thời dành cho MySQL. Chặng 4 dùng schema MySQL staging riêng. Trên trình duyệt đã kiểm tra đặt COD ở 390 px, tạm ngừng nhận đơn từ checkout cũ, hoàn tất COD, đối soát chuyển khoản mẫu và tra cứu. Email báo nhận đơn được kiểm tra bằng mailer log khi worker khởi động lại. Đã phục hồi 9 đơn và ảnh sản phẩm mẫu vào schema và thư mục ảnh riêng, đối chiếu mã băm ảnh và xem lại đơn trên trình duyệt. SMTP thật và tiền chuyển khoản thật cần cấu hình cửa hàng để xác minh.
 
 ## Cấu hình cửa hàng thật
+
+Xem [hướng dẫn vận hành, kiểm tra cấu hình và phục hồi bản sao lưu](docs/van-hanh.md).
 
 - Tạo cơ sở dữ liệu trống, cấu hình `APP_ENV=production`, `APP_DEBUG=false`, `APP_URL` HTTPS, `SESSION_SECURE_COOKIE=true`, `BAKERY_DEMO_SEED=false`, khóa ứng dụng và tài khoản DB riêng.
 - Cấu hình thư SMTP và địa chỉ gửi qua biến môi trường. Dùng trình quản lý tiến trình để duy trì `php artisan queue:work order-mail --sleep=2`. Kiểm tra thư gửi thất bại bằng `php artisan queue:failed`. Giới hạn truy cập nhật ký vì liên kết tra cứu và đặt lại mật khẩu là thông tin riêng.

@@ -10,7 +10,6 @@ use App\Services\Store;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -127,18 +126,23 @@ class Storefront extends Controller
 
     public function checkout(Request $request, Checkout $checkout)
     {
+        $settings = Store::settings();
+        if (! $settings['accepting_orders']) {
+            return redirect('/gio-hang');
+        }
+
         $lines = $checkout->cart($request->session()->get('cart', []));
         if (! $lines || collect($lines)->contains('available', false)) {
             return redirect('/gio-hang')->with('notice', 'Vui lòng kiểm tra giỏ hàng trước khi đặt.');
         }
 
-        $settings = Store::settings();
         $key = $request->session()->get('checkout_key') ?? (string) Str::uuid();
         $request->session()->put('checkout_key', $key);
 
         return Inertia::render('Checkout', [
             'lines' => $lines, 'slots' => $checkout->availableSlots($settings, max(array_column($lines, 'prep_minutes'))),
             'regions' => $settings['regions'], 'bankEnabled' => Store::bank($settings) !== null, 'keyToken' => $key,
+            'policy' => $settings['order_policy'],
         ]);
     }
 
@@ -161,20 +165,15 @@ class Storefront extends Controller
         if (! $key || ! hash_equals($key, $fields['key'])) {
             throw ValidationException::withMessages(['cart' => 'Giỏ hàng đã thay đổi. Vui lòng mở lại trang đặt bánh.']);
         }
-        [$order, $created] = $checkout->place($request->session()->get('cart', []), $fields, $request->user()?->id);
+        [$order] = $checkout->place($request->session()->get('cart', []), $fields, $request->user()?->id);
         $request->session()->forget('cart');
 
-        if ($created) {
-            try {
-                Mail::raw("Cảm ơn bạn đã đặt bánh! Mã đơn {$order->code}.\nTổng tiền: ".number_format($order->total, 0, ',', '.')." ₫\nTheo dõi đơn tại ".Orders::link($order),
-                    fn ($mail) => $mail->to($order->email)->subject('Đã nhận đơn '.$order->code));
-            } catch (Throwable $exception) {
-                report($exception);
-                $request->session()->flash('notice', 'Đơn đã được tạo. Hãy lưu liên kết tra cứu vì email có thể đến chậm.');
-            }
-        }
-
         return redirect(Orders::link($order));
+    }
+
+    public function policy()
+    {
+        return Inertia::render('OrderPolicy', ['policy' => Store::settings()['order_policy']]);
     }
 
     public function tracking()

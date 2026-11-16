@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\SendOrderEmail;
 use App\Services\Orders;
+use App\Services\Store;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
@@ -40,6 +42,41 @@ class AdminOrders extends Controller
         ]);
     }
 
+    public function inbox(Request $request)
+    {
+        $fields = $request->validate(['filter' => 'nullable|in:new,overdue']);
+        $filter = $fields['filter'] ?? 'new';
+        $new = DB::table('orders')->where('status', 'pending');
+        $overdue = $this->unpaidTransfers()->where('bank_due_at', '<=', now()->toDateTimeString());
+        $orders = $filter === 'overdue'
+            ? (clone $overdue)->orderBy('bank_due_at')
+            : (clone $new)->orderBy('scheduled_at');
+        $settings = Store::settings();
+
+        return Inertia::render('AdminInbox', [
+            'filter' => $filter, 'newCount' => $new->count(), 'overdueCount' => $overdue->count(),
+            'orders' => $orders->orderBy('id')->paginate(15, ['id', 'code', 'method', 'total', 'created_at', 'scheduled_at', 'bank_due_at'])->withQueryString(),
+            'intake' => ['accepting_orders' => $settings['accepting_orders'], 'pause_message' => $settings['pause_message']],
+        ])->toResponse($request)->header('Cache-Control', 'private, no-store');
+    }
+
+    public function mail(Request $request)
+    {
+        $connection = SendOrderEmail::CONNECTION;
+        $queue = config("queue.connections.{$connection}.queue");
+        $jobs = DB::table(config("queue.connections.{$connection}.table"))->where('queue', $queue);
+        $threshold = (int) config('bakery.mail_wait_minutes');
+        $failures = DB::connection(config('queue.failed.database'))->table(config('queue.failed.table'))
+            ->where('connection', $connection)->where('queue', $queue);
+
+        return Inertia::render('AdminMail', [
+            'queued' => $jobs->count(),
+            'delayed' => (clone $jobs)->where('created_at', '<=', now()->subMinutes($threshold)->timestamp)->count(),
+            'threshold' => $threshold,
+            'failures' => $failures->orderByDesc('failed_at')->orderByDesc('id')->paginate(15, ['uuid', 'failed_at']),
+        ])->toResponse($request)->header('Cache-Control', 'private, no-store');
+    }
+
     public function reports(Request $request)
     {
         $filters = $request->validate($this->dateRules($request));
@@ -74,7 +111,7 @@ class AdminOrders extends Controller
         $fields = $request->validate(['filter' => 'nullable|in:pending,overdue']);
         $filter = $fields['filter'] ?? 'pending';
         $now = now()->toDateTimeString();
-        $pending = Orders::scheduled()->where('method', 'bank')->where('payment', 'unpaid');
+        $pending = $this->unpaidTransfers();
 
         $orders = $pending->when($filter === 'overdue', fn ($query) => $query->where('bank_due_at', '<=', $now))
             ->orderBy('bank_due_at')->orderBy('id')
@@ -87,6 +124,11 @@ class AdminOrders extends Controller
 
         return Inertia::render('AdminReconciliation', ['orders' => $orders, 'filter' => $filter])
             ->toResponse($request)->header('Cache-Control', 'private, no-store');
+    }
+
+    private function unpaidTransfers(): Builder
+    {
+        return Orders::scheduled()->where('method', 'bank')->where('payment', 'unpaid');
     }
 
     public function show(Request $request, int $order)

@@ -5,7 +5,7 @@ import { createRoot } from 'react-dom/client';
 createInertiaApp({
     async resolve(name) {
         if (name.startsWith('Admin')) return (await import('./admin'))[name];
-        if (['Cart', 'Checkout', 'Tracking', 'Order', 'History'].includes(name)) return (await import('./checkout'))[name];
+        if (['Cart', 'Checkout', 'Tracking', 'Order', 'History', 'OrderPolicy'].includes(name)) return (await import('./checkout'))[name];
         return (await import('./storefront'))[name];
     },
     title: title => title || 'Tiệm Bánh Nhà Mình',

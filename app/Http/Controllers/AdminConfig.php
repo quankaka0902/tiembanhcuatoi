@@ -16,7 +16,27 @@ class AdminConfig extends Controller
 {
     public function settings()
     {
-        return Inertia::render('AdminSettings', ['settings' => Store::settings()]);
+        $settings = Store::settings();
+        unset($settings['accepting_orders'], $settings['pause_message']);
+
+        return Inertia::render('AdminSettings', ['settings' => $settings]);
+    }
+
+    public function saveIntake(Request $request)
+    {
+        $fields = $request->validate([
+            'accepting_orders' => 'required|boolean', 'pause_message' => 'nullable|string|max:250',
+        ]);
+        DB::transaction(function () use ($fields) {
+            $current = Store::settings(lock: true);
+            $settings = array_replace($current, [
+                'accepting_orders' => (bool) $fields['accepting_orders'],
+                'pause_message' => $fields['pause_message'] ?? null,
+            ]);
+            DB::table('store_settings')->where('id', 1)->update(['data' => json_encode($settings, JSON_THROW_ON_ERROR)]);
+        }, 5);
+
+        return back()->with('notice', $fields['accepting_orders'] ? 'Tiệm đang nhận đơn mới.' : 'Đã tạm ngừng nhận đơn mới.');
     }
 
     public function saveSettings(Request $request, AdminCatalog $catalog)
@@ -24,6 +44,7 @@ class AdminConfig extends Controller
         $fields = $request->validate([
             'name' => 'required|string|max:100', 'phone' => 'nullable|string|max:30', 'email' => 'nullable|email|max:254',
             'address' => 'nullable|string|max:250', 'hours' => 'required|string|max:100',
+            'order_policy' => 'nullable|string|max:4000',
             'logo' => 'nullable|'.AdminCatalog::IMAGE_RULES, 'remove_logo' => 'required|boolean',
             'weekdays' => 'required|array|min:1|max:7', 'weekdays.*' => 'integer|distinct|between:1,7',
             'slots' => 'required|array|min:1|max:48', 'slots.*' => 'required|date_format:H:i|distinct',

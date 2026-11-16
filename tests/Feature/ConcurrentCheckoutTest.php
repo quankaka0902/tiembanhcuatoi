@@ -46,6 +46,7 @@ class ConcurrentCheckoutTest extends TestCase
         $this->assertSame(['created', 'replayed'], $this->race(null, sameKey: true));
         $this->assertDatabaseHas('variants', ['id' => 1, 'stock' => 14]);
         $this->assertDatabaseCount('orders', 8);
+        $this->assertDatabaseCount('jobs', 1);
     }
 
     public function test_simultaneous_pickup_and_delivery_cannot_take_the_same_last_slot(): void

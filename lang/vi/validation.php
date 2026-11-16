@@ -38,5 +38,6 @@ return [
         'date' => 'ngày nhận bánh', 'slots.*' => 'khung giờ', 'slot_limits.*' => 'số đơn tối đa',
         'code' => 'mã đơn hoặc mã giảm giá', 'bank_due_minutes' => 'thời hạn chuyển khoản',
         'reason' => 'loại thay đổi tồn kho', 'product' => 'sản phẩm', 'variants.*.stock_note' => 'lý do thay đổi tồn',
+        'accepting_orders' => 'trạng thái nhận đơn', 'pause_message' => 'thông báo tạm ngừng', 'order_policy' => 'chính sách đặt bánh',
     ],
 ];

@@ -8,8 +8,11 @@ const scheduleUrl = root + '/lich-lam-banh';
 const reconciliationUrl = root + '/doi-soat';
 const reportsUrl = root + '/bao-cao';
 const inventoryUrl = root + '/ton-kho';
+const inboxUrl = root + '/viec-can-xu-ly';
+const mailUrl = root + '/email-don';
 const nav = [
     [root, 'Tổng quan', LayoutDashboard], [root + '/don-hang', 'Đơn hàng', ClipboardList],
+    [inboxUrl, 'Đơn cần xử lý', Package],
     [scheduleUrl, 'Lịch làm bánh', CalendarDays],
     [reconciliationUrl, 'Đối soát', Banknote],
     [reportsUrl, 'Báo cáo', ChartNoAxesCombined], [inventoryUrl, 'Nhật ký tồn kho', Package, true],
@@ -64,7 +67,8 @@ function DateFilters({ filters, url, statuses }) {
 }
 
 export function AdminDashboard({ filters, total, revenue, working, low, lowCount, recent, statuses }) {
-    return <Admin title="Tổng quan" detail="Theo dõi đơn bánh, doanh thu và tồn kho.">
+    return <Admin title="Tổng quan" detail="Theo dõi đơn bánh, doanh thu và tồn kho."
+        action={<ButtonLink href={inboxUrl}>Đơn cần xử lý</ButtonLink>}>
         <DateFilters filters={filters} url={root} />
         <div className="stats">
             {[[ClipboardList, 'Số đơn', total], [Package, 'Đang xử lý', working], [Ticket, 'Doanh thu đã thanh toán', money(revenue)], [CakeSlice, 'Phiên bản sắp hết', lowCount]].map(([Icon, label, value]) =>
@@ -73,6 +77,67 @@ export function AdminDashboard({ filters, total, revenue, working, low, lowCount
         <div className="admin-columns"><section className="panel"><div className="section-head"><h2>Đơn gần đây</h2><Link className="subtle-link" href={root + '/don-hang'}>Xem tất cả</Link></div>
             <Table headers={['Mã đơn', 'Khách hàng', 'Trạng thái', 'Tổng']} rows={recent.map(order => [order.id, <Link className="table-link" href={root + '/don-hang/' + order.id}>{order.code}</Link>, order.name, <Pill value={order.status} labels={statuses} />, money(order.total)])} />
         </section><section className="panel"><h2>Tồn kho thấp</h2><Table headers={['Bánh', 'Phiên bản', 'Còn']} rows={low.map((item, index) => [index, item.product_name, item.name, item.stock])} /></section></div>
+    </Admin>;
+}
+
+function IntakeControl({ intake }) {
+    const form = useForm({ ...intake });
+    return <section className="panel form-stack">
+        <div className="section-head"><h2>Nhận đơn mới</h2><span className="muted">{intake.accepting_orders ? 'Đang nhận đơn' : 'Đang tạm ngừng'}</span></div>
+        <form className="form-stack" onSubmit={event => {
+            event.preventDefault();
+            form.post(root + '/nhan-don', { preserveScroll: true });
+        }}>
+            <Flag form={form} field="accepting_orders" label="Cho phép khách đặt đơn mới" />
+            <Text form={form} field="pause_message" label="Thông báo cho khách khi tạm ngừng" maxLength={250} />
+            <ErrorList errors={form.errors} />
+            <button className="button secondary compact" disabled={form.processing || !form.isDirty}>Lưu trạng thái nhận đơn</button>
+        </form>
+    </section>;
+}
+
+export function AdminInbox({ filter, newCount, overdueCount, orders, intake }) {
+    const { auth } = usePage().props;
+    const isAdmin = auth.role === 'admin';
+    const latest = filter === 'new';
+    return <Admin title="Đơn cần xử lý"
+        action={isAdmin && <ButtonLink href={mailUrl} secondary>Email đơn hàng</ButtonLink>}>
+        {!intake.accepting_orders && <p className="warning" role="status">Tiệm đang tạm ngừng nhận đơn mới.</p>}
+        <section className="panel form-stack">
+            <nav className="row-actions" aria-label="Loại đơn cần xử lý">
+                <Link className={'button compact' + (!latest ? ' secondary' : '')} aria-current={latest ? 'page' : undefined} href={inboxUrl}>Chưa xác nhận ({newCount})</Link>
+                <Link className={'button compact' + (latest ? ' secondary' : '')} aria-current={!latest ? 'page' : undefined} href={inboxUrl + '?filter=overdue'}>Chuyển khoản quá hạn ({overdueCount})</Link>
+            </nav>
+            <Table headers={['Mã đơn', 'Thanh toán', 'Tổng tiền', 'Giờ giao hoặc nhận', latest ? 'Giờ đặt' : 'Hạn chuyển khoản']}
+                empty={latest ? 'Hiện không có đơn chờ xác nhận.' : 'Hiện không có chuyển khoản quá hạn.'}
+                rows={orders.data.map(order => [order.id,
+                    <Link className="table-link" href={root + '/don-hang/' + order.id}>{order.code}</Link>,
+                    order.method === 'bank' ? 'Chuyển khoản' : 'COD', money(order.total), dateTime(order.scheduled_at),
+                    dateTime(latest ? order.created_at : order.bank_due_at),
+                ])} />
+            <Pagination page={orders} />
+        </section>
+        {isAdmin && <IntakeControl key={JSON.stringify(intake)} intake={intake} />}
+    </Admin>;
+}
+
+export function AdminMail({ queued, delayed, threshold, failures }) {
+    return <Admin title="Email đơn hàng" action={<ButtonLink href={inboxUrl} secondary><ArrowLeft size={17} />Đơn cần xử lý</ButtonLink>}>
+        <section className="panel form-stack">
+            <dl className="totals">
+                <div><dt>Trong hàng đợi</dt><dd>{queued}</dd></div>
+                <div><dt>Chưa xử lý xong sau {threshold} phút</dt><dd>{delayed}</dd></div>
+                <div><dt>Gửi thất bại sau các lần thử</dt><dd>{failures.total}</dd></div>
+            </dl>
+            {delayed > 0 && <p className="warning">Kiểm tra worker và cấu hình gửi thư. Hàng đợi trống chỉ cho biết hiện không có thư đang chờ.</p>}
+        </section>
+        <section className="panel form-stack">
+            <h2>Thư cần kiểm tra</h2>
+            <Table headers={['Mã tác vụ', 'Thất bại lúc']} empty="Hiện không có tác vụ gửi thư thất bại."
+                rows={failures.data.map(job => [job.uuid, <code>{job.uuid}</code>, dateTime(job.failed_at)])} />
+            <Pagination page={failures} />
+            {failures.total > 0 && <p className="muted">Sau khi xử lý nguyên nhân, dùng <code>php artisan queue:retry &lt;mã tác vụ&gt;</code> trên máy chủ để gửi lại.</p>}
+        </section>
     </Admin>;
 }
 
@@ -380,6 +445,7 @@ export function AdminSettings({ settings }) {
             <div className="admin-columns"><section className="panel form-stack"><h2>Thông tin tiệm</h2>
                 <Text form={form} field="name" label="Tên cửa hàng" required maxLength={100} /><Text form={form} field="address" label="Địa chỉ" maxLength={250} />
                 <div className="two-fields"><Text form={form} field="phone" label="Số điện thoại" /><Text form={form} field="email" label="Email liên hệ" type="email" /></div>
+                <TextArea form={form} field="order_policy" label="Chính sách đổi giờ, hủy đơn và hoàn tiền" maxLength={4000} />
                 <Text form={form} field="hours" label="Giờ mở cửa hiển thị" required /><Field label="Logo" hint="JPEG, PNG hoặc WebP, tối đa 4 MB"><input type="file" accept="image/jpeg,image/png,image/webp" onChange={e => form.setData('logo', e.target.files?.[0] ?? null)} /></Field>
                 {logo && <><img className="logo-preview" src={logo} alt="Logo hiện tại" /><Flag form={form} field="remove_logo" label="Bỏ logo hiện tại" /></>}
             </section><section className="panel form-stack"><h2>Lịch nhận bánh</h2>

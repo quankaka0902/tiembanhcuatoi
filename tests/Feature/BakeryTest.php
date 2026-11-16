@@ -80,8 +80,92 @@ class BakeryTest extends TestCase
         $this->post('/dat-banh', $fields)->assertRedirect($first->headers->get('Location'));
         $this->assertDatabaseCount('orders', $count + 1);
         $this->assertDatabaseHas('variants', ['id' => $variant->id, 'stock' => $variant->stock - 1]);
+        $this->assertDatabaseCount('jobs', 1);
 
         $this->post('/dat-banh', array_replace($fields, ['key' => (string) Str::uuid()]))->assertSessionHasErrors('cart');
+    }
+
+    public function test_intake_pause_rejects_a_stale_checkout_and_preserves_existing_orders_and_cart(): void
+    {
+        $variant = $this->variant();
+        $first = $this->cartAndFields($variant);
+        $accepted = $this->post('/dat-banh', $first)->assertSessionHasNoErrors()->headers->get('Location');
+        $count = DB::table('orders')->count();
+        $stale = $this->cartAndFields($variant);
+        $cart = session('cart');
+        $pause = ['accepting_orders' => false, 'pause_message' => 'Tiệm đang bảo trì lò.'];
+        $inbox = '/quan-tri/viec-can-xu-ly';
+        $this->actingAs($this->account('nhanvien'))->post('/quan-tri/nhan-don', $pause)->assertForbidden();
+        $this->actingAs($this->account('admin'))->from($inbox)->post('/quan-tri/nhan-don', $pause)->assertRedirect($inbox);
+        $this->get($inbox)->assertInertia(fn (Assert $page) => $page->where('intake.accepting_orders', false));
+        $this->actingAs($this->account('khach'))->get('/dat-banh')->assertRedirect('/gio-hang');
+        $this->get('/gio-hang')->assertInertia(fn (Assert $page) => $page
+            ->where('shop.accepting_orders', false)->where('shop.pause_message', $pause['pause_message'])->has('lines', 1));
+        $this->postJson('/dat-banh/bao-gia', ['fulfillment' => 'pickup'])->assertUnprocessable()->assertJsonValidationErrors('cart');
+        $this->post('/dat-banh', $stale)->assertSessionHasErrors(['cart' => $pause['pause_message']]);
+        $this->assertSame($cart, session('cart'));
+        $this->assertDatabaseCount('orders', $count);
+        $this->assertDatabaseHas('variants', ['id' => $variant->id, 'stock' => $variant->stock - 1]);
+
+        $this->withSession(['cart' => [], 'checkout_key' => $first['key']])->post('/dat-banh', $first)->assertRedirect($accepted);
+        $this->assertDatabaseCount('orders', $count);
+        $this->assertDatabaseCount('jobs', 1);
+        $this->get($accepted)->assertOk();
+        $orderId = DB::table('orders')->where('code', 'NB-DEMO001')->value('id');
+        $this->actingAs($this->account('nhanvien'))->patch('/quan-tri/don-hang/'.$orderId, ['kind' => 'status', 'value' => 'confirmed'])->assertSessionHasNoErrors();
+        $this->actingAs($this->account('admin'))->post('/quan-tri/nhan-don', ['accepting_orders' => true])->assertSessionHasNoErrors();
+        $this->withSession(['cart' => $cart, 'checkout_key' => $stale['key']])->post('/dat-banh', $stale)->assertSessionHasNoErrors();
+        $this->assertDatabaseCount('orders', $count + 1);
+    }
+
+    public function test_receipt_waits_for_worker_and_admin_can_see_delayed_and_failed_mail(): void
+    {
+        $fields = $this->cartAndFields($this->variant());
+        $this->post('/dat-banh', $fields)->assertSessionHasNoErrors();
+        $order = DB::table('orders')->latest('id')->first();
+        $this->get(route('tracking.show', $order->tracking_token))->assertOk();
+        $messages = Mail::mailer('array')->getSymfonyTransport()->messages();
+        $this->assertCount(0, $messages);
+        $this->assertDatabaseCount('jobs', 1);
+        DB::table('jobs')->insert([
+            'queue' => 'default', 'payload' => '{}', 'attempts' => 0,
+            'available_at' => now()->timestamp, 'created_at' => now()->timestamp,
+        ]);
+        $failureId = (string) Str::uuid();
+        DB::table('failed_jobs')->insert([
+            'uuid' => $failureId, 'connection' => 'order-mail', 'queue' => 'order-mail',
+            'payload' => 'payload test', 'exception' => 'personal data test', 'failed_at' => now(),
+        ]);
+        $this->travel(5)->minutes();
+        $url = '/quan-tri/email-don';
+        $this->actingAs($this->account('nhanvien'))->get($url)->assertForbidden();
+        $this->actingAs($this->account('admin'))->get($url)->assertInertia(fn (Assert $page) => $page
+            ->component('AdminMail')->where('queued', 1)->where('delayed', 1)
+            ->where('failures.total', 1)->where('failures.data.0.uuid', $failureId)
+            ->missing('failures.data.0.exception')->missing('failures.data.0.payload'));
+        $this->runOrderMailWorker();
+        $mail = $messages->sole()->getOriginalMessage();
+        $this->assertSame($fields['email'], $mail->getTo()[0]->getAddress());
+        $this->assertSame('Đã nhận đơn '.$order->code, $mail->getSubject());
+        $this->assertStringContainsString(route('tracking.show', $order->tracking_token), $mail->getTextBody());
+        $this->get($url)->assertInertia(fn (Assert $page) => $page->where('queued', 0)->where('delayed', 0));
+    }
+
+    public function test_work_inbox_shows_pending_and_overdue_without_order_contact_data(): void
+    {
+        $url = '/quan-tri/viec-can-xu-ly';
+        $this->get($url)->assertRedirect('/dang-nhap');
+        $this->actingAs($this->account('khach'))->get($url)->assertForbidden();
+        $staff = $this->account('nhanvien');
+        $this->actingAs($staff)->get($url)->assertInertia(fn (Assert $page) => $page
+            ->component('AdminInbox')->where('newCount', 1)->where('overdueCount', 0)
+            ->where('orders.data.0.code', 'NB-DEMO001')->missing('orders.data.0.email'));
+        $this->travel(1)->hour();
+        $this->get($url.'?filter=overdue')->assertInertia(fn (Assert $page) => $page
+            ->where('overdueCount', 1)->where('orders.total', 1)->where('orders.data.0.code', 'NB-DEMO001'));
+        $pending = DB::table('orders')->where('code', 'NB-DEMO001')->value('id');
+        $this->patch('/quan-tri/don-hang/'.$pending, ['kind' => 'status', 'value' => 'confirmed'])->assertSessionHasNoErrors();
+        $this->get($url)->assertInertia(fn (Assert $page) => $page->where('newCount', 0)->where('overdueCount', 1));
     }
 
     public function test_stock_and_schedule_are_revalidated_at_checkout(): void
@@ -207,7 +291,7 @@ class BakeryTest extends TestCase
         }
         $this->get('/tra-cuu/'.$order->tracking_token)->assertInertia(fn (Assert $page) => $page->where('order.status', 'completed')->where('order.payment', 'paid'));
         $this->assertDatabaseHas('order_events', ['order_id' => $order->id, 'actor_id' => $this->account('doisoat')->id, 'kind' => 'payment', 'value' => 'paid']);
-        $this->assertDatabaseCount('jobs', 2);
+        $this->assertDatabaseCount('jobs', 3);
     }
 
     public function test_bank_deadlines_filter_and_allow_late_reconciliation(): void
@@ -501,6 +585,7 @@ class BakeryTest extends TestCase
         $fields['bank_name'] = $fields['bank_account'] = $fields['bank_holder'] = null;
         $fields['bank_demo'] = false;
         $fields['bank_due_minutes'] = '90';
+        $fields['order_policy'] = "Liên hệ tiệm để đổi giờ.\nHoàn tiền sau khi đối soát.";
 
         $this->actingAs($this->account('admin'))->post('/quan-tri/cai-dat', $fields)->assertSessionHasNoErrors();
         $stored = Store::settings();
@@ -508,6 +593,8 @@ class BakeryTest extends TestCase
         $this->assertSame(['10:00' => 3], $stored['slot_limits']);
         $this->assertSame(['2026-11-16'], $stored['closed_dates']);
         $this->assertSame(90, $stored['bank_due_minutes']);
+        $this->get('/chinh-sach-dat-banh')->assertInertia(fn (Assert $page) => $page
+            ->component('OrderPolicy')->where('policy', $fields['order_policy']));
         $this->assertNull(Store::bank($stored));
         $this->get('/')->assertInertia(fn (Assert $page) => $page->where('shop.name', 'Tiệm Bánh QA')->where('shop.logo', $stored['logo']));
         $this->get($stored['logo'])->assertOk();

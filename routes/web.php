@@ -20,6 +20,7 @@ Route::controller(Storefront::class)->group(function () {
     Route::get('/dat-banh', 'checkout')->block();
     Route::post('/dat-banh/bao-gia', 'quote')->middleware('throttle:60,1');
     Route::post('/dat-banh', 'place')->middleware('throttle:20,1')->block(30, 10);
+    Route::get('/chinh-sach-dat-banh', 'policy');
     Route::get('/tra-cuu', 'tracking');
     Route::post('/tra-cuu', 'track')->middleware('throttle:tracking');
     Route::post('/tra-cuu/gui-lai', 'resendTracking')->middleware('throttle:tracking-resend');
@@ -58,12 +59,14 @@ Route::prefix('quan-tri')->middleware(['auth', 'can:staff'])->group(function () 
         Route::get('/don-hang', 'index');
         Route::get('/don-hang/xuat', 'export');
         Route::get('/doi-soat', 'reconciliation');
+        Route::get('/viec-can-xu-ly', 'inbox');
         Route::get('/bao-cao', 'reports');
         Route::get('/don-hang/{order}', 'show')->whereNumber('order');
         Route::patch('/don-hang/{order}', 'change')->whereNumber('order');
     });
 
     Route::middleware('can:admin')->group(function () {
+        Route::get('/email-don', [AdminOrders::class, 'mail']);
         Route::controller(AdminCatalog::class)->group(function () {
             Route::get('/ton-kho', 'inventory');
             Route::get('/san-pham', 'index');
@@ -75,6 +78,7 @@ Route::prefix('quan-tri')->middleware(['auth', 'can:staff'])->group(function () 
         Route::controller(AdminConfig::class)->group(function () {
             Route::get('/cai-dat', 'settings');
             Route::post('/cai-dat', 'saveSettings');
+            Route::post('/nhan-don', 'saveIntake');
             Route::get('/ma-giam/{coupon?}', 'coupons')->whereNumber('coupon');
             Route::post('/ma-giam/{coupon?}', 'saveCoupon')->whereNumber('coupon');
             Route::get('/nhan-su/{user?}', 'users')->whereNumber('user');

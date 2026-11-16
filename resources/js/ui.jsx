@@ -43,6 +43,10 @@ export function Layout({ title, children }) {
             </div>
         </header>
         <main id="main">
+            {!shop.accepting_orders && <div className="wrap pause-wrap"><p className="warning pause-banner" role="status">
+                <span>{shop.pause_message}</span>
+                {shop.phone && <a className="subtle-link" href={`tel:${shop.phone.replace(/[^+\d]/g, '')}`}>Gọi tiệm {shop.phone}</a>}
+            </p></div>}
             {notice && <div className="wrap toast" role="status"><Check size={18} />{notice}</div>}
             {children}
         </main>
@@ -51,7 +55,7 @@ export function Layout({ title, children }) {
                 <div><Brand shop={shop} /><p>Bánh tươi cho những dịp đáng nhớ và cả những ngày bình thường.</p></div>
                 <div><h3>Ghé tiệm</h3>{shop.address && <p><MapPin size={17} />{shop.address}</p>}{shop.hours && <p><Clock3 size={17} />{shop.hours}</p>}</div>
                 <div><h3>Liên hệ</h3>{shop.phone && <p><Phone size={17} /><a href={`tel:${shop.phone.replace(/[^+\d]/g, '')}`}>{shop.phone}</a></p>}{shop.email && <p><a href={`mailto:${shop.email}`}>{shop.email}</a></p>}</div>
-                <div><h3>Đặt bánh</h3><p><Link href="/thuc-don">Thực đơn</Link></p><p><Link href="/tra-cuu">Tra cứu đơn</Link></p>{auth && <Link className="text-action" as="button" method="post" href="/dang-xuat">Đăng xuất</Link>}</div>
+                <div><h3>Đặt bánh</h3><p><Link href="/thuc-don">Thực đơn</Link></p><p><Link href="/tra-cuu">Tra cứu đơn</Link></p><p><Link href="/chinh-sach-dat-banh">Chính sách đặt bánh</Link></p>{auth && <Link className="text-action" as="button" method="post" href="/dang-xuat">Đăng xuất</Link>}</div>
             </div>
         </footer>
     </>;

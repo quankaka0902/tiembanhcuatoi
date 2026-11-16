@@ -2,7 +2,9 @@
 
 namespace App\Services;
 
+use App\Jobs\SendOrderEmail;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -128,6 +130,10 @@ class Checkout
 
     public function quote(array $lines, array $fields, array $settings, bool $lock = false): array
     {
+        if (! $settings['accepting_orders']) {
+            $this->invalid('cart', Store::pauseMessage($settings));
+        }
+
         if (! $lines || collect($lines)->contains('available', false)) {
             $this->invalid('cart', 'Giỏ hàng trống hoặc có bánh không còn đủ tồn. Vui lòng cập nhật giỏ hàng.');
         }
@@ -228,6 +234,7 @@ class Checkout
                 DB::table('coupons')->where('id', $quote['coupon_id'])->increment('used');
             }
             Orders::event($id, null, 'status', 'pending');
+            Bus::dispatch(new SendOrderEmail($id, SendOrderEmail::RECEIPT));
 
             return [DB::table('orders')->find($id), true];
         }, 5);

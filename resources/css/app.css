@@ -147,6 +147,9 @@ input[type=file]::file-selector-button { padding: 4px 9px; border-radius: 5px; b
 .detail-copy { margin: 13px 0; }
 .detail-copy strong { display: block; margin-bottom: 2px; }
 .warning, .error-list { padding: 10px 13px; border-radius: 10px; color: #743033; background: #fff1e9; font-size: 14px; }
+.pause-wrap { margin-block-start: 14px; }
+.pause-banner { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; }
+.policy-text { white-space: pre-wrap; overflow-wrap: anywhere; }
 .warning strong { display: block; }
 .detail-grid .warning { margin-bottom: 16px; }
 .detail-actions, .row-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }

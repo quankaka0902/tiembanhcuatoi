@@ -37,21 +37,22 @@ export function Totals({ subtotal, discount, delivery_fee: deliveryFee, total })
 }
 
 export function Cart({ lines }) {
+    const { shop } = usePage().props;
     const subtotal = lines.reduce((sum, line) => sum + Number(line.subtotal), 0);
     return <Layout title="Giỏ hàng"><div className="wrap page">
         <Breadcrumb><span>Giỏ hàng</span></Breadcrumb><div className="page-heading"><h1>Giỏ hàng</h1></div>
         {lines.length ? <div className="order-grid"><div className="form-stack">{lines.map(line => <CartLine key={line.key + JSON.stringify([line.variant_id, line.quantity, line.message, line.note])} line={line} />)}</div>
             <aside className="panel order-summary"><h2>Tóm tắt đơn</h2><Totals subtotal={subtotal} />
                 <p className="muted">Mã giảm giá và phí giao được tính khi bạn chọn cách nhận bánh.</p>
-                {lines.every(line => line.available) && <ButtonLink href="/dat-banh">Tiến hành đặt bánh <ArrowRight size={18} /></ButtonLink>}
+                {shop.accepting_orders && lines.every(line => line.available) && <ButtonLink href="/dat-banh">Tiến hành đặt bánh <ArrowRight size={18} /></ButtonLink>}
                 <Link className="subtle-link" href="/thuc-don"><ArrowLeft size={16} />Chọn thêm bánh</Link>
             </aside>
         </div> : <Empty title="Giỏ bánh đang trống" text="Chọn món bạn yêu thích từ thực đơn của tiệm." href="/thuc-don" label="Xem thực đơn" />}
     </div></Layout>;
 }
 
-export function Checkout({ lines, slots, regions, bankEnabled, keyToken }) {
-    const { auth } = usePage().props;
+export function Checkout({ lines, slots, regions, bankEnabled, keyToken, policy }) {
+    const { auth, shop } = usePage().props;
     const subtotal = lines.reduce((sum, line) => sum + Number(line.subtotal), 0);
     const form = useForm({ key: keyToken, name: auth?.name ?? '', email: auth?.email ?? '', phone: '', fulfillment: 'pickup', region: '', address: '', slot: '', method: 'cod', coupon: '' });
     const { fulfillment, region } = form.data;
@@ -63,7 +64,7 @@ export function Checkout({ lines, slots, regions, bankEnabled, keyToken }) {
     const displayed = quoteResult?.key === quoteKey ? quoteResult : null;
 
     useEffect(() => {
-        if (waitingForRegion) return;
+        if (waitingForRegion || !shop.accepting_orders) return;
         const abort = new AbortController();
         const cookie = document.cookie.split('; ').find(entry => entry.startsWith('XSRF-TOKEN='));
         fetch('/dat-banh/bao-gia', {
@@ -78,7 +79,7 @@ export function Checkout({ lines, slots, regions, bankEnabled, keyToken }) {
             if (!abort.signal.aborted) setQuoteResult({ key: quoteKey, error: error.message });
         });
         return () => abort.abort();
-    }, [quoteKey, waitingForRegion]);
+    }, [quoteKey, waitingForRegion, shop.accepting_orders]);
 
     function place(event) {
         event.preventDefault();
@@ -122,12 +123,26 @@ export function Checkout({ lines, slots, regions, bankEnabled, keyToken }) {
                 <ul className="summary-lines">{lines.map(line => <li key={line.key}><span>{line.quantity} × {line.product_name}<small>{line.variant_name}</small></span><strong>{money(line.subtotal)}</strong></li>)}</ul>
                 <div className="coupon-row"><Field label="Mã giảm giá" error={form.errors.coupon}><input maxLength={32} value={form.data.coupon} onChange={e => form.setData('coupon', e.target.value)} placeholder="Nhập mã nếu có" /></Field><button type="button" className="button secondary compact" onClick={() => setAppliedCode(form.data.coupon.trim())}>Áp dụng</button></div>
                 <Totals subtotal={subtotal} {...displayed?.data} />
-                {!waitingForRegion && !displayed && <p className="muted" role="status">Đang tính tổng tiền…</p>}
+                {shop.accepting_orders && !waitingForRegion && !displayed && <p className="muted" role="status">Đang tính tổng tiền…</p>}
                 {displayed?.error && <p className="warning" role="alert">{displayed.error} <button type="button" className="text-action" onClick={() => { setAppliedCode(''); form.setData('coupon', ''); }}>Bỏ mã</button></p>}
+                {policy && <details className="fold"><summary>Chính sách đặt bánh</summary><p className="policy-text">{policy}</p></details>}
                 <ErrorList errors={form.errors} />
-                <button className="button" disabled={form.processing || !displayed?.data || !selectedSlot}><ShoppingBag size={19} />{form.processing ? 'Đang đặt bánh…' : 'Xác nhận đặt bánh'}</button>
+                <button className="button" disabled={!shop.accepting_orders || form.processing || !displayed?.data || !selectedSlot}><ShoppingBag size={19} />{form.processing ? 'Đang đặt bánh…' : 'Xác nhận đặt bánh'}</button>
             </aside>
         </form>
+    </div></Layout>;
+}
+
+export function OrderPolicy({ policy }) {
+    const { shop } = usePage().props;
+    return <Layout title="Chính sách đặt bánh"><div className="wrap page">
+        <Breadcrumb><span>Chính sách đặt bánh</span></Breadcrumb>
+        <div className="page-heading"><h1>Chính sách đặt bánh</h1></div>
+        <section className="panel form-stack">
+            <p className="policy-text">{policy || 'Vui lòng liên hệ tiệm để hỏi về đổi giờ nhận, hủy đơn và hoàn tiền trước khi đặt bánh.'}</p>
+            {shop.phone && <p><a className="subtle-link" href={`tel:${shop.phone.replace(/[^+\d]/g, '')}`}>Gọi tiệm {shop.phone}</a></p>}
+            {shop.email && <p><a className="subtle-link" href={`mailto:${shop.email}`}>{shop.email}</a></p>}
+        </section>
     </div></Layout>;
 }
 
