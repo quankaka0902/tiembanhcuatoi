@@ -174,6 +174,15 @@ class Checkout
         ];
     }
 
+    public function quoteToken(array $quote, array $lines, string $key): string
+    {
+        $prices = array_map(fn (array $line) => [
+            $line['variant_id'], $line['quantity'], $line['unit_price'], $line['option_fee'],
+        ], $lines);
+
+        return hash_hmac('sha256', json_encode([$key, $quote, $prices], JSON_THROW_ON_ERROR), config('app.key'));
+    }
+
     public function place(array $cart, array $fields, ?int $userId): array
     {
         return DB::transaction(function () use ($cart, $fields, $userId) {
@@ -190,6 +199,10 @@ class Checkout
             $quote = $this->quote($lines, $fields, $settings, lock: true);
 
             $scheduledAt = $this->assertSlot($fields['slot'], $settings, max(array_column($lines, 'prep_minutes')));
+
+            if (! hash_equals($this->quoteToken($quote, $lines, $fields['key']), $fields['quote_token'])) {
+                $this->invalid('quote_token', 'Giá bánh, giảm giá hoặc phí giao đã thay đổi. Hãy kiểm tra tổng mới và xác nhận lại.');
+            }
 
             $bank = $fields['method'] === 'bank' ? Store::bank($settings) : null;
             if ($fields['method'] === 'bank' && ! $bank) {

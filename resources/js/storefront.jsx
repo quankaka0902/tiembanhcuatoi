@@ -1,5 +1,5 @@
 import { Link, useForm, usePage } from '@inertiajs/react';
-import { ArrowLeft, ArrowRight, CakeSlice, Clock3, Gift, Heart, MapPin, Search, ShoppingBag, Sparkles, Truck } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CakeSlice, Clock3, Gift, Heart, MapPin, Search, ShoppingBag, Truck } from 'lucide-react';
 import { useState } from 'react';
 import { Breadcrumb, ButtonLink, categoriesIcons, Empty, ErrorList, Field, Image, Layout, money, Pagination } from './ui';
 
@@ -26,15 +26,14 @@ export function Home({ categories, featured }) {
     return <Layout>
         <section className="hero wrap">
             <div className="hero-content">
-                <span className="hero-label"><Sparkles size={15} /> BÁNH TƯƠI LÀM MỖI NGÀY</span>
-                <h1>Ngày thường<br /> <em>cũng ngọt ngào.</em></h1>
+                <h1>Đặt bánh cho <em>dịp của bạn.</em></h1>
                 <p>Từ bánh kem cho dịp đặc biệt đến chiếc croissant cho buổi sáng, tiệm có một chút ngọt cho mỗi ngày của bạn.</p>
-                <div className="hero-actions"><ButtonLink href="/thuc-don">Khám phá thực đơn <ArrowRight size={19} /></ButtonLink><a className="subtle-link" href="#banh-noi-bat">Bánh nổi bật</a></div>
+                <div className="hero-actions"><ButtonLink href="/thuc-don">Xem thực đơn <ArrowRight size={19} /></ButtonLink><a className="subtle-link" href="#banh-noi-bat">Bánh nổi bật</a></div>
             </div>
             <div className="hero-photo"><img src={featured[0]?.images[0] ?? '/images/strawberry.webp'} alt={featured[0]?.name ?? 'Bánh kem dâu tươi trên đĩa sứ'} fetchPriority="high" />{featured[0] && <div className="hero-caption"><div><small>BÁNH NỔI BẬT</small><Link href={'/banh/' + featured[0].slug}>{featured[0].name} <ArrowRight size={14} /></Link></div></div>}</div>
         </section>
         <div className="wrap service-strip">
-            {[[CakeSlice, 'Nướng mới mỗi ngày', 'Từ căn bếp nhỏ của tiệm'], [Heart, 'Lời chúc riêng', 'Thêm lời chúc trên bánh kem'], [Truck, 'Giao tận nơi', 'Chọn khu vực và giờ nhận'], [Gift, 'Nhận tại tiệm', 'Đặt trước, ghé lấy đúng giờ']].map(([Icon, title, copy]) =>
+            {[[CakeSlice, 'Đặt bánh trước', 'Chọn lịch theo thời gian chuẩn bị'], [Heart, 'Lời chúc riêng', 'Thêm lời chúc trên bánh hỗ trợ'], [Truck, 'Giao tận nơi', 'Xem khu vực và phí khi đặt'], [Gift, 'Nhận tại tiệm', 'Ghé lấy theo giờ đã chọn']].map(([Icon, title, copy]) =>
                 <div key={title}><span className="service-icon"><Icon size={22} strokeWidth={1.65} /></span><div><strong>{title}</strong><p>{copy}</p></div></div>)}
         </div>
         <section className="wrap home-categories">
@@ -93,10 +92,12 @@ export function Product({ product }) {
                 {product.images.length > 1 && <div className="gallery">{product.images.map((src, index) => <button type="button" className={photo === index ? 'selected' : ''} key={src} aria-label={`Ảnh ${index + 1}`} onClick={() => setPhoto(index)}><img src={src} alt="" /></button>)}</div>}
             </div>
             <section>
-                <span className="product-category">{product.category}</span><h1>{product.name}</h1><p className="intro">{product.description}</p>
-                <span className="prep"><Clock3 size={16} /> Chuẩn bị khoảng {product.prep_minutes} phút</span>
-                {product.ingredients && <p className="detail-copy"><strong>Thành phần</strong>{product.ingredients}</p>}
+                <span className="product-category">{product.category}</span><h1>{product.name}</h1>
+                <div className="product-facts"><p className="product-price">{variant ? money(variant.price) : 'Chưa mở bán'} {variant && <small>/ bánh</small>}</p>
+                    <span className="prep"><Clock3 size={16} /> Chuẩn bị khoảng {product.prep_minutes} phút</span></div>
+                <p className="intro">{product.description}</p>
                 {product.allergens && <p className="warning"><strong>Cảnh báo dị ứng</strong> {product.allergens}</p>}
+                {product.ingredients && <p className="detail-copy"><strong>Thành phần</strong> {product.ingredients}</p>}
                 <form className="form-stack" onSubmit={e => { e.preventDefault(); form.post('/gio-hang', { preserveScroll: true }); }}>
                     <div className="two-fields">
                         <Field label="Phiên bản bánh" error={form.errors.variant_id}><select value={form.data.variant_id} onChange={e => form.setData('variant_id', e.target.value)} disabled={!product.variants.length}>
@@ -107,7 +108,7 @@ export function Product({ product }) {
                     </div>
                     {Boolean(product.customizable) && <Field label="Lời chúc trên bánh" hint={product.message_fee ? `Phụ phí ${money(product.message_fee)} mỗi bánh` : undefined} error={form.errors.message}><input placeholder="Ví dụ Chúc mừng sinh nhật!" maxLength={60} value={form.data.message} onChange={e => form.setData('message', e.target.value)} /></Field>}
                     <Field label="Ghi chú cho tiệm" error={form.errors.note}><textarea rows="2" maxLength={250} value={form.data.note} onChange={e => form.setData('note', e.target.value)} /></Field>
-                    <div className="detail-actions"><strong>{variant ? money(price * Number(form.data.quantity || 0)) : 'Chưa mở bán'}</strong><button className="button" disabled={form.processing || !variant || variant.stock <= 0}><ShoppingBag size={19} />{form.processing ? 'Đang thêm…' : variant?.stock > 0 ? 'Thêm vào giỏ' : 'Hết hàng'}</button></div>
+                    <div className="detail-actions"><div><small className="muted">Tạm tính</small><strong>{variant ? money(price * Number(form.data.quantity || 0)) : 'Chưa mở bán'}</strong></div><button className="button" disabled={form.processing || !variant || variant.stock <= 0}><ShoppingBag size={19} />{form.processing ? 'Đang thêm…' : variant?.stock > 0 ? 'Thêm vào giỏ' : 'Hết hàng'}</button></div>
                 </form>
             </section>
         </div>

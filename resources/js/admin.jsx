@@ -51,6 +51,17 @@ function Table({ headers, rows, empty = 'Chưa có dữ liệu.' }) {
     </table></div>;
 }
 
+function OrderQueue({ headers, rows, empty }) {
+    if (!rows.length) return <p className="inline-empty">{empty}</p>;
+    return <>
+        <div className="order-queue-table"><Table headers={headers} rows={rows} /></div>
+        <ul className="order-queue-cards">{rows.map(([id, orderLink, amount, ...details]) => <li key={id}>
+            <div className="queue-card-heading">{orderLink}<strong>{amount}</strong></div>
+            <dl>{details.map((value, index) => <div key={headers[index + 2]}><dt>{headers[index + 2]}</dt><dd>{value}</dd></div>)}</dl>
+        </li>)}</ul>
+    </>;
+}
+
 function DateFilters({ filters, url, statuses }) {
     const form = useForm({});
     return <form className="panel admin-filters" onSubmit={e => {
@@ -96,7 +107,7 @@ function IntakeControl({ intake }) {
     </section>;
 }
 
-export function AdminInbox({ filter, newCount, overdueCount, refundCount, orders, intake }) {
+export function AdminInbox({ filter, newCount, overdueCount, refundCount, orders, payments, intake }) {
     const { auth } = usePage().props;
     const isAdmin = auth.role === 'admin';
     const tabs = [
@@ -113,11 +124,13 @@ export function AdminInbox({ filter, newCount, overdueCount, refundCount, orders
                 {tabs.map(([key, label, count]) => <Link key={key} className={'button compact' + (key === filter ? '' : ' secondary')}
                     aria-current={key === filter ? 'page' : undefined} href={inboxUrl + (key === 'new' ? '' : '?filter=' + key)}>{label} ({count})</Link>)}
             </nav>
-            <Table headers={['Mã đơn', 'Thanh toán', 'Tổng tiền', 'Giờ giao hoặc nhận', dateLabel]}
+            <OrderQueue headers={['Mã đơn', 'Tổng tiền', 'Thanh toán', 'Giờ giao hoặc nhận', dateLabel]}
                 empty={empty}
                 rows={orders.data.map(order => [order.id,
                     <Link className="table-link" href={root + '/don-hang/' + order.id}>{order.code}</Link>,
-                    order.method === 'bank' ? 'Chuyển khoản' : 'COD', money(order.total), dateTime(order.scheduled_at),
+                    money(order.total),
+                    <>{order.method === 'bank' ? 'Chuyển khoản' : 'COD'}<small><Pill value={order.payment} labels={payments} /></small></>,
+                    <>{dateTime(order.scheduled_at)}<small>{order.fulfillment === 'delivery' ? 'Giao tận nơi' : 'Nhận tại tiệm'}</small></>,
                     dateTime(order[dateField]),
                 ])} />
             <Pagination page={orders} />
@@ -252,12 +265,13 @@ export function AdminReconciliation({ orders, filter }) {
                     <Link key={value} href={href} className={'button compact' + (filter === value ? '' : ' secondary')} aria-current={filter === value ? 'page' : undefined}>{label}</Link>
                 ))}
             </nav>
-            <Table headers={['Mã đơn', 'Số tiền', 'Giờ đặt', 'Giao hoặc nhận', 'Hạn chuyển khoản']}
+            <OrderQueue headers={['Mã đơn', 'Số tiền', 'Giờ giao hoặc nhận', 'Hạn chuyển khoản', 'Giờ đặt']}
                 empty={filter === 'overdue' ? 'Chưa có đơn quá hạn.' : 'Chưa có đơn chuyển khoản chờ đối soát.'}
                 rows={orders.data.map(order => [
                     order.id, <Link className="table-link" href={root + '/don-hang/' + order.id}>{order.code}</Link>,
-                    money(order.total), dateTime(order.created_at), dateTime(order.scheduled_at),
+                    money(order.total), dateTime(order.scheduled_at),
                     <div className="row-actions">{dateTime(order.bank_due_at)}{order.overdue && <span className="pill state-pending">Quá hạn</span>}</div>,
+                    dateTime(order.created_at),
                 ])} />
             <Pagination page={orders} />
         </section>
@@ -338,7 +352,11 @@ export function AdminOrder({ order, statuses, payments, next, reconcile, resched
                 <section className="panel form-stack"><h2>Thanh toán</h2>
                     <p>{order.method === 'bank' ? 'Chuyển khoản thủ công' : 'Thanh toán khi nhận bánh'}</p>
                     {order.bank_due_at && order.payment === 'unpaid' && order.status !== 'cancelled' && <p className="muted">Hạn chuyển khoản · {dateTime(order.bank_due_at)}</p>}
-                    {order.bank_snapshot && <p className="muted">{order.bank_snapshot.demo ? 'Dữ liệu mẫu · ' : ''}Nội dung {order.code} · {money(order.total)}</p>}
+                    {(order.bank_snapshot || canPay || canRefund) && <dl className="totals payment-review">
+                        <div><dt>{order.bank_snapshot && order.payment === 'unpaid' ? 'Nội dung chuyển khoản' : 'Mã đơn'}</dt><dd>{order.code}</dd></div>
+                        <div><dt>{canRefund ? 'Số tiền hoàn' : 'Tổng thanh toán'}</dt><dd>{money(order.total)}</dd></div>
+                    </dl>}
+                    {order.bank_snapshot?.demo && <p className="warning">Thông tin chuyển khoản mẫu.</p>}
                     {(canPay || canRefund) && <form className="form-stack" onSubmit={e => {
                         e.preventDefault();
                         payment.transform(data => ({ ...data, value: canPay ? 'paid' : 'refunded' }));

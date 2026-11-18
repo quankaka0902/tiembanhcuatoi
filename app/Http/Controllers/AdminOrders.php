@@ -11,6 +11,7 @@ use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class AdminOrders extends Controller
@@ -60,7 +61,8 @@ class AdminOrders extends Controller
         return Inertia::render('AdminInbox', [
             'filter' => $filter, 'newCount' => $new->count(), 'overdueCount' => $overdue->count(),
             'refundCount' => $refund->count(),
-            'orders' => $orders->orderBy('id')->paginate(15, ['id', 'code', 'method', 'total', 'created_at', 'scheduled_at', 'bank_due_at', 'updated_at'])->withQueryString(),
+            'orders' => $orders->orderBy('id')->paginate(15, ['id', 'code', 'method', 'payment', 'fulfillment', 'total', 'created_at', 'scheduled_at', 'bank_due_at', 'updated_at'])->withQueryString(),
+            'payments' => Orders::PAYMENTS,
             'intake' => ['accepting_orders' => $settings['accepting_orders'], 'pause_message' => $settings['pause_message']],
         ])->toResponse($request)->header('Cache-Control', 'private, no-store');
     }
@@ -152,23 +154,33 @@ class AdminOrders extends Controller
 
     public function change(Request $request, int $order)
     {
-        $fields = $request->validate([
-            'kind' => 'required|in:status,payment', 'value' => 'required|string|max:16', 'note' => 'nullable|string|max:250',
-        ]);
-        Orders::change($order, $request->user(), $fields);
+        $url = '/quan-tri/don-hang/'.$order;
+        try {
+            $fields = $request->validate([
+                'kind' => 'required|in:status,payment', 'value' => 'required|string|max:16', 'note' => 'nullable|string|max:250',
+            ]);
+            Orders::change($order, $request->user(), $fields);
+        } catch (ValidationException $failure) {
+            throw $failure->redirectTo($url);
+        }
 
-        return back()->with('notice', 'Đã cập nhật đơn.');
+        return redirect($url)->with('notice', 'Đã cập nhật đơn.');
     }
 
     public function reschedule(Request $request, int $order, Checkout $checkout)
     {
-        $fields = $request->validate([
-            'slot' => 'required|date_format:Y-m-d H:i', 'previous_slot' => 'required|date_format:Y-m-d H:i',
-            'note' => 'required|string|max:200',
-        ]);
-        Orders::reschedule($order, $request->user(), $fields, $checkout);
+        $url = '/quan-tri/don-hang/'.$order;
+        try {
+            $fields = $request->validate([
+                'slot' => 'required|date_format:Y-m-d H:i', 'previous_slot' => 'required|date_format:Y-m-d H:i',
+                'note' => 'required|string|max:200',
+            ]);
+            Orders::reschedule($order, $request->user(), $fields, $checkout);
+        } catch (ValidationException $failure) {
+            throw $failure->redirectTo($url);
+        }
 
-        return back()->with('notice', 'Đã lưu giờ giao hoặc nhận mới.');
+        return redirect($url)->with('notice', 'Đã lưu giờ giao hoặc nhận mới.');
     }
 
     public function export(Request $request)

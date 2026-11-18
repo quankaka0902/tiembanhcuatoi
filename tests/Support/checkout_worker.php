@@ -14,6 +14,16 @@ $app->make(Kernel::class)->bootstrap();
 $checkout = $app->make(Checkout::class);
 $slot = $argv[3] ?: $checkout->slots(Store::settings(), 120)[2];
 $reschedule = empty($argv[5]) ? null : DB::table('orders')->find((int) $argv[5]);
+$cart = [['variant_id' => 1, 'quantity' => 1, 'message' => null, 'note' => null]];
+$fields = [
+    'key' => $argv[1], 'coupon' => $argv[2], 'fulfillment' => $argv[4], 'method' => 'cod',
+    'region' => 'quan-1', 'address' => 'Địa chỉ giao thử nghiệm',
+    'slot' => $slot, 'name' => 'Kiểm thử đồng thời', 'email' => 'concurrent@tiembanh.test', 'phone' => '0900000000',
+];
+if (! $reschedule) {
+    $lines = $checkout->cart($cart);
+    $fields['quote_token'] = $checkout->quoteToken($checkout->quote($lines, $fields, Store::settings()), $lines, $fields['key']);
+}
 
 echo "ready\n";
 if (trim((string) fgets(STDIN)) !== 'go') {
@@ -29,13 +39,7 @@ try {
         echo 'rescheduled';
         exit;
     }
-    [, $created] = $checkout->place([
-        ['variant_id' => 1, 'quantity' => 1, 'message' => null, 'note' => null],
-    ], [
-        'key' => $argv[1], 'coupon' => $argv[2], 'fulfillment' => $argv[4], 'method' => 'cod',
-        'region' => 'quan-1', 'address' => 'Địa chỉ giao thử nghiệm',
-        'slot' => $slot, 'name' => 'Kiểm thử đồng thời', 'email' => 'concurrent@tiembanh.test', 'phone' => '0900000000',
-    ], null);
+    [, $created] = $checkout->place($cart, $fields, null);
     echo $created ? 'created' : 'replayed';
 } catch (ValidationException $failure) {
     echo array_key_first($failure->errors());

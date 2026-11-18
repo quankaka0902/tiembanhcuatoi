@@ -120,6 +120,8 @@ Chặng 6 đạt 32 bài trên MySQL với 894 assertions và 27 bài trên SQLi
 
 Chặng 7 thêm chế độ staging kín có tên miền HTTPS riêng và chỉ gửi thư tới các địa chỉ thử được duyệt. MySQL đạt 35 bài với 914 assertions. SQLite đạt 30 bài với 879 assertions. Xem [biên bản nghiệm thu chặng 7](docs/nghiem-thu-chang-7.md) để biết kết quả ca thử, phục hồi, quay lui và các dịch vụ còn chờ cấu hình của tiệm.
 
+Chặng 8 yêu cầu khách xác nhận lại khi báo giá đổi và bổ sung thử lại khi mất kết nối lúc tính tiền. Checkout cho chọn ngày và giờ riêng. Hai màn hình **Đơn cần xử lý** và **Đối soát** dùng thẻ trên điện thoại. Xem [biên bản chặng 8](docs/nghiem-thu-chang-8.md) trước khi nghiệm thu bằng menu và dịch vụ thật của tiệm.
+
 ## Cấu hình cửa hàng thật
 
 Xem [hướng dẫn vận hành, kiểm tra cấu hình và phục hồi bản sao lưu](docs/van-hanh.md).

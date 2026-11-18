@@ -35,6 +35,11 @@ class AppServiceProvider extends ServiceProvider
             Limit::perMinute(5)->by('staff:'.$request->session()->get('staff_mfa_pending.id', 'none')),
         ]);
         RateLimiter::for('tracking', fn (Request $request) => Limit::perMinute(30)->by($request->ip()));
+        $checkoutClient = fn (Request $request) => $request->user()
+            ? 'user:'.$request->user()->getAuthIdentifier()
+            : 'ip:'.$request->ip();
+        RateLimiter::for('checkout-quote', fn (Request $request) => Limit::perMinute(60)->by($checkoutClient($request)));
+        RateLimiter::for('checkout-place', fn (Request $request) => Limit::perMinute(20)->by($checkoutClient($request)));
         RateLimiter::for('tracking-resend', function (Request $request) {
             $code = $request->input('code');
             $code = is_string($code) ? Str::upper(trim($code)) : '';

@@ -112,7 +112,8 @@ class Storefront extends Controller
 
         $request->session()->put(['cart' => $cart, 'checkout_key' => (string) Str::uuid()]);
 
-        return back()->with('notice', $line ? 'Đã cập nhật giỏ hàng.' : 'Đã thêm bánh vào giỏ.');
+        return redirect($line ? '/gio-hang' : '/banh/'.$updated['slug'])
+            ->with('notice', $line ? 'Đã cập nhật giỏ hàng.' : 'Đã thêm bánh vào giỏ.');
     }
 
     public function removeLine(Request $request, string $line)
@@ -121,7 +122,7 @@ class Storefront extends Controller
         unset($cart[$line]);
         $request->session()->put(['cart' => $cart, 'checkout_key' => (string) Str::uuid()]);
 
-        return back()->with('notice', 'Đã bỏ bánh khỏi giỏ.');
+        return redirect('/gio-hang')->with('notice', 'Đã bỏ bánh khỏi giỏ.');
     }
 
     public function checkout(Request $request, Checkout $checkout)
@@ -150,23 +151,41 @@ class Storefront extends Controller
     public function quote(Request $request, Checkout $checkout)
     {
         $data = $request->validate($this->quoteRules());
+        $lines = $checkout->cart($request->session()->get('cart', []));
+        $quote = $checkout->quote($lines, $data, Store::settings());
+        $key = $request->session()->get('checkout_key');
+        if (! is_string($key)) {
+            throw ValidationException::withMessages(['cart' => 'Vui lòng mở lại trang đặt bánh từ giỏ hàng.']);
+        }
 
-        return response()->json($checkout->quote($checkout->cart($request->session()->get('cart', [])), $data, Store::settings()));
+        return response()->json([
+            ...$quote,
+            'line_totals' => array_column($lines, 'subtotal', 'key'),
+            'quote_token' => $checkout->quoteToken($quote, $lines, $key),
+        ])->header('Cache-Control', 'private, no-store');
     }
 
     public function place(Request $request, Checkout $checkout)
     {
-        $fields = $request->validate([
-            ...$this->quoteRules(), 'key' => 'required|uuid', 'name' => 'required|string|max:120',
-            'email' => 'required|email|max:254', 'phone' => ['required', 'string', 'regex:/^(?:\+84|0)[0-9]{9,10}$/'],
-            'address' => 'nullable|required_if:fulfillment,delivery|string|max:250',
-            'slot' => 'required|date_format:Y-m-d H:i', 'method' => 'required|in:cod,bank',
-        ]);
-        $key = $request->session()->get('checkout_key');
-        if (! $key || ! hash_equals($key, $fields['key'])) {
-            throw ValidationException::withMessages(['cart' => 'Giỏ hàng đã thay đổi. Vui lòng mở lại trang đặt bánh.']);
+        try {
+            $fields = $request->validate([
+                ...$this->quoteRules(), 'key' => 'required|uuid', 'name' => 'required|string|max:120',
+                'email' => 'required|email|max:254', 'phone' => ['required', 'string', 'regex:/^(?:\+84|0)[0-9]{9,10}$/'],
+                'address' => 'nullable|required_if:fulfillment,delivery|string|max:250',
+                'slot' => 'required|date_format:Y-m-d H:i', 'method' => 'required|in:cod,bank',
+                'quote_token' => ['required', 'string', 'regex:/^[a-f0-9]{64}$/D'],
+            ], [
+                'quote_token.required' => 'Hãy tải lại báo giá trước khi đặt bánh.',
+                'quote_token.regex' => 'Hãy tải lại báo giá trước khi đặt bánh.',
+            ]);
+            $key = $request->session()->get('checkout_key');
+            if (! $key || ! hash_equals($key, $fields['key'])) {
+                throw ValidationException::withMessages(['cart' => 'Giỏ hàng đã thay đổi. Vui lòng mở lại trang đặt bánh.']);
+            }
+            [$order] = $checkout->place($request->session()->get('cart', []), $fields, $request->user()?->id);
+        } catch (ValidationException $failure) {
+            throw $failure->redirectTo('/dat-banh');
         }
-        [$order] = $checkout->place($request->session()->get('cart', []), $fields, $request->user()?->id);
         $request->session()->forget('cart');
 
         return redirect(Orders::link($order));

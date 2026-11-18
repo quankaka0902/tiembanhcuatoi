@@ -1,7 +1,7 @@
 import { Link, useForm, usePage } from '@inertiajs/react';
 import { ArrowLeft, ArrowRight, Banknote, CalendarClock, Check, Clipboard, CreditCard, MapPin, Search, ShoppingBag, ShoppingCart, Store, Trash2, Truck } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { Breadcrumb, ButtonLink, dateTime, Empty, ErrorList, Field, Image, Layout, money, Pagination, Pill } from './ui';
+import { Breadcrumb, ButtonLink, date as formatDate, dateTime, Empty, ErrorList, Field, Image, Layout, money, Pagination, Pill } from './ui';
 
 function CartLine({ line }) {
     const form = useForm({ variant_id: line.variant_id, quantity: line.quantity, message: line.message ?? '', note: line.note ?? '' });
@@ -51,6 +51,28 @@ export function Cart({ lines }) {
     </div></Layout>;
 }
 
+function CheckoutSchedule({ slots, form, selectedSlot }) {
+    const [day, setDay] = useState('');
+    const days = [...new Set(slots.map(slot => slot.slice(0, 10)))];
+    const selectedDay = days.includes(day) ? day : '';
+    const times = selectedDay ? slots.filter(slot => slot.startsWith(selectedDay)) : [];
+
+    if (!days.length) return <p className="warning" id="checkout-schedule" tabIndex={-1}>Tiệm chưa có lịch nhận phù hợp trong 14 ngày tới. Vui lòng liên hệ để đặt bánh.</p>;
+
+    return <div className="two-fields checkout-schedule" id="checkout-schedule" tabIndex={-1}>
+        <Field label="Ngày giao hoặc nhận" error={!selectedDay ? form.errors.slot : undefined}>
+            <select required value={selectedDay} onChange={event => { setDay(event.target.value); form.setData('slot', ''); form.clearErrors('slot'); }}>
+                <option value="">Chọn ngày</option>{days.map(value => <option key={value} value={value}>{formatDate(value)}</option>)}
+            </select>
+        </Field>
+        <Field label="Giờ giao hoặc nhận" error={selectedDay ? form.errors.slot : undefined}>
+            <select required disabled={!selectedDay} value={selectedSlot} onChange={event => { form.setData('slot', event.target.value); form.clearErrors('slot'); }}>
+                <option value="">Chọn giờ</option>{times.map(slot => <option key={slot} value={slot}>{slot.slice(11)}</option>)}
+            </select>
+        </Field>
+    </div>;
+}
+
 export function Checkout({ lines, slots, regions, bankEnabled, keyToken, policy, privacy }) {
     const { auth, shop } = usePage().props;
     const subtotal = lines.reduce((sum, line) => sum + Number(line.subtotal), 0);
@@ -58,40 +80,63 @@ export function Checkout({ lines, slots, regions, bankEnabled, keyToken, policy,
     const { fulfillment, region } = form.data;
     const selectedSlot = slots.includes(form.data.slot) ? form.data.slot : '';
     const [appliedCode, setAppliedCode] = useState('');
+    const [quoteAttempt, setQuoteAttempt] = useState(0);
     const [quoteResult, setQuoteResult] = useState(null);
     const quoteKey = JSON.stringify({ fulfillment, region, coupon: appliedCode });
+    const attemptKey = JSON.stringify([keyToken, quoteKey, quoteAttempt]);
     const waitingForRegion = fulfillment === 'delivery' && !region;
-    const displayed = quoteResult?.key === quoteKey ? quoteResult : null;
+    const displayed = quoteResult?.key === attemptKey ? quoteResult : null;
+    const retryQuote = () => setQuoteAttempt(value => value + 1);
 
     useEffect(() => {
         if (waitingForRegion || !shop.accepting_orders) return;
         const abort = new AbortController();
+        const connectionError = 'Chưa tính được tổng tiền. Kiểm tra kết nối rồi thử lại.';
+        const timeout = setTimeout(() => {
+            abort.abort();
+            setQuoteResult({ key: attemptKey, error: connectionError });
+        }, 12000);
         const cookie = document.cookie.split('; ').find(entry => entry.startsWith('XSRF-TOKEN='));
         fetch('/dat-banh/bao-gia', {
             method: 'POST', signal: abort.signal,
             headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-XSRF-TOKEN': decodeURIComponent(cookie?.slice(11) ?? '') },
             body: quoteKey,
         }).then(async response => {
+            if (response.status !== 422 && !response.ok) return { error: connectionError };
             const data = await response.json();
-            if (!response.ok) throw new Error(data.message || 'Không lấy được báo giá.');
-            return data;
-        }).then(data => setQuoteResult({ key: quoteKey, data })).catch(error => {
-            if (!abort.signal.aborted) setQuoteResult({ key: quoteKey, error: error.message });
-        });
-        return () => abort.abort();
-    }, [quoteKey, waitingForRegion, shop.accepting_orders]);
+            if (response.ok && typeof data.quote_token === 'string') return { data };
+            const field = data.errors?.coupon ? 'coupon' : data.errors?.cart ? 'cart' : null;
+            return { field, error: (field && data.errors[field][0]) || connectionError };
+        }).then(result => {
+            if (!abort.signal.aborted) setQuoteResult({ key: attemptKey, ...result });
+        }).catch(() => {
+            if (!abort.signal.aborted) setQuoteResult({ key: attemptKey, error: connectionError });
+        }).finally(() => clearTimeout(timeout));
+        return () => {
+            clearTimeout(timeout);
+            abort.abort();
+        };
+    }, [attemptKey, quoteKey, waitingForRegion, shop.accepting_orders]);
 
     function place(event) {
         event.preventDefault();
-        form.transform(fields => ({ ...fields, coupon: appliedCode }));
-        form.post('/dat-banh', { preserveScroll: true });
+        if (!displayed?.data || !selectedSlot || form.processing || !shop.accepting_orders) return;
+        form.transform(fields => ({ ...fields, coupon: appliedCode, quote_token: displayed.data.quote_token }));
+        form.post('/dat-banh', {
+            preserveScroll: true,
+            onError: errors => {
+                if (errors.quote_token || errors.coupon) retryQuote();
+                const target = errors.slot ? 'checkout-schedule' : 'checkout-feedback';
+                requestAnimationFrame(() => document.getElementById(target)?.focus());
+            },
+        });
     }
 
     return <Layout title="Đặt bánh"><div className="wrap page">
         <Breadcrumb><Link href="/gio-hang">Giỏ hàng</Link><span aria-hidden="true">/</span><span>Đặt bánh</span></Breadcrumb>
         <div className="page-heading"><h1>Đặt bánh</h1><p>Chọn cách nhận bánh và giờ phù hợp với bạn.</p></div>
-        <form onSubmit={place} className="order-grid">
-            <div className="form-stack">
+        <form onSubmit={place} className="order-grid checkout-grid">
+            <div className="form-stack checkout-fields">
                 <section className="panel form-stack"><h2>Thông tin liên hệ</h2>
                     <Field label="Họ và tên" error={form.errors.name}><input autoComplete="name" required value={form.data.name} onChange={e => form.setData('name', e.target.value)} /></Field>
                     <div className="two-fields">
@@ -109,10 +154,7 @@ export function Checkout({ lines, slots, regions, bankEnabled, keyToken, policy,
                         <Field label="Khu vực giao" error={form.errors.region}><select required value={region} onChange={e => form.setData('region', e.target.value)}><option value="">Chọn khu vực</option>{regions.map(area => <option key={area.key} value={area.key}>{area.name}</option>)}</select></Field>
                         <Field label="Địa chỉ giao bánh" error={form.errors.address}><input autoComplete="street-address" required value={form.data.address} onChange={e => form.setData('address', e.target.value)} /></Field>
                     </div>}
-                    <Field label="Giờ nhận bánh" error={form.errors.slot}><select required value={selectedSlot} onChange={e => { form.setData('slot', e.target.value); form.clearErrors('slot'); }}>
-                        <option value="">Chọn một khung giờ</option>{slots.map(slot => <option value={slot} key={slot}>{dateTime(slot)}</option>)}
-                    </select></Field>
-                    {!slots.length && <p className="warning">Tiệm chưa có lịch nhận phù hợp trong 14 ngày tới. Vui lòng liên hệ để đặt bánh.</p>}
+                    <CheckoutSchedule slots={slots} form={form} selectedSlot={selectedSlot} />
                 </section>
                 <section className="panel form-stack"><h2>Thanh toán</h2><div className="choices">
                     <label><input type="radio" name="method" value="cod" checked={form.data.method === 'cod'} onChange={e => form.setData('method', e.target.value)} /><Banknote size={19} />Khi nhận bánh</label>
@@ -121,15 +163,27 @@ export function Checkout({ lines, slots, regions, bankEnabled, keyToken, policy,
             </div>
             <aside className="panel order-summary">
                 <h2>Đơn bánh của bạn</h2>
-                <ul className="summary-lines">{lines.map(line => <li key={line.key}><span>{line.quantity} × {line.product_name}<small>{line.variant_name}</small></span><strong>{money(line.subtotal)}</strong></li>)}</ul>
-                <div className="coupon-row"><Field label="Mã giảm giá" error={form.errors.coupon}><input maxLength={32} value={form.data.coupon} onChange={e => form.setData('coupon', e.target.value)} placeholder="Nhập mã nếu có" /></Field><button type="button" className="button secondary compact" onClick={() => setAppliedCode(form.data.coupon.trim())}>Áp dụng</button></div>
+                <ul className="summary-lines">{lines.map(line => <li key={line.key}><span>{line.quantity} × {line.product_name}<small>{line.variant_name}</small></span><strong>{money(displayed?.data?.line_totals?.[line.key] ?? line.subtotal)}</strong></li>)}</ul>
+                <div className="coupon-row"><Field label="Mã giảm giá" error={form.errors.coupon}><input maxLength={32} value={form.data.coupon} onChange={e => form.setData('coupon', e.target.value)} placeholder="Nhập mã nếu có" /></Field><button type="button" className="button secondary compact" onClick={() => { setAppliedCode(form.data.coupon.trim()); form.clearErrors('coupon'); retryQuote(); }}>Áp dụng</button></div>
                 <Totals subtotal={subtotal} {...displayed?.data} />
-                {shop.accepting_orders && !waitingForRegion && !displayed && <p className="muted" role="status">Đang tính tổng tiền…</p>}
-                {displayed?.error && <p className="warning" role="alert">{displayed.error} <button type="button" className="text-action" onClick={() => { setAppliedCode(''); form.setData('coupon', ''); }}>Bỏ mã</button></p>}
+                <div className="checkout-feedback" id="checkout-feedback" tabIndex={-1}>
+                    {waitingForRegion && <p className="muted">Chọn khu vực để xem phí giao và tổng tiền.</p>}
+                    {shop.accepting_orders && !waitingForRegion && !displayed && <p className="muted" role="status">Đang tính tổng tiền…</p>}
+                    {displayed?.error && <div className="warning quote-warning"><p role="alert">{displayed.error}</p>
+                        {displayed.field === 'cart' ? <Link className="text-action" href="/gio-hang">Mở giỏ hàng</Link> :
+                            <button type="button" className="text-action" onClick={() => {
+                                if (displayed.field === 'coupon') { setAppliedCode(''); form.setData('coupon', ''); form.clearErrors('coupon'); }
+                                retryQuote();
+                            }}>{displayed.field === 'coupon' ? 'Bỏ mã giảm giá' : 'Thử tính lại'}</button>}
+                    </div>}
+                    <ErrorList errors={form.errors} />
+                </div>
                 {policy && <details className="fold"><summary>Chính sách đặt bánh</summary><p className="policy-text">{policy}</p></details>}
-                <ErrorList errors={form.errors} />
-                <button className="button" disabled={!shop.accepting_orders || form.processing || !displayed?.data || !selectedSlot}><ShoppingBag size={19} />{form.processing ? 'Đang đặt bánh…' : 'Xác nhận đặt bánh'}</button>
             </aside>
+            <div className="checkout-actions">
+                <p className="checkout-action-total"><small>Tổng thanh toán</small><strong>{displayed?.data ? money(displayed.data.total) : 'Chưa tính'}</strong></p>
+                <button className="button" disabled={!shop.accepting_orders || form.processing || !displayed?.data || !selectedSlot}><ShoppingBag size={19} />{form.processing ? 'Đang đặt bánh…' : form.errors.quote_token ? 'Xác nhận giá mới' : 'Xác nhận đặt bánh'}</button>
+            </div>
         </form>
     </div></Layout>;
 }
@@ -182,20 +236,48 @@ export function OrderEvents({ events, statuses, payments }) {
     </div></li>)}</ol>;
 }
 
+function CopyValue({ value, label }) {
+    const [result, setResult] = useState('');
+    if (!navigator.clipboard) return null;
+    return <span className="copy-value">
+        <button className="button secondary compact" type="button" onClick={async () => {
+            try {
+                await navigator.clipboard.writeText(value);
+                setResult('Đã sao chép ' + label);
+            } catch {
+                setResult('Hãy chọn và sao chép ' + label + ' thủ công.');
+            }
+        }}>{result.startsWith('Đã') ? <Check size={16} /> : <Clipboard size={16} />} Sao chép {label}</button>
+        {result && <small className="muted" role="status">{result}</small>}
+    </span>;
+}
+
 export function Order({ order, statuses, payments, trackingLink, canReorder }) {
     const { shop } = usePage().props;
-    const [copied, setCopied] = useState(false);
     const reorder = useForm({});
+    const awaitingTransfer = order.bank_snapshot && order.payment === 'unpaid' && order.status !== 'cancelled';
+    const nextStep = {
+        pending: 'Tiệm sẽ xác nhận bánh và giờ hẹn. Hãy lưu mã đơn để theo dõi.',
+        confirmed: 'Tiệm đã xác nhận đơn. Hãy theo dõi tại đây để biết khi bánh sẵn sàng.',
+        preparing: 'Tiệm đang làm bánh. Bạn có thể xem giờ hẹn bên dưới.',
+        ready: 'Bánh đã sẵn sàng. Hãy mang mã đơn khi đến tiệm nhận bánh.',
+        shipping: 'Bánh đang được giao. Hãy giữ điện thoại để nhận cuộc gọi khi giao bánh.',
+    }[order.status];
     return <Layout title={'Đơn ' + order.code}><div className="wrap page">
         <Breadcrumb>{canReorder ? <Link href="/don-cua-toi">Đơn của tôi</Link> : <Link href="/tra-cuu">Tra cứu đơn</Link>}<span aria-hidden="true">/</span><span>{order.code}</span></Breadcrumb>
-        <div className="page-heading"><h1>Đơn bánh {order.code}</h1><div className="row-actions"><Pill value={order.status} labels={statuses} /><Pill value={order.payment} labels={payments} /></div></div>
+        <div className="page-heading order-heading"><h1>Đơn bánh {order.code}</h1><div className="row-actions"><Pill value={order.status} labels={statuses} /><Pill value={order.payment} labels={payments} /></div>
+            {!awaitingTransfer && nextStep && <p>{nextStep}</p>}
+        </div>
         <div className="order-grid">
             <div className="form-stack">
-                {order.bank_snapshot && order.payment === 'unpaid' && order.status !== 'cancelled' && <section className="panel form-stack bank-panel"><h2>Thông tin chuyển khoản</h2>
+                {awaitingTransfer && <section className="panel form-stack bank-panel"><h2>Thông tin chuyển khoản</h2>
                     {order.bank_snapshot.demo && <p className="warning">Thông tin chuyển khoản là dữ liệu mẫu. Vui lòng không chuyển tiền.</p>}
-                    <dl className="totals"><div><dt>Ngân hàng</dt><dd>{order.bank_snapshot.name}</dd></div><div><dt>Số tài khoản</dt><dd>{order.bank_snapshot.account}</dd></div>
-                        <div><dt>Chủ tài khoản</dt><dd>{order.bank_snapshot.holder}</dd></div><div><dt>Số tiền</dt><dd><strong>{money(order.total)}</strong></dd></div><div><dt>Nội dung chuyển khoản</dt><dd><strong>{order.code}</strong></dd></div></dl>
-                    {order.bank_due_at && <p className="muted">Hạn chuyển khoản · {dateTime(order.bank_due_at)}</p>}
+                    <p className="bank-amount"><span>Số tiền</span><strong>{money(order.total)}</strong></p>
+                    <dl className="totals"><div><dt>Ngân hàng</dt><dd>{order.bank_snapshot.name}</dd></div>
+                        <div><dt>Số tài khoản</dt><dd><strong>{order.bank_snapshot.account}</strong><CopyValue value={order.bank_snapshot.account} label="số tài khoản" /></dd></div>
+                        <div><dt>Chủ tài khoản</dt><dd>{order.bank_snapshot.holder}</dd></div>
+                        <div><dt>Nội dung chuyển khoản</dt><dd><strong>{order.code}</strong><CopyValue value={order.code} label="nội dung" /></dd></div></dl>
+                    {order.bank_due_at && <p className="warning">Hạn chuyển khoản · {dateTime(order.bank_due_at)}</p>}
                     <p className="muted">Tiệm cập nhật thanh toán sau khi nhân viên đối soát.</p>
                 </section>}
                 <section className="panel form-stack"><h2>Cách nhận bánh</h2><p className="icon-text"><MapPin size={19} />{order.fulfillment === 'pickup' ? 'Nhận tại tiệm · ' + shop.address : (order.address || 'Giao tận nơi') + ' · ' + order.region_label}</p><p className="icon-text"><CalendarClock size={19} />{dateTime(order.scheduled_at)}</p></section>
@@ -210,7 +292,7 @@ export function Order({ order, statuses, payments, trackingLink, canReorder }) {
                     <small className="muted">Thêm bánh còn bán theo giá và tồn hiện tại. Bạn có thể nhập lời chúc và ghi chú mới trong giỏ.</small>
                 </form>}
                 <Field label="Liên kết tra cứu"><input readOnly value={trackingLink} onFocus={e => e.target.select()} /></Field>
-                {navigator.clipboard && <button className="button secondary" type="button" onClick={async () => { try { await navigator.clipboard.writeText(trackingLink); setCopied(true); } catch { setCopied(false); } }}>{copied ? <Check size={17} /> : <Clipboard size={17} />}{copied ? 'Đã sao chép' : 'Sao chép liên kết'}</button>}
+                <CopyValue value={trackingLink} label="liên kết" />
             </aside>
         </div>
     </div></Layout>;

@@ -97,7 +97,7 @@ class BakeryTest extends TestCase
     {
         $variant = $this->variant();
         $customer = $this->account('khach');
-        $fields = array_replace($this->actingAs($customer)->cartAndFields($variant, 'Lời chúc riêng'), [
+        $fields = $this->actingAs($customer)->cartAndFields($variant, 'Lời chúc riêng', overrides: [
             'method' => 'bank', 'fulfillment' => 'delivery', 'region' => 'quan-1', 'address' => 'Địa chỉ riêng',
         ]);
         $this->post('/dat-banh', $fields)->assertSessionHasNoErrors();
@@ -108,9 +108,10 @@ class BakeryTest extends TestCase
         $url = '/quan-tri/don-hang/'.$order->id;
         $change = ['previous_slot' => $fields['slot'], 'slot' => '2026-11-15 16:00', 'note' => 'Khách cần dời giờ'];
         $this->patch($url.'/doi-gio', $change)->assertForbidden();
-        $this->actingAs($this->account('nhanvien'))->patch($url.'/doi-gio', $change)->assertSessionHasErrors('slot');
+        $this->actingAs($this->account('nhanvien'))->from('/quan-tri/viec-can-xu-ly')
+            ->patch($url.'/doi-gio', $change)->assertRedirect($url)->assertSessionHasErrors('slot');
         $change['slot'] = '2026-11-15 18:00';
-        $this->patch($url.'/doi-gio', $change)->assertSessionHasNoErrors();
+        $this->patch($url.'/doi-gio', $change)->assertRedirect($url)->assertSessionHasNoErrors();
         $this->patch($url.'/doi-gio', $change)->assertSessionHasErrors('slot');
         $this->assertDatabaseHas('orders', [
             'id' => $order->id, 'scheduled_at' => '2026-11-15 18:00:00', 'bank_due_at' => $order->bank_due_at, 'total' => $order->total,
@@ -147,8 +148,7 @@ class BakeryTest extends TestCase
     {
         DB::table('orders')->delete();
         $variant = $this->variant();
-        $fields = $this->cartAndFields($variant, '0', 2);
-        $fields = array_replace($fields, [
+        $fields = $this->cartAndFields($variant, '0', 2, [
             'fulfillment' => 'delivery', 'region' => 'quan-1', 'address' => 'Địa chỉ thử nghiệm',
             'coupon' => 'nhaminh10', 'total' => 1, 'subtotal' => 1, 'delivery_fee' => 999999,
             'discount' => 750000, 'unit_price' => 1, 'user_id' => 1, 'payment' => 'paid',
@@ -183,6 +183,58 @@ class BakeryTest extends TestCase
         $this->assertDatabaseCount('jobs', 1);
 
         $this->post('/dat-banh', array_replace($fields, ['key' => (string) Str::uuid()]))->assertSessionHasErrors('cart');
+    }
+
+    public function test_checkout_requires_a_fresh_quote_when_prices_or_fees_change(): void
+    {
+        $variant = $this->variant();
+        $settings = array_replace(Store::settings(), [
+            'free_from' => null,
+            'regions' => [['key' => 'quan-1', 'name' => 'Khu vực thử', 'fee' => 25000]],
+        ]);
+        DB::table('store_settings')->update(['data' => json_encode($settings)]);
+        $fields = $this->cartAndFields($variant, overrides: [
+            'fulfillment' => 'delivery', 'region' => 'quan-1', 'address' => 'Địa chỉ thử',
+            'coupon' => 'NHAMINH10',
+        ]);
+        $count = DB::table('orders')->count();
+        $queued = DB::table('jobs')->count();
+
+        DB::table('variants')->where('id', $variant->id)->increment('price', 10000);
+        $settings['regions'][0]['fee'] -= 9000;
+        DB::table('store_settings')->update(['data' => json_encode($settings)]);
+        $this->from('/')->post('/dat-banh', $fields)->assertRedirect('/dat-banh')->assertSessionHasErrors('quote_token');
+        $this->post('/dat-banh', array_diff_key($fields, ['quote_token' => true]))->assertSessionHasErrors('quote_token');
+        $this->assertDatabaseCount('orders', $count);
+        $this->assertDatabaseCount('jobs', $queued);
+        $this->assertDatabaseHas('variants', ['id' => $variant->id, 'stock' => $variant->stock]);
+        $this->assertDatabaseHas('coupons', ['code' => 'NHAMINH10', 'used' => 0]);
+        $this->assertNotEmpty(session('cart'));
+
+        $preview = $this->postJson('/dat-banh/bao-gia', ['fulfillment' => 'delivery', 'region' => 'quan-1', 'coupon' => 'NHAMINH10'])
+            ->assertOk()->assertJsonPath('delivery_fee', 16000)->assertJsonPath('total', 349000);
+        $this->assertSame([370000], array_values($preview->json('line_totals')));
+        $fields['quote_token'] = $preview->json('quote_token');
+        $receipt = $this->post('/dat-banh', $fields)->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('orders', ['total' => 349000, 'subtotal' => 370000, 'delivery_fee' => 16000]);
+
+        DB::table('variants')->where('id', $variant->id)->increment('price', 5000);
+        $this->post('/dat-banh', $fields)->assertRedirect($receipt->headers->get('Location'));
+        $this->assertDatabaseCount('orders', $count + 1);
+        $this->assertDatabaseCount('jobs', $queued + 1);
+    }
+
+    public function test_checkout_quotes_do_not_consume_the_password_recovery_limit(): void
+    {
+        Notification::fake();
+        $this->cartAndFields($this->variant());
+        for ($attempt = 0; $attempt < 5; $attempt++) {
+            $this->postJson('/dat-banh/bao-gia', ['fulfillment' => 'pickup'])->assertOk();
+        }
+
+        $user = $this->account('khach');
+        $this->post('/quen-mat-khau', ['email' => $user->email])->assertSessionHasNoErrors();
+        Notification::assertSentTo($user, ResetPassword::class);
     }
 
     public function test_intake_pause_rejects_a_stale_checkout_and_preserves_existing_orders_and_cart(): void
@@ -297,7 +349,7 @@ class BakeryTest extends TestCase
         $this->assertSame('2026-11-15 11:00:00', $order->scheduled_at);
         $this->post('/dat-banh', $pickup)->assertRedirect($first->headers->get('Location'));
 
-        $delivery = array_replace($this->cartAndFields($variant), [
+        $delivery = $this->cartAndFields($variant, overrides: [
             'fulfillment' => 'delivery', 'region' => 'quan-1', 'address' => 'Địa chỉ giao thử nghiệm',
         ]);
         $this->get('/dat-banh')->assertInertia(fn (Assert $page) => $page->where('slots', fn ($slots) => ! $slots->contains($pickup['slot'])
@@ -352,7 +404,7 @@ class BakeryTest extends TestCase
     {
         DB::table('coupons')->where('code', 'NHAMINH10')->update(['usage_limit' => 1]);
         $variant = $this->variant();
-        $fields = $this->cartAndFields($variant) + ['coupon' => 'NHAMINH10'];
+        $fields = $this->cartAndFields($variant, overrides: ['coupon' => 'NHAMINH10']);
         $this->post('/dat-banh', $fields)->assertRedirect();
         $order = DB::table('orders')->latest('id')->first();
         $this->assertDatabaseHas('coupons', ['code' => 'NHAMINH10', 'used' => 1]);
@@ -373,7 +425,7 @@ class BakeryTest extends TestCase
 
     public function test_bank_snapshot_authorization_and_paid_fulfillment(): void
     {
-        $fields = array_replace($this->cartAndFields($this->variant()), ['method' => 'bank', 'fulfillment' => 'delivery', 'region' => 'quan-1', 'address' => '24 Địa chỉ mẫu']);
+        $fields = $this->cartAndFields($this->variant(), overrides: ['method' => 'bank', 'fulfillment' => 'delivery', 'region' => 'quan-1', 'address' => '24 Địa chỉ mẫu']);
         $receipt = $this->post('/dat-banh', $fields);
         $order = DB::table('orders')->latest('id')->first();
         $receipt->assertRedirect(route('tracking.show', $order->tracking_token));
@@ -556,7 +608,7 @@ class BakeryTest extends TestCase
         $product = DB::table('products')->find($variant->product_id);
         $checkout = $this->cartAndFields($variant, quantity: 2);
         $this->post('/gio-hang', ['variant_id' => $variant->id, 'quantity' => 1, 'note' => 'Gói riêng'])->assertSessionHasNoErrors();
-        $checkout['key'] = session('checkout_key');
+        $checkout = $this->confirmQuote(array_replace($checkout, ['key' => session('checkout_key')]));
         $this->post('/dat-banh', $checkout)->assertSessionHasNoErrors();
         $this->post('/dat-banh', $checkout)->assertSessionHasNoErrors();
         $order = DB::table('orders')->latest('id')->first();
@@ -667,8 +719,13 @@ class BakeryTest extends TestCase
         $this->post('/quan-tri/san-pham', $fields + ['uploads' => [UploadedFile::fake()->create('bad.svg', 5, 'image/svg+xml')]])->assertSessionHasErrors('uploads.0');
         $this->post('/quan-tri/san-pham', $fields + ['uploads' => [UploadedFile::fake()->image('large.jpg')->size(5000)]])->assertSessionHasErrors('uploads.0');
         $this->post('/quan-tri/san-pham', $fields + ['uploads' => [UploadedFile::fake()->image('valid.jpg')]])->assertSessionHasNoErrors();
-        $uploaded = DB::table('products')->where('name', 'Bánh QA')->value('images');
-        $this->get(json_decode($uploaded, true)[0])->assertOk()->assertHeader('X-Content-Type-Options', 'nosniff');
+        $product = DB::table('products')->where('name', 'Bánh QA')->first();
+        $productUrl = '/banh/'.$product->slug;
+        $this->get($productUrl)->assertOk();
+        $this->get(json_decode($product->images, true)[0])->assertOk()->assertHeader('X-Content-Type-Options', 'nosniff');
+        $this->post('/gio-hang', [
+            'variant_id' => DB::table('variants')->where('product_id', $product->id)->value('id'), 'quantity' => 1,
+        ])->assertRedirect($productUrl)->assertSessionHasNoErrors();
         $this->assertDatabaseHas('stock_movements', ['actor_id' => $this->account('admin')->id, 'reason' => 'initial', 'stock_before' => 0, 'stock_after' => 5]);
     }
 
@@ -724,7 +781,7 @@ class BakeryTest extends TestCase
         return User::where('email', $prefix.'@tiembanh.test')->firstOrFail();
     }
 
-    private function cartAndFields(object $variant, ?string $message = null, int $quantity = 1): array
+    private function cartAndFields(object $variant, ?string $message = null, int $quantity = 1, array $overrides = []): array
     {
         $this->post('/gio-hang', compact('message', 'quantity') + ['variant_id' => $variant->id])
             ->assertSessionHasNoErrors();
@@ -732,9 +789,16 @@ class BakeryTest extends TestCase
         $lines = app(Checkout::class)->cart(session('cart'));
         $slot = app(Checkout::class)->slots(Store::settings(), max(array_column($lines, 'prep_minutes')))[0];
 
-        return [
+        return $this->confirmQuote(array_replace([
             'key' => session('checkout_key'), 'name' => 'Khách Đặt Bánh', 'email' => 'test@example.test', 'phone' => '0900123456',
             'fulfillment' => 'pickup', 'slot' => $slot, 'method' => 'cod',
-        ];
+        ], $overrides));
+    }
+
+    private function confirmQuote(array $fields): array
+    {
+        $preview = $this->postJson('/dat-banh/bao-gia', array_intersect_key($fields, array_flip(['fulfillment', 'region', 'coupon'])))->assertOk();
+
+        return array_replace($fields, ['quote_token' => $preview->json('quote_token')]);
     }
 }

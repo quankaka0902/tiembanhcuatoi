@@ -19,8 +19,8 @@ Route::controller(Storefront::class)->group(function () {
     Route::patch('/gio-hang/{line}', 'saveLine')->whereUuid('line')->block();
     Route::delete('/gio-hang/{line}', 'removeLine')->whereUuid('line')->block();
     Route::get('/dat-banh', 'checkout')->block();
-    Route::post('/dat-banh/bao-gia', 'quote')->middleware('throttle:60,1');
-    Route::post('/dat-banh', 'place')->middleware('throttle:20,1')->block(30, 10);
+    Route::post('/dat-banh/bao-gia', 'quote')->middleware('throttle:checkout-quote');
+    Route::post('/dat-banh', 'place')->middleware('throttle:checkout-place')->block(30, 10);
     Route::get('/chinh-sach-dat-banh', 'policy');
     Route::get('/tra-cuu', 'tracking');
     Route::post('/tra-cuu', 'track')->middleware('throttle:tracking');
@@ -38,7 +38,7 @@ Route::get('/anh/{file}', function (string $file) {
     abort_unless($disk->exists('bakery/'.$file), 404);
 
     return $disk->response('bakery/'.$file, headers: ['Cache-Control' => 'public, max-age=86400', 'X-Content-Type-Options' => 'nosniff']);
-})->where('file', '[A-Za-z0-9]{40}\.(?:jpg|jpeg|png|webp)');
+})->where('file', '[A-Za-z0-9]{40}\.(?:jpg|jpeg|png|webp)')->withoutMiddleware('web');
 
 Route::middleware('guest')->group(function () {
     Route::get('/dang-nhap', fn (Accounts $accounts) => $accounts->form('login'))->name('login');
