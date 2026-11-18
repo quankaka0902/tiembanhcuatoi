@@ -8,7 +8,7 @@ class LaunchReadiness
 {
     public static function required(): bool
     {
-        return app()->environment('production') || config('bakery.rehearsal');
+        return app()->environment(['production', 'staging']) || config('bakery.rehearsal');
     }
 
     public static function loopback(string $host): bool
@@ -16,18 +16,31 @@ class LaunchReadiness
         return in_array(strtolower($host), ['localhost', '127.0.0.1', '::1', '[::1]'], true);
     }
 
-    public static function configurationIssues(bool $rehearsal = false): array
+    public static function configurationIssues(): array
     {
         $issues = [];
+        $privateStaging = PrivateStaging::enabled();
+        $rehearsal = (bool) config('bakery.rehearsal');
         $url = (string) config('app.url');
         $loopback = self::loopback((string) parse_url($url, PHP_URL_HOST));
         if (config('app.debug') || config('bakery.demo_seed')
-            || ($rehearsal ? ! app()->environment(['local', 'testing']) : ! app()->environment('production') || config('bakery.rehearsal'))) {
+            || ($rehearsal ? ! app()->environment(['local', 'testing']) : ! app()->environment(['production', 'staging']))) {
             $issues[] = 'Chọn đúng môi trường và tắt debug, dữ liệu mẫu.';
         }
         if (! filter_var($url, FILTER_VALIDATE_URL) || parse_url($url, PHP_URL_SCHEME) !== 'https'
             || ($rehearsal !== $loopback) || ! config('session.secure') || ! config('session.encrypt')) {
             $issues[] = 'Cấu hình APP_URL HTTPS, SESSION_SECURE_COOKIE=true và SESSION_ENCRYPT=true.';
+        }
+        if ($privateStaging) {
+            if (! PrivateStaging::accessConfigured() || config('session.domain')) {
+                $issues[] = 'Dùng địa chỉ HTTPS riêng, mật khẩu truy cập staging và cookie giới hạn ở tên miền này.';
+            }
+            if (! PrivateStaging::isolatedDatabase()) {
+                $issues[] = 'Staging cần MySQL riêng với tên schema kết thúc bằng _test.';
+            }
+            if (! PrivateStaging::smtpConfigured() || ! PrivateStaging::approvedRecipients()) {
+                $issues[] = 'Cấu hình SMTP qua TLS và danh sách hộp thư thử đã duyệt cho staging.';
+            }
         }
         $sender = (string) config('mail.from.address');
         $smtpHost = (string) config('mail.mailers.smtp.host');

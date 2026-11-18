@@ -3,11 +3,14 @@
 namespace App\Providers;
 
 use App\Models\User;
+use App\Services\PrivateStaging;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Middleware\TrustProxies;
 use Illuminate\Http\Request;
+use Illuminate\Mail\Events\MessageSending;
 use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
@@ -18,6 +21,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         TrustProxies::at(config('bakery.trusted_proxies'));
+        Event::listen(MessageSending::class, PrivateStaging::class.'@checkOutgoingMail');
         Gate::define('active-account', fn (User $user) => $user->active);
         Gate::define('staff', fn (User $user) => $user->active && in_array($user->role, ['admin', 'staff'], true));
         Gate::define('admin', fn (User $user) => $user->active && $user->role === 'admin');

@@ -32,7 +32,7 @@ class AdminConfig extends Controller
             $current = Store::settings(lock: true);
             if ($fields['accepting_orders'] && ! $current['accepting_orders'] && LaunchReadiness::required()) {
                 $errors = [
-                    ...LaunchReadiness::configurationIssues(rehearsal: ! app()->environment('production')),
+                    ...LaunchReadiness::configurationIssues(),
                     ...LaunchReadiness::dataIssues($current),
                 ];
                 if ($errors) {

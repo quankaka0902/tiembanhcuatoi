@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Jobs\SendOrderEmail;
 use App\Services\LaunchReadiness;
+use App\Services\PrivateStaging;
 use App\Services\Store;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -12,7 +13,7 @@ use Throwable;
 
 class BakeryPreflight extends Command
 {
-    protected $signature = 'bakery:preflight {--staging : Kiểm tra môi trường local nghiệm thu}';
+    protected $signature = 'bakery:preflight {--staging : Kiểm tra staging kín hoặc môi trường local nghiệm thu}';
 
     protected $description = 'Kiểm tra cấu hình và dữ liệu cần thiết trước khi mở nhận đơn';
 
@@ -22,10 +23,21 @@ class BakeryPreflight extends Command
         $url = (string) config('app.url');
         $host = strtolower((string) parse_url($url, PHP_URL_HOST));
         $loopback = LaunchReadiness::loopback($host);
+        $privateStaging = PrivateStaging::enabled();
         $rehearsal = $staging && config('bakery.rehearsal');
         $failures = [];
 
-        if ($staging) {
+        if (! $staging && ($privateStaging || config('bakery.rehearsal'))) {
+            $this->error('Dùng --staging để kiểm tra môi trường nghiệm thu.');
+
+            return self::FAILURE;
+        }
+        if ($privateStaging && ! PrivateStaging::isolatedDatabase()) {
+            $this->error('Staging cần MySQL riêng với tên schema kết thúc bằng _test.');
+
+            return self::FAILURE;
+        }
+        if ($staging && ! $privateStaging) {
             $database = (string) DB::connection('mysql')->getDatabaseName();
             if (! app()->environment(['local', 'testing']) || ! $loopback || ! str_ends_with($database, '_test')) {
                 $this->error('Nghiệm thu cần APP_ENV=local/testing, URL loopback và schema MySQL có hậu tố _test.');
@@ -33,7 +45,7 @@ class BakeryPreflight extends Command
                 return self::FAILURE;
             }
             if ($rehearsal) {
-                array_push($failures, ...LaunchReadiness::configurationIssues(rehearsal: true));
+                array_push($failures, ...LaunchReadiness::configurationIssues());
             } elseif (! in_array(config('mail.default'), ['log', 'array'], true)) {
                 $failures[] = 'Dùng mailer log hoặc array cho nghiệm thu local.';
             }
@@ -61,7 +73,7 @@ class BakeryPreflight extends Command
         if (config('database.default') !== 'mysql') {
             $failures[] = 'Chọn kết nối MySQL riêng cho môi trường này.';
         } else {
-            array_push($failures, ...$this->databaseChecks(! $staging || $rehearsal));
+            array_push($failures, ...$this->databaseChecks(! $staging || $privateStaging || $rehearsal));
         }
 
         foreach ($failures as $failure) {

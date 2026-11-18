@@ -22,6 +22,7 @@ class OperationsTest extends TestCase
             'app.url' => 'https://bakery.example.test',
             'cache.stores.bakery-operations' => ['driver' => 'array'],
             'operations.monitor.alert_url' => 'https://alerts.example.test',
+            'operations.monitor.heartbeat_url' => null,
             'operations.backup.root' => Storage::fake('ops-backups')->path(''),
             'operations.backup.copy_root' => null,
             'operations.backup.max_age_hours' => 1,
@@ -87,6 +88,22 @@ class OperationsTest extends TestCase
         config(['operations.backup.root' => Storage::fake('ops-partial')->path('')]);
         $this->backupFixture('ops-partial', name: '.partial-20261116-120000-acde1234');
         $this->assertFalse($backup->hasRecentCompleteBackup(now()->subHour()->timestamp));
+    }
+
+    public function test_scheduler_heartbeat_is_sent_even_while_an_incident_is_reported(): void
+    {
+        config([
+            'operations.monitor.heartbeat_url' => 'https://heartbeat.example.test/ping',
+            'operations.monitor.heartbeat_token' => 'test-token',
+        ]);
+        Http::fake(['https://heartbeat.example.test/ping' => Http::response('', 204)]);
+
+        $this->artisan('bakery:monitor')->assertFailed();
+
+        Http::assertSent(fn ($request) => $request->url() === 'https://alerts.example.test' && $request['checks'] === ['backup']);
+        Http::assertSent(fn ($request) => $request->url() === 'https://heartbeat.example.test/ping'
+            && $request->hasHeader('Authorization', 'Bearer test-token')
+            && $request->data() === ['service' => 'bakery', 'at' => now()->toIso8601String()]);
     }
 
     private function backupFixture(string $disk = 'ops-backups', ?int $finishedAt = null, string $name = '20261116-120000-acde1234'): string

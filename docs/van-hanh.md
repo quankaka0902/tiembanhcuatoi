@@ -29,6 +29,8 @@ Khi mất thiết bị hoặc cần đổi khóa, người có quyền quản tr
 
 Cấu hình `BAKERY_ALERT_URL` bằng HTTPS trỏ đến bộ nhận webhook của đầu mối trực. Nếu cần, đặt `BAKERY_ALERT_TOKEN` làm Bearer token. Bộ nhận trả 2xx khi đã nhận, và chuyển thông báo tới người trực đã được duyệt. Payload chỉ gồm `service`, `state`, `checks` và `at`. Trạng thái là `incident` hoặc `recovered`. Các cảnh báo không đổi được nhắc lại sau 30 phút kể từ lần gửi thành công. Cấu hình CA của staging qua `BAKERY_MONITOR_CA`. Với staging có xác thực HTTP Basic, dùng `BAKERY_MONITOR_WEB_USER` và `BAKERY_MONITOR_WEB_PASSWORD`. Kiểm tra ở ngoài máy chủ vẫn cần thiết để phát hiện sự cố mất cả máy hoặc scheduler.
 
+Nếu có bộ nhận độc lập ngoài máy chủ, đặt `BAKERY_HEARTBEAT_URL` bằng HTTPS và đặt `BAKERY_HEARTBEAT_TOKEN` khi bộ nhận yêu cầu Bearer token. Mỗi lần `bakery:monitor` chạy xong phần kiểm tra, kể cả khi phát hiện sự cố, nó gửi JSON gồm `service` và `at`. Bộ nhận trả 2xx, ghi thời điểm thực sự nhận được và báo người trực khi vắng tín hiệu quá khoảng thời gian đã thống nhất. Cấu hình thêm phép kiểm tra HTTPS `/up` từ bộ giám sát độc lập để theo dõi web. Khi diễn tập mất scheduler, tạm dừng lịch và chờ cảnh báo vắng tín hiệu. Chạy lệnh tay cũng gửi tín hiệu, vì vậy hãy chờ hết khoảng kiểm tra trước khi chạy tay.
+
 ## Sao lưu và diễn tập phục hồi
 
 Đặt `BAKERY_BACKUP_ROOT` tới thư mục riêng đã tạo, bên ngoài vùng phục vụ web. Dùng `BAKERY_BACKUP_COPY_ROOT` cho nơi lưu bản thứ hai, ưu tiên thiết bị hoặc kho lưu trữ khác máy chủ đã được cấp. Cấp quyền đọc cho tài khoản sao lưu và ghi thông tin kết nối vào tệp MySQL `[client]` riêng, trỏ `BAKERY_BACKUP_MYSQL_DEFAULTS` vào tệp đó. Host, cổng hoặc socket nguồn và tên schema lấy từ kết nối MySQL hiện hành của ứng dụng. Dùng `BAKERY_MYSQLDUMP` nếu công cụ ở ngoài PATH. Cài PHP Zip và MySQL 8.4 client trên máy chạy tác vụ. Giới hạn quyền đọc cả bản sao và cấu hình kết nối. Giữ `APP_KEY` trong kho bí mật riêng cùng chính sách truy cập của tiệm.
@@ -54,7 +56,7 @@ Trên Windows có thể dùng `mysql --database=SCHEMA_TRONG --execute="source C
 
 ## Phát hành và quay lui ứng dụng
 
-Chuẩn bị gói ứng dụng đã cài dependency và build frontend dưới `ROOT/releases/ID`. Dùng chung cấu hình bí mật, MySQL, ảnh, cache vận hành và các thư mục cần lưu bền vững giữa các phiên bản. Đặt trạng thái phát hành ở `ROOT/release.json` ngoài document root. Các lệnh dưới đây kiểm tra preflight trước khi đổi phiên bản hiện hành. Có thể thêm `--staging` vào `activate` và `rollback` khi diễn tập trên loopback.
+Chuẩn bị gói ứng dụng đã cài dependency và build frontend dưới `ROOT/releases/ID`. Dùng chung cấu hình bí mật, MySQL, ảnh, cache vận hành và các thư mục cần lưu bền vững giữa các phiên bản. Đặt trạng thái phát hành ở `ROOT/release.json` ngoài document root. Các lệnh dưới đây kiểm tra preflight trước khi đổi phiên bản hiện hành. Dùng `--staging` với `activate` và `rollback` khi diễn tập trên staging kín hoặc loopback. Kiểm tra bản quay lui hỗ trợ chế độ staging đã chọn trước buổi diễn tập.
 
 ```console
 php ops/release.php activate ROOT ID
@@ -71,6 +73,14 @@ Dùng schema MySQL có hậu tố `_test` dành cho nghiệm thu, tách khỏi s
 Kiểm tra đơn COD, đơn chuyển khoản mẫu, đối soát và tra cứu. Đặt một đơn trong lúc worker dừng, sau đó khởi động worker và đối chiếu email trong nhật ký. Mở sẵn trang đặt bánh, tạm ngừng nhận đơn bằng một phiên quản trị, rồi gửi trang cũ. Kiểm tra giỏ vẫn còn và đơn đã nhận trước đó vẫn xử lý được. Diễn tập phục hồi vào schema và thư mục ảnh thứ hai.
 
 Để nghiệm thu kiểu chặng 5, dùng thêm `BAKERY_REHEARSAL=true` với hostname loopback qua HTTPS và một hộp thư SMTP nhận thử trên loopback. Dùng MySQL test, dữ liệu giả, khóa ứng dụng và thư mục ảnh riêng. Tắt seed demo và cấu hình các tài khoản thử bằng TOTP riêng. Đặt `SESSION_SECURE_COOKIE=true` và `SESSION_ENCRYPT=true`. Giới hạn staging ở loopback và kiểm tra chứng chỉ bằng CA được cấp riêng cho môi trường này. Chạy `php artisan bakery:preflight --staging` rồi thử công tắc mở nhận đơn, trạng thái worker, ba loại thư, đổi giờ và ghi nhận hoàn tiền. Nghiệm thu tên miền và nhà cung cấp SMTP của cửa hàng cần cấu hình cùng hộp thư do chủ tiệm xác nhận.
+
+## Nghiệm thu kín với tên miền riêng
+
+1. Dùng mạng riêng hoặc VPN để giới hạn toàn bộ tên miền staging, kể cả ảnh và tệp frontend do web server phục vụ. Chỉ máy chủ web hoặc proxy được phép kết nối trực tiếp tới tiến trình ứng dụng. Chuyển đúng tên miền, tiêu đề `Authorization` và giao thức HTTPS từ proxy đã khai báo trong `BAKERY_TRUSTED_PROXIES`. Tắt việc lưu giá trị Authorization, Referer hoặc URL tra cứu và đặt lại mật khẩu đầy đủ vào log.
+2. Đặt `APP_ENV=staging`, `APP_URL` là địa chỉ HTTPS của tên miền riêng, `APP_DEBUG=false`, `BAKERY_REHEARSAL=false` và `BAKERY_DEMO_SEED=false`. Dùng MySQL tên schema kết thúc bằng `_test`, tài khoản MySQL chỉ có quyền trên schema staging, khóa ứng dụng và thư mục ảnh riêng. Đặt tên cookie riêng qua `SESSION_COOKIE`, để trống `SESSION_DOMAIN`, đồng thời bật `SESSION_SECURE_COOKIE` và `SESSION_ENCRYPT`.
+3. Đặt `BAKERY_STAGING_PASSWORD` là mật khẩu ngẫu nhiên từ 32 ký tự. Trình duyệt dùng tài khoản HTTP Basic `staging` và mật khẩu này ở lớp truy cập Laravel, kể cả đường dẫn `/up`. Sau lớp đó, nhân viên đăng nhập tài khoản của mình và xác thực TOTP như bình thường. Nếu dùng giám sát nội bộ, cấu hình thông tin Basic tương ứng qua `BAKERY_MONITOR_WEB_USER` và `BAKERY_MONITOR_WEB_PASSWORD`.
+4. Đặt `MAIL_MAILER=smtp`, điền địa chỉ gửi đã xác minh và các trường SMTP `MAIL_HOST`, `MAIL_PORT`, `MAIL_SCHEME`, `MAIL_USERNAME`, `MAIL_PASSWORD` theo nhà cung cấp. Để trống `MAIL_URL`. Staging yêu cầu TLS và kiểm tra chứng chỉ SMTP. Điền các địa chỉ thử được duyệt vào `BAKERY_STAGING_MAIL_RECIPIENTS`, cách nhau bằng dấu phẩy. Ứng dụng bỏ qua cả thư nếu bất kỳ người nhận nào ngoài danh sách hoặc cấu hình gửi sai. Dùng chính các địa chỉ đã duyệt khi thử đặt đơn và khôi phục mật khẩu.
+5. Chạy migration, tạo tài khoản và nhập dữ liệu cửa hàng được phép dùng trong staging. Chạy `php artisan bakery:preflight --staging` trước khi bật nhận đơn để chạy ca thử bên trong staging. Kiểm tra truy cập khi thiếu mật khẩu, trạng thái đơn, ba loại thư và các thao tác sự cố theo [biên bản nghiệm thu](nghiem-thu-chang-7.md). Tạm ngừng nhận đơn khi kết thúc ca. Giữ mật khẩu, khóa TOTP, khóa ứng dụng và token trong kho bí mật được cấp.
 
 ## Các mục cần cấu hình của tiệm để nghiệm thu lần cuối
 

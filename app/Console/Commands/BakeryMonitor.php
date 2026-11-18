@@ -50,7 +50,10 @@ class BakeryMonitor extends Command
 
             $this->line($issues ? 'Cần kiểm tra: '.implode(', ', $issues) : 'Các kiểm tra vận hành đạt.');
 
-            return $this->notify($issues, $state) && ! $issues ? self::SUCCESS : self::FAILURE;
+            $notified = $this->notify($issues, $state);
+            $heartbeat = $this->sendHeartbeat();
+
+            return $notified && $heartbeat && ! $issues ? self::SUCCESS : self::FAILURE;
         });
 
         return $code === false ? self::SUCCESS : $code;
@@ -119,27 +122,49 @@ class BakeryMonitor extends Command
 
         $payload = ['service' => 'bakery', 'state' => $issues ? 'incident' : 'recovered', 'checks' => $issues, 'at' => now()->toIso8601String()];
         $url = (string) config('operations.monitor.alert_url');
-        if (! $this->trustedDestination($url)) {
-            Log::warning('Chưa cấu hình kênh nhận cảnh báo hợp lệ.', $payload);
+        if ($this->post($url, config('operations.monitor.alert_token'), $payload)) {
+            $state->forever('last-alert', ['checks' => $issues, 'at' => now()->timestamp]);
 
-            return false;
-        }
-        try {
-            $request = $this->http()->asJson()->acceptJson();
-            if ($token = config('operations.monitor.alert_token')) {
-                $request->withToken($token);
-            }
-            if ($request->post($url, $payload)->successful()) {
-                $state->forever('last-alert', ['checks' => $issues, 'at' => now()->timestamp]);
-
-                return true;
-            }
-        } catch (Throwable) {
-            // Transport exceptions may include the private webhook URL.
+            return true;
         }
         Log::warning('Chưa gửi được cảnh báo vận hành.', $payload);
 
         return false;
+    }
+
+    private function sendHeartbeat(): bool
+    {
+        $url = config('operations.monitor.heartbeat_url');
+        if (! $url) {
+            return true;
+        }
+
+        if ($this->post($url, config('operations.monitor.heartbeat_token'), [
+            'service' => 'bakery', 'at' => now()->toIso8601String(),
+        ])) {
+            return true;
+        }
+        Log::warning('Chưa gửi được tín hiệu định kỳ của trình lập lịch.');
+
+        return false;
+    }
+
+    private function post(string $url, ?string $token, array $payload): bool
+    {
+        if (! $this->trustedDestination($url)) {
+            return false;
+        }
+        try {
+            $request = $this->http()->asJson()->acceptJson();
+            if ($token) {
+                $request->withToken($token);
+            }
+
+            return $request->post($url, $payload)->successful();
+        } catch (Throwable) {
+            // Transport exceptions may include the private destination URL.
+            return false;
+        }
     }
 
     private function trustedDestination(string $url): bool

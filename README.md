@@ -118,6 +118,8 @@ Chặng 5 đạt 29 bài trên MySQL với 875 assertions và 24 bài trên SQLi
 
 Chặng 6 đạt 32 bài trên MySQL với 894 assertions và 27 bài trên SQLite với 859 assertions. Ca bán staging riêng đã hoàn tất một đơn COD và một đơn chuyển khoản giả lập, cùng thư qua SMTP local. Đã chạy sao lưu theo lịch, xác minh SHA-256 ở cả hai thư mục và phục hồi hai đơn cùng ảnh vào schema và thư mục ảnh riêng. Hộp nhận thử đã ghi cảnh báo và thông báo phục hồi khi worker ngừng phản hồi, bản sao quá hạn và bản phát hành trả HTTP 503. Quay lui trả web về HTTP 200 và giữ cả hai đơn. Các đầu vào cần cấu hình của tiệm được liệt kê trong hướng dẫn vận hành.
 
+Chặng 7 thêm chế độ staging kín có tên miền HTTPS riêng và chỉ gửi thư tới các địa chỉ thử được duyệt. MySQL đạt 35 bài với 914 assertions. SQLite đạt 30 bài với 879 assertions. Xem [biên bản nghiệm thu chặng 7](docs/nghiem-thu-chang-7.md) để biết kết quả ca thử, phục hồi, quay lui và các dịch vụ còn chờ cấu hình của tiệm.
+
 ## Cấu hình cửa hàng thật
 
 Xem [hướng dẫn vận hành, kiểm tra cấu hình và phục hồi bản sao lưu](docs/van-hanh.md).

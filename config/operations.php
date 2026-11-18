@@ -8,6 +8,8 @@ return [
         'web_password' => env('BAKERY_MONITOR_WEB_PASSWORD') ?: null,
         'alert_url' => env('BAKERY_ALERT_URL') ?: null,
         'alert_token' => env('BAKERY_ALERT_TOKEN') ?: null,
+        'heartbeat_url' => env('BAKERY_HEARTBEAT_URL') ?: null,
+        'heartbeat_token' => env('BAKERY_HEARTBEAT_TOKEN') ?: null,
         'worker_wait_minutes' => 5,
         'repeat_minutes' => 30,
     ],

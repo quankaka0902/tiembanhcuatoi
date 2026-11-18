@@ -3,6 +3,10 @@
 return [
     'demo_seed' => env('BAKERY_DEMO_SEED', false),
     'rehearsal' => env('BAKERY_REHEARSAL', false),
+    'staging' => [
+        'password' => env('BAKERY_STAGING_PASSWORD'),
+        'recipients' => array_values(array_filter(array_map('trim', explode(',', (string) env('BAKERY_STAGING_MAIL_RECIPIENTS', ''))), 'strlen')),
+    ],
     'trusted_proxies' => array_values(array_filter(array_map('trim', explode(',', (string) env('BAKERY_TRUSTED_PROXIES', ''))))),
     'mail_wait_minutes' => 5,
     'defaults' => [
