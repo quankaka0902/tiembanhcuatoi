@@ -31,6 +31,9 @@ class LaunchReadiness
             || ($rehearsal !== $loopback) || ! config('session.secure') || ! config('session.encrypt')) {
             $issues[] = 'Cấu hình APP_URL HTTPS, SESSION_SECURE_COOKIE=true và SESSION_ENCRYPT=true.';
         }
+        if (! config('session.http_only') || ! in_array(config('session.same_site'), ['lax', 'strict'], true)) {
+            $issues[] = 'Cấu hình cookie phiên HttpOnly và SameSite=lax hoặc strict.';
+        }
         if ($privateStaging) {
             if (! PrivateStaging::accessConfigured() || config('session.domain')) {
                 $issues[] = 'Dùng địa chỉ HTTPS riêng, mật khẩu truy cập staging và cookie giới hạn ở tên miền này.';
@@ -45,7 +48,10 @@ class LaunchReadiness
         $sender = (string) config('mail.from.address');
         $smtpHost = (string) config('mail.mailers.smtp.host');
         $smtpUrl = config('mail.mailers.smtp.url');
-        if (config('mail.default') !== 'smtp' || ! filter_var($sender, FILTER_VALIDATE_EMAIL)
+        if ($smtpUrl) {
+            $smtpHost = (string) parse_url($smtpUrl, PHP_URL_HOST);
+        }
+        if (config('mail.default') !== 'smtp' || ! filter_var($sender, FILTER_VALIDATE_EMAIL) || trim($smtpHost) === ''
             || ($rehearsal && (! self::loopback($smtpHost) || $smtpUrl))
             || (! $rehearsal && preg_match('/(?:\.(?:test|example|invalid)|@example\.(?:com|net|org))$/i', $sender))) {
             $issues[] = $rehearsal ? 'SMTP nghiệm thu phải gửi vào hộp thư bắt tại loopback.' : 'Cấu hình SMTP và địa chỉ gửi thư của cửa hàng.';

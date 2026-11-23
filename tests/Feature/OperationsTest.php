@@ -6,6 +6,7 @@ use App\Jobs\ProbeOrderMailWorker;
 use App\Services\BakeryBackup;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -104,6 +105,61 @@ class OperationsTest extends TestCase
         Http::assertSent(fn ($request) => $request->url() === 'https://heartbeat.example.test/ping'
             && $request->hasHeader('Authorization', 'Bearer test-token')
             && $request->data() === ['service' => 'bakery', 'at' => now()->toIso8601String()]);
+    }
+
+    public function test_invalid_backup_metadata_reports_a_backup_incident_and_keeps_the_heartbeat(): void
+    {
+        $directory = $this->backupFixture();
+        $path = $directory.'/manifest.json';
+        $manifest = json_decode(file_get_contents($path), true);
+        $backup = app(BakeryBackup::class);
+        $this->assertTrue($backup->verified($directory));
+        file_put_contents($path, json_encode($manifest + ['started_at' => now()->subMinute()->timestamp]));
+        $this->assertTrue($backup->verified($directory));
+
+        $invalid = [
+            'scalar document' => 'invalid',
+            'version type' => array_replace($manifest, ['version' => '1']),
+            'files type' => array_replace($manifest, ['files' => 'invalid']),
+            'metadata type' => array_replace($manifest, ['files' => ['database.sql' => 'invalid']]),
+            'hash type' => array_replace_recursive($manifest, ['files' => ['database.sql' => ['sha256' => []]]]),
+            'size type' => array_replace_recursive($manifest, ['files' => ['database.sql' => ['size' => '3']]]),
+            'start type' => $manifest + ['started_at' => null],
+            'start after completion' => $manifest + ['started_at' => now()->addMinute()->timestamp],
+        ];
+        foreach ($invalid as $description => $data) {
+            file_put_contents($path, json_encode($data));
+            $this->assertFalse($backup->verified($directory), $description);
+        }
+
+        file_put_contents($path, json_encode($invalid['hash type']));
+        $this->artisan('bakery:backup', ['--verify' => $directory])->assertFailed();
+        config(['operations.monitor.heartbeat_url' => 'https://heartbeat.example.test/ping']);
+        Http::fake(['https://heartbeat.example.test/ping' => Http::response('', 204)]);
+        $this->artisan('bakery:monitor')->assertFailed();
+        Http::assertSent(fn ($request) => $request->url() === 'https://alerts.example.test'
+            && $request['state'] === 'incident' && $request['checks'] === ['backup']);
+        Http::assertSent(fn ($request) => $request->url() === 'https://heartbeat.example.test/ping');
+    }
+
+    public function test_unresolved_failed_mail_stays_an_incident_after_twenty_four_hours(): void
+    {
+        $this->backupFixture();
+        $id = DB::table('failed_jobs')->insertGetId([
+            'uuid' => '00000000-0000-4000-8000-000000000001',
+            'connection' => 'order-mail', 'queue' => 'order-mail',
+            'payload' => '{}', 'exception' => 'SMTP test failure',
+            'failed_at' => now()->subDays(2),
+        ]);
+
+        $this->artisan('bakery:monitor')->assertFailed();
+        Http::assertSent(fn ($request) => $request->url() === 'https://alerts.example.test'
+            && $request['state'] === 'incident' && $request['checks'] === ['mail_failed']);
+
+        DB::table('failed_jobs')->where('id', $id)->delete();
+        $this->artisan('bakery:monitor')->assertSuccessful();
+        Http::assertSent(fn ($request) => $request->url() === 'https://alerts.example.test'
+            && $request['state'] === 'recovered' && $request['checks'] === []);
     }
 
     private function backupFixture(string $disk = 'ops-backups', ?int $finishedAt = null, string $name = '20261116-120000-acde1234'): string

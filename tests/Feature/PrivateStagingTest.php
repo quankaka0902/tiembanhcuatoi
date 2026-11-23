@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Services\LaunchReadiness;
 use Illuminate\Mail\Transport\ArrayTransport;
 use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
@@ -65,5 +66,56 @@ class PrivateStagingTest extends TestCase
         config(['bakery.staging.recipients' => ['qa@example.test'], 'mail.mailers.smtp.require_tls' => false]);
         Mail::raw('Thiếu TLS', fn ($message) => $message->to('qa@example.test'));
         $this->assertCount(1, $smtp->messages());
+    }
+
+    public function test_preflight_rejects_unsafe_session_cookie_configuration(): void
+    {
+        config([
+            'bakery.demo_seed' => false,
+            'bakery.rehearsal' => false,
+            'session.secure' => true,
+            'session.encrypt' => true,
+            'session.http_only' => true,
+            'session.same_site' => 'lax',
+            'session.domain' => null,
+            'mail.from.address' => 'acceptance@bakery.example.com',
+        ]);
+        $this->assertSame([], LaunchReadiness::configurationIssues());
+
+        $cookieError = 'Cấu hình cookie phiên HttpOnly và SameSite=lax hoặc strict.';
+        config(['session.http_only' => false]);
+        $this->assertContains($cookieError, LaunchReadiness::configurationIssues());
+
+        config(['session.http_only' => true]);
+        foreach ([null, 'none'] as $sameSite) {
+            config(['session.same_site' => $sameSite]);
+            $this->assertContains($cookieError, LaunchReadiness::configurationIssues());
+        }
+
+        config(['session.same_site' => 'strict']);
+        $this->assertSame([], LaunchReadiness::configurationIssues());
+
+        $secureError = 'Cấu hình APP_URL HTTPS, SESSION_SECURE_COOKIE=true và SESSION_ENCRYPT=true.';
+        config(['session.secure' => false]);
+        $this->assertContains($secureError, LaunchReadiness::configurationIssues());
+
+        config(['session.secure' => true, 'session.encrypt' => false]);
+        $this->assertContains($secureError, LaunchReadiness::configurationIssues());
+    }
+
+    public function test_preflight_requires_an_effective_smtp_host_and_accepts_a_connection_url(): void
+    {
+        $this->app['env'] = 'production';
+        config([
+            'bakery.demo_seed' => false, 'bakery.rehearsal' => false,
+            'session.secure' => true, 'session.encrypt' => true,
+            'session.http_only' => true, 'session.same_site' => 'lax',
+            'mail.from.address' => 'acceptance@bakery.example.com',
+            'mail.mailers.smtp.host' => '',
+        ]);
+        $message = 'Cấu hình SMTP và địa chỉ gửi thư của cửa hàng.';
+        $this->assertContains($message, LaunchReadiness::configurationIssues());
+        config(['mail.mailers.smtp.url' => 'smtps://mail.example.test:465']);
+        $this->assertSame([], LaunchReadiness::configurationIssues());
     }
 }

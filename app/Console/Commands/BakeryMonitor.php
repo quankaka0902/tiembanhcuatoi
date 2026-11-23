@@ -104,8 +104,7 @@ class BakeryMonitor extends Command
             $issues[] = 'mail_backlog';
         }
         if (DB::connection(config('queue.failed.database'))->table(config('queue.failed.table'))
-            ->where('connection', $connection)->where('queue', $queue)
-            ->where('failed_at', '>=', now()->subDay())->exists()) {
+            ->where('connection', $connection)->where('queue', $queue)->exists()) {
             $issues[] = 'mail_failed';
         }
 

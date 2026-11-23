@@ -22,7 +22,8 @@ class BakeryBackup
             throw new RuntimeException('Chọn hai thư mục sao lưu độc lập.');
         }
         $id = now()->format('Ymd-His').'-'.bin2hex(random_bytes(4));
-        $backup = $this->publish($root, $id, function (string $directory) {
+        $startedAt = now()->timestamp;
+        $backup = $this->publish($root, $id, function (string $directory) use ($startedAt) {
             $this->dumpDatabase($directory.'/database.sql');
             $this->checkMediaReferences();
             $this->archiveMedia($directory.'/images.zip');
@@ -33,6 +34,7 @@ class BakeryBackup
             }
             if (file_put_contents($directory.'/'.self::MANIFEST, json_encode([
                 'version' => 1,
+                'started_at' => $startedAt,
                 'completed_at' => now()->timestamp,
                 'files' => $metadata,
             ], JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT)) === false) {
@@ -199,14 +201,21 @@ class BakeryBackup
             return null;
         }
         $data = json_decode((string) file_get_contents($path), true);
-        if (($data['version'] ?? null) !== 1 || ! is_int($data['completed_at'] ?? null)) {
+        if (! is_array($data) || ($data['version'] ?? null) !== 1
+            || ! is_int($data['completed_at'] ?? null) || $data['completed_at'] <= 0
+            || ! is_array($data['files'] ?? null)) {
+            return null;
+        }
+        if (array_key_exists('started_at', $data) && (! is_int($data['started_at'])
+            || $data['started_at'] <= 0 || $data['started_at'] > $data['completed_at'])) {
             return null;
         }
         foreach (self::FILES as $file) {
             $metadata = $data['files'][$file] ?? [];
             $path = $directory.'/'.$file;
-            if (! is_file($path) || is_link($path) || filesize($path) !== ($metadata['size'] ?? null)
-                || ! preg_match('/^[a-f0-9]{64}$/D', $metadata['sha256'] ?? '')) {
+            if (! is_array($metadata) || ! is_int($metadata['size'] ?? null) || $metadata['size'] < 0
+                || ! is_string($metadata['sha256'] ?? null) || ! preg_match('/^[a-f0-9]{64}$/D', $metadata['sha256'])
+                || ! is_file($path) || is_link($path) || filesize($path) !== $metadata['size']) {
                 return null;
             }
         }
