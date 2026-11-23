@@ -1,5 +1,7 @@
 # Nghiệm thu mở bán một cơ sở
 
+Đây là biên bản của bản mã `5de11c0`. Các quy tắc hủy sau làm, đổi lịch, trả trước và quyền khách đã được cập nhật sau ca này. Xem [hồ sơ vòng đời đơn mới](vong-doi-don.md) khi nghiệm thu phiên bản hiện tại, đặc biệt quy tắc không tự hoàn tồn sau khi bắt đầu làm.
+
 Ngày kiểm tra 23/11/2026, múi giờ Asia/Ho_Chi_Minh. Các bản sửa ứng dụng được đóng trong commit local `5de11c0c694ea8e784680e8c39e7bc2dc0b6eb31`, nối tiếp `ef35bd2`. Người thử kỹ thuật là Codex. Đại diện tiệm chưa được chỉ định để xác nhận dữ liệu và nghiệm thu dịch vụ thật.
 
 **Quyết định hiện tại là CHỜ mở bán.** Bộ dữ liệu demo dùng cho ca local đã được tạo bằng seeder của dự án. Môi trường `production` hoặc staging dùng dữ liệu thật chưa được cấp. Preflight của staging có dữ liệu demo báo lỗi đúng theo thiết kế. Công tắc nhận đơn trong sandbox được tạm ngừng sau ca thử.

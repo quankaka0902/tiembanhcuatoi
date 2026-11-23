@@ -1,5 +1,7 @@
 # Vận hành Tiệm Bánh Nhà Mình
 
+Quy tắc đổi/hủy, tồn sau làm, trả trước và bằng chứng hoàn hiện tại nằm trong [vòng đời đơn và ma trận quyền](vong-doi-don.md). Đơn mới có snapshot lead time; đơn cũ cần quản lý xác minh. Hủy sau làm không tự nhập lại tồn bán.
+
 ## Chuẩn bị môi trường thật
 
 1. Dựng bằng một cơ sở dữ liệu MySQL riêng và thư mục ảnh bền vững. Trỏ web server vào `public/` và cấp quyền ghi cho `storage/` cùng `bootstrap/cache/`. Nếu dùng proxy TLS, ghi IP của các proxy tin cậy vào `BAKERY_TRUSTED_PROXIES`, cách nhau bằng dấu phẩy. Proxy phải ghi đè `X-Forwarded-Proto` bằng giao thức kết nối thực và chỉ chuyển đúng tên miền đã cấu hình. Hạn chế quyền truy cập cổng ứng dụng phía sau proxy.
@@ -7,7 +9,7 @@
 3. Cài dependency, chạy `npm run build`, `php artisan migrate --force` và `php artisan bakery:admin` nếu chưa có quản trị viên. Cấp TOTP cho từng tài khoản nội bộ. Cấp quyền đối soát cho người phụ trách. Dùng trình quản lý tiến trình để chạy và tự khởi động lại `php artisan queue:work order-mail --sleep=2`. Sau khi cập nhật mã, chạy `php artisan queue:restart` để worker nạp bản mới.
 4. Môi trường thật mới dựng tạm ngừng nhận đơn. Điền liên hệ, địa chỉ, chính sách đặt bánh và thông báo xử lý dữ liệu trong **Cấu hình**. Nhập menu, tồn, lịch nhận, giới hạn theo giờ, khu vực và phí giao. Nếu sử dụng chuyển khoản, nhập thông tin ngân hàng đã xác minh và bỏ đánh dấu dữ liệu mẫu.
 5. Chạy `php artisan bakery:preflight` và xử lý các mục báo lỗi. Kiểm tra HTTPS, truy cập `/up` và chạy thử một đơn từ lúc đặt đến lúc cập nhật trạng thái và tra cứu. Kiểm tra thư xác nhận, thư trạng thái và khôi phục mật khẩu đến hộp thư thử đã được phép. Lệnh preflight kiểm tra cấu hình và schema. Đơn thử xác minh worker và kết nối SMTP.
-6. Dùng **Đơn cần xử lý** để bật nhận đơn sau khi hoàn tất nghiệm thu và có quyết định mở bán. Kiểm tra log ở proxy, ứng dụng và nền tảng giám sát. Dùng tên route hoặc loại thao tác cho đường dẫn tra cứu, đặt lại mật khẩu và xác thực. Loại bỏ đường dẫn đầy đủ, chuỗi truy vấn, tiêu đề Referer và nội dung yêu cầu khỏi log các luồng này.
+6. Dùng **Đơn cần xử lý** để bật nhận đơn sau khi hoàn tất nghiệm thu và có quyết định mở bán. Kiểm tra log ở proxy, ứng dụng và nền tảng giám sát. Dùng tên route hoặc loại thao tác cho đường dẫn tra cứu, `/thao-tac-don/{token}`, yêu cầu đổi/hủy, đặt lại mật khẩu và xác thực. Loại bỏ đường dẫn đầy đủ, chuỗi truy vấn, tiêu đề Referer và nội dung yêu cầu khỏi log các luồng này.
 
 ## Xác thực hai bước cho tài khoản nội bộ
 

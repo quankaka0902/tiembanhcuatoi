@@ -77,9 +77,9 @@ Nhân viên mở **Lịch làm bánh** trong quản trị để xem đơn theo n
 
 Nhân viên mở **Đối soát** để xem đơn chuyển khoản chờ thanh toán hoặc lọc các đơn quá hạn. Hạn mặc định là 60 phút từ khi đặt và tối đa đến giờ giao hoặc nhận đã hẹn. Đổi thời hạn cho đơn mới trong **Cấu hình → Chuyển khoản thủ công**. Đơn phát sinh trước migration được tính hạn theo mốc mặc định. Đơn quá hạn vẫn chờ người có quyền đối soát kiểm tra và cập nhật thủ công.
 
-Hệ thống đưa email báo nhận đơn vào hàng đợi khi tạo đơn và gửi thêm email khi đơn chuyển sang **Đã xác nhận**, **Sẵn sàng nhận** hoặc **Đang giao**. Khách có thể mở **Tra cứu**, nhập mã đơn và email đã dùng khi đặt để yêu cầu nhận lại liên kết riêng. Hệ thống hiển thị cùng một thông báo sau khi tiếp nhận và sẽ gửi liên kết khi thông tin trùng khớp.
+Hệ thống đưa email nhận đơn, thay đổi trạng thái, đổi giờ, hủy, thanh toán/hoàn và kết quả yêu cầu khách vào hàng đợi. Thông báo giữ nội dung tại thời điểm sự kiện và chống lặp theo sự kiện. Khách mở **Tra cứu**, nhập mã đơn và email đã đặt để xin lại liên kết xem đơn. Liên kết này tiếp tục chỉ có quyền xem.
 
-**Đơn cần xử lý** gom đơn chưa xác nhận, chuyển khoản quá hạn và đơn chờ hoàn tiền. Quản trị viên có thể tạm ngừng nhận đơn mới, nhập thông báo cho khách và xem email đang chờ hoặc thất bại. Nhân viên có thể đổi giờ giao hoặc nhận đối với đơn chưa vào khâu chuẩn bị. Khách vẫn tra cứu được đơn đã nhận khi tiệm tạm ngừng. Chỉnh chính sách đặt bánh và thông báo xử lý dữ liệu trong **Cấu hình**.
+**Đơn cần xử lý** gom đơn chưa xác nhận, chuyển khoản quá hạn, chờ hoàn, yêu cầu khách, chưa giao/nhận và bánh cần kiểm tra sau hủy. Nhân viên đổi giờ trước mốc chuẩn bị, quản lý xử lý ngoại lệ. Khách vẫn tra cứu và gửi yêu cầu đủ điều kiện khi tiệm tạm ngừng. Chỉnh chính sách đặt bánh và thông báo xử lý dữ liệu trong **Cấu hình**.
 
 Khách đã đăng nhập mở **Đơn của tôi**, chọn đơn cũ rồi bấm **Mua lại bánh**. Giỏ giữ các món đã có và thêm số bánh còn bán theo giá hiện tại. Nếu chỉ đủ một phần, hệ thống báo số bánh đã thêm và số bánh chưa thêm được. Khách nhập lời chúc và ghi chú mới trong giỏ. Đơn mới giữ tồn khi được đặt thành công.
 
@@ -87,7 +87,17 @@ Quản trị viên mở **Nhật ký tồn kho** để xem tồn trước và sa
 
 Nhân viên mở **Báo cáo** để chọn kỳ và xem doanh thu theo ngày cùng 10 bánh bán chạy theo số lượng. Báo cáo tính các đơn hoàn tất đã thanh toán theo ngày hoàn tất ở giờ Việt Nam. Doanh thu là tổng tiền sau giảm giá, gồm phí giao hàng. Mặc định xem từ đầu tháng đến hôm nay.
 
-Giờ nhận được tính trong 14 ngày tới từ lịch cửa hàng và thời gian chuẩn bị dài nhất trong giỏ. Ngưỡng miễn phí giao tính trên tiền bánh sau giảm giá. Một lần hủy hợp lệ trả lại tồn và lượt dùng mã. Nếu đơn đã thanh toán, nhân sự có quyền ghi nhận hoàn tiền sau khi hoàn trả bên ngoài ứng dụng. Doanh thu tính theo ngày hoàn tất của đơn đã thanh toán. Đơn khách vãng lai được tra cứu bằng liên kết riêng. Lịch sử tài khoản gồm những đơn đặt khi đã đăng nhập.
+Giờ nhận được tính trong 14 ngày tới từ lịch cửa hàng và thời gian chuẩn bị dài nhất trong giỏ, được chụp lại trên đơn mới. Hủy trước làm giải phóng phần giữ một lần; trả lượt mã theo cấu hình riêng. Hủy sau làm cần quản lý, không tự tăng tồn bán, sau đó phân loại phần chưa làm/còn bán được/tiêu hao. Đã xuất giao thì không được ghi là chưa làm. Đơn đã trả rồi hủy chờ người có quyền hoàn bên ngoài và nhập bằng chứng. Doanh thu tính từ đơn hoàn tất đã thanh toán.
+
+## Đổi lịch, hủy và xử lý sau bán
+
+Xem [bảng trạng thái, ma trận quyền và hướng dẫn ca bán](docs/vong-doi-don.md). Khách đăng nhập gửi yêu cầu cho đơn của mình. Khách vãng lai xác minh bằng liên kết thao tác riêng qua email, hạn 15 phút và dùng một lần. Yêu cầu chỉ đổi đơn sau khi nhân viên chấp thuận. Máy chủ kiểm tra lại giờ cũ, lịch, công suất và thời gian chuẩn bị trong transaction.
+
+Trong **Cấu hình**, chuyển khoản mặc định yêu cầu trả trước, ngoại lệ quản lý mặc định tắt. Khi yêu cầu trả trước còn hiệu lực, đơn chưa thu đủ bị chặn vào bếp và giao. Đơn cũ thiếu bản chụp lead time cần quản lý xác minh. Ghi đủ tham chiếu và số tiền, xác nhận đã đối chiếu chứng từ trước khi ghi hoàn. Ứng dụng không thực hiện chuyển tiền ngân hàng.
+
+Khi cập nhật môi trường đã có, sao lưu trước, kiểm tra đúng schema rồi chạy `php artisan migrate`, `npm run build` và `php artisan queue:restart`; trình quản lý tiến trình phải khởi động lại worker. Ba migration mới không phát lại các lần hủy cũ. Không quay về mã cũ không hiểu trạng thái mới sau khi đã phát sinh dữ liệu vòng đời mới. Chưa áp dụng migration này lên cơ sở dữ liệu bán thật.
+
+Lần kiểm tra 23/11/2026 đạt Pint, ESLint, build; MySQL 68/68 bài với 1.365 assertions, SQLite 61 bài đạt với 1.308 assertions và 7 ca MySQL được bỏ qua. Gồm hai tiến trình tranh khung cuối và gửi trùng yêu cầu. Giao diện thử ở 390×844 và 1366×900 trên HTTP loopback/schema riêng. SMTP và dữ liệu tiệm thật cần nghiệm thu riêng.
 
 ## Kiểm thử
 

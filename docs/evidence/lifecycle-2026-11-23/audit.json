@@ -1,0 +1,612 @@
+{
+  "captured_at": "2026-11-23T13:03:27+07:00",
+  "timezone": "Asia/Ho_Chi_Minh",
+  "tester": "Codex",
+  "environment": {
+    "app": "local demo",
+    "url": "http://127.0.0.1:18914",
+    "mysql_schema": "tiembanh_lifecycle_20261123_test",
+    "mysql_port": 33317,
+    "smtp": "Local SMTPS, supplied test CA: seven notices accepted at18902; notice6 retried at dedicated18912. No external recipient.",
+    "viewport": {
+      "mobile": "390x844",
+      "desktop": "1366x900"
+    }
+  },
+  "orders": {
+    "early_cancel": {
+      "code": "NB-DEMO001",
+      "status": "cancelled",
+      "payment": "unpaid",
+      "scheduled_at": "2026-11-25 11:00:00",
+      "stock_released": true,
+      "inventory_processed": true
+    },
+    "prepared_cancel": {
+      "code": "NB-DEMO003",
+      "status": "cancelled",
+      "payment": "unpaid",
+      "stock_automatically_restored": false,
+      "inventory_reviewed": true
+    }
+  },
+  "customer_requests": [
+    {
+      "id": 1,
+      "kind": "reschedule",
+      "status": "approved",
+      "previous_status": "pending",
+      "previous_slot": "2026-11-24 14:00:00",
+      "requested_slot": "2026-11-25 11:00:00",
+      "created_at": "2026-11-23 12:49:49",
+      "handled_at": "2026-11-23 12:51:46"
+    },
+    {
+      "id": 2,
+      "kind": "cancel",
+      "status": "approved",
+      "previous_status": "confirmed",
+      "previous_slot": "2026-11-25 11:00:00",
+      "requested_slot": null,
+      "created_at": "2026-11-23 12:54:00",
+      "handled_at": "2026-11-23 12:55:16"
+    }
+  ],
+  "events": [
+    {
+      "id": 1,
+      "order_id": 1,
+      "kind": "status",
+      "value": "pending",
+      "previous_value": null,
+      "created_at": "2026-11-23 12:47:18",
+      "actor_recorded": false
+    },
+    {
+      "id": 3,
+      "order_id": 3,
+      "kind": "status",
+      "value": "preparing",
+      "previous_value": null,
+      "created_at": "2026-11-23 12:47:18",
+      "actor_recorded": false
+    },
+    {
+      "id": 8,
+      "order_id": 1,
+      "kind": "request",
+      "value": "reschedule",
+      "previous_value": null,
+      "created_at": "2026-11-23 12:49:49",
+      "actor_recorded": true
+    },
+    {
+      "id": 9,
+      "order_id": 1,
+      "kind": "schedule",
+      "value": "2026-11-25 11:00",
+      "previous_value": "2026-11-24 14:00",
+      "created_at": "2026-11-23 12:51:45",
+      "actor_recorded": true
+    },
+    {
+      "id": 10,
+      "order_id": 1,
+      "kind": "request",
+      "value": "approved",
+      "previous_value": null,
+      "created_at": "2026-11-23 12:51:46",
+      "actor_recorded": true
+    },
+    {
+      "id": 11,
+      "order_id": 1,
+      "kind": "status",
+      "value": "confirmed",
+      "previous_value": "pending",
+      "created_at": "2026-11-23 12:52:06",
+      "actor_recorded": true
+    },
+    {
+      "id": 12,
+      "order_id": 1,
+      "kind": "request",
+      "value": "cancel",
+      "previous_value": null,
+      "created_at": "2026-11-23 12:54:00",
+      "actor_recorded": true
+    },
+    {
+      "id": 13,
+      "order_id": 1,
+      "kind": "status",
+      "value": "cancelled",
+      "previous_value": "confirmed",
+      "created_at": "2026-11-23 12:55:16",
+      "actor_recorded": true
+    },
+    {
+      "id": 14,
+      "order_id": 1,
+      "kind": "request",
+      "value": "approved",
+      "previous_value": null,
+      "created_at": "2026-11-23 12:55:16",
+      "actor_recorded": true
+    },
+    {
+      "id": 15,
+      "order_id": 3,
+      "kind": "status",
+      "value": "cancelled",
+      "previous_value": "preparing",
+      "created_at": "2026-11-23 12:56:09",
+      "actor_recorded": true
+    },
+    {
+      "id": 16,
+      "order_id": 3,
+      "kind": "inventory",
+      "value": "checked",
+      "previous_value": null,
+      "created_at": "2026-11-23 12:56:24",
+      "actor_recorded": true
+    }
+  ],
+  "stock_movements": {
+    "early": [
+      {
+        "reason": "cancel",
+        "stock_before": 15,
+        "stock_after": 16,
+        "affected_quantity": 1
+      }
+    ],
+    "prepared": [
+      {
+        "reason": "waste",
+        "stock_before": 21,
+        "stock_after": 21,
+        "affected_quantity": 1
+      }
+    ]
+  },
+  "dispositions": [
+    {
+      "order_id": 3,
+      "unmade": 0,
+      "sellable": 0,
+      "waste": 1,
+      "created_at": "2026-11-23 12:56:24"
+    }
+  ],
+  "notifications": [
+    {
+      "id": 1,
+      "order_id": 1,
+      "event_id": 8,
+      "type": "request_created",
+      "sent_at": "2026-11-23 12:49:51",
+      "attempts": 1,
+      "last_error": null
+    },
+    {
+      "id": 2,
+      "order_id": 1,
+      "event_id": 9,
+      "type": "schedule",
+      "sent_at": "2026-11-23 12:51:46",
+      "attempts": 1,
+      "last_error": null
+    },
+    {
+      "id": 3,
+      "order_id": 1,
+      "event_id": 10,
+      "type": "request_approved",
+      "sent_at": "2026-11-23 12:51:46",
+      "attempts": 1,
+      "last_error": null
+    },
+    {
+      "id": 4,
+      "order_id": 1,
+      "event_id": 11,
+      "type": "confirmed",
+      "sent_at": "2026-11-23 12:52:36",
+      "attempts": 2,
+      "last_error": null
+    },
+    {
+      "id": 5,
+      "order_id": 1,
+      "event_id": 12,
+      "type": "request_created",
+      "sent_at": "2026-11-23 12:54:31",
+      "attempts": 2,
+      "last_error": null
+    },
+    {
+      "id": 6,
+      "order_id": 1,
+      "event_id": 13,
+      "type": "cancelled",
+      "sent_at": "2026-11-23 13:02:42",
+      "attempts": 4,
+      "last_error": null
+    },
+    {
+      "id": 7,
+      "order_id": 1,
+      "event_id": 14,
+      "type": "request_approved",
+      "sent_at": "2026-11-23 12:55:17",
+      "attempts": 1,
+      "last_error": null
+    },
+    {
+      "id": 8,
+      "order_id": 3,
+      "event_id": 15,
+      "type": "cancelled",
+      "sent_at": "2026-11-23 12:56:10",
+      "attempts": 1,
+      "last_error": null
+    }
+  ],
+  "smtp_fixture_recovery": {
+    "at": "2026-11-23T13:02:44+07:00",
+    "diagnosis": "Shared old SMTP fixture closed idle sockets after12seconds; dedicated local sink now allows600seconds and NOOP/RSET/QUIT.",
+    "smtp_port": 18912,
+    "local_tls_only": true,
+    "notices": [
+      {
+        "id": 1,
+        "order_id": 1,
+        "type": "request_created",
+        "sent_at": "2026-11-23 12:49:51",
+        "attempts": 1,
+        "last_error": null
+      },
+      {
+        "id": 2,
+        "order_id": 1,
+        "type": "schedule",
+        "sent_at": "2026-11-23 12:51:46",
+        "attempts": 1,
+        "last_error": null
+      },
+      {
+        "id": 3,
+        "order_id": 1,
+        "type": "request_approved",
+        "sent_at": "2026-11-23 12:51:46",
+        "attempts": 1,
+        "last_error": null
+      },
+      {
+        "id": 4,
+        "order_id": 1,
+        "type": "confirmed",
+        "sent_at": "2026-11-23 12:52:36",
+        "attempts": 2,
+        "last_error": null
+      },
+      {
+        "id": 5,
+        "order_id": 1,
+        "type": "request_created",
+        "sent_at": "2026-11-23 12:54:31",
+        "attempts": 2,
+        "last_error": null
+      },
+      {
+        "id": 6,
+        "order_id": 1,
+        "type": "cancelled",
+        "sent_at": "2026-11-23 13:02:42",
+        "attempts": 4,
+        "last_error": null
+      },
+      {
+        "id": 7,
+        "order_id": 1,
+        "type": "request_approved",
+        "sent_at": "2026-11-23 12:55:17",
+        "attempts": 1,
+        "last_error": null
+      },
+      {
+        "id": 8,
+        "order_id": 3,
+        "type": "cancelled",
+        "sent_at": "2026-11-23 12:56:10",
+        "attempts": 1,
+        "last_error": null
+      }
+    ],
+    "order_stock_audit_unchanged": true,
+    "paused": true,
+    "jobs": 0,
+    "failed": 0,
+    "limits": [
+      "Local fixture fix only. Messages1-5,7,8 delivered to prior loopback sink; notice6 retried to dedicated loopback sink. No external mail delivery verified."
+    ],
+    "actual_mime_file_evidence": {
+      "at": "2026-11-23T06:03:27.707Z",
+      "method": "Matched each stored stable Message-ID against actual MIME files, with header folding handled. Private message IDs, recipients and bodies omitted.",
+      "notices": [
+        {
+          "notice_id": 1,
+          "prior_fixture": 1,
+          "dedicated_fixture": 0,
+          "sha256": [
+            "1f7cb9811ee1b2bc4f41031c7018055e8cf607d43a924239d8267d9c6bfbdd43"
+          ],
+          "total": 1
+        },
+        {
+          "notice_id": 2,
+          "prior_fixture": 1,
+          "dedicated_fixture": 0,
+          "sha256": [
+            "a6e476f272e494cfa4994d6633af6b61c1b619fb69d5db2f884ab64a408d99c5"
+          ],
+          "total": 1
+        },
+        {
+          "notice_id": 3,
+          "prior_fixture": 1,
+          "dedicated_fixture": 0,
+          "sha256": [
+            "687fe71d8365c6ca316fa7b8003d95c35e4111ac1d93d4a4276e53a9f62ed756"
+          ],
+          "total": 1
+        },
+        {
+          "notice_id": 4,
+          "prior_fixture": 1,
+          "dedicated_fixture": 0,
+          "sha256": [
+            "b729f325950af65a74b9942395bba8f80d88daf1942f65e559c88c1fae67b4ae"
+          ],
+          "total": 1
+        },
+        {
+          "notice_id": 5,
+          "prior_fixture": 1,
+          "dedicated_fixture": 0,
+          "sha256": [
+            "957f834d233b197d53fac69731bfef4682216c246fb5e19558bc2a65e03851fa"
+          ],
+          "total": 1
+        },
+        {
+          "notice_id": 6,
+          "prior_fixture": 0,
+          "dedicated_fixture": 1,
+          "sha256": [
+            "66f825f58a409e6e587abd1dd70ebd235e556c278bda90df8b65bd9c8216d23e"
+          ],
+          "total": 1
+        },
+        {
+          "notice_id": 7,
+          "prior_fixture": 1,
+          "dedicated_fixture": 0,
+          "sha256": [
+            "3dc7d6a08d62ed105d2fbf57cde888ed8be29dae41613afbd8b7a47ec22cbc8b"
+          ],
+          "total": 1
+        },
+        {
+          "notice_id": 8,
+          "prior_fixture": 1,
+          "dedicated_fixture": 0,
+          "sha256": [
+            "84c9464b3868e99131a29cbd4139e9678ed051c98de6737dedb8841ceb02cbd7"
+          ],
+          "total": 1
+        }
+      ],
+      "all_exactly_one": true,
+      "limits": "Local MIME files establish sink acceptance only; real SMTP delivery/reading and exactly-once guarantees are not asserted."
+    }
+  },
+  "final_state": {
+    "paused": true,
+    "orders": 7,
+    "queued": 0,
+    "failed": 0
+  },
+  "privacy": "No tracking/action tokens, credentials, recipients, private reasons, response text or TOTP secrets in this evidence. Screenshots use seed/demo data only.",
+  "limitations": [
+    "HTTP browser sandbox; repeat with trusted HTTPS and approved real shop inputs before launch.",
+    "SMTP is a local TLS sink. No real bank transfer/refund or external SMTP delivery occurred.",
+    "Browser expiry uses an explicitly expired local fixture; valid short-lived links, expiry and replay verified by PHPUnit.",
+    "COD completion, bank prepay/override/refund permissions and concurrent last-slot cases were verified by PHPUnit."
+  ],
+  "source": {
+    "application_commit": "8861a72eaec381779389d0d88ad390f73b70f9bb",
+    "base_commit": "0dc3903f4c5bd9500436ddbe38a29e685b91e4d2",
+    "run_context": "Tests and browser acceptance ran on this source in the working tree before local commit creation. Final source matches commit. No push or deployment.",
+    "files": [
+      {
+        "path": "app/Http/Controllers/AdminConfig.php",
+        "sha256": "bd43fe21b97c25c50e7b037447ee1a0682268c0f2afa8068e1c958b415b45dec"
+      },
+      {
+        "path": "app/Http/Controllers/AdminOrders.php",
+        "sha256": "a7875e58b2f15c60b97c17190fd7b136e2ecbe5ab5496429030d105b3aab680e"
+      },
+      {
+        "path": "app/Http/Controllers/OrderChanges.php",
+        "sha256": "273770ba280d8c5a74c448dbb7abd06aee8ccf9ef6c73dfb3370b23ccd85bade"
+      },
+      {
+        "path": "app/Http/Controllers/Storefront.php",
+        "sha256": "5d02eb1f213428021ea08f61b83a2becdda6c7082960e019c37606c44681a310"
+      },
+      {
+        "path": "app/Jobs/SendOrderEmail.php",
+        "sha256": "065e46055fd18a614f63b41ca0ec641ef084706ec3b5cec68aeeb7f509517af8"
+      },
+      {
+        "path": "app/Providers/AppServiceProvider.php",
+        "sha256": "78a8f5659c2a17a868f81da517ef5da038b88cad7502d9ed108f90306abe8041"
+      },
+      {
+        "path": "app/Services/Checkout.php",
+        "sha256": "0381eda1fd2c360b1c899032fe0a4980136cc129b87612893a52e15b60dcd1f0"
+      },
+      {
+        "path": "app/Services/Inventory.php",
+        "sha256": "c4b0d710654de9864afcd94bc462426c309324f81e103131adcc41fc7ebf8e7a"
+      },
+      {
+        "path": "app/Services/OrderNotices.php",
+        "sha256": "d0aa474ded8e742dd98401a4e011781134677cf6bd8c6207cb36d6c4ec31b46e"
+      },
+      {
+        "path": "app/Services/OrderRequests.php",
+        "sha256": "748d3c42673298b3a198659f54db85f125584c3577cb2d8ee042bd9aa84d8761"
+      },
+      {
+        "path": "app/Services/Orders.php",
+        "sha256": "66df9e01513fe4a740005f74c6bb74474c41dcd77eef781ceb023828eff7bf1c"
+      },
+      {
+        "path": "app/Services/Store.php",
+        "sha256": "9b6e8139b063411dab11951db0bb84d480c0c177ab64e2ca6c8c89f84784fc61"
+      },
+      {
+        "path": "bootstrap/app.php",
+        "sha256": "185d02c98c27f4c9a31cdcc6926de25c12123c052a6b4b496a9d07b437f692e0"
+      },
+      {
+        "path": "config/bakery.php",
+        "sha256": "100a4bfe41f7a75c8399f78465e36be32daa46af5cb169862dde17b10773a870"
+      },
+      {
+        "path": "database/migrations/2026_11_23_000001_add_order_lifecycle.php",
+        "sha256": "736b734a4d7b4711f1a95a580334e739d81921a6d8b9ec0e6559c694a3d126ae"
+      },
+      {
+        "path": "database/migrations/2026_11_23_000002_create_order_change_requests.php",
+        "sha256": "b6faf0ac27325df33fa6711f8dc11bbd42038f8fbe6a4c1d5c4828663893bf97"
+      },
+      {
+        "path": "database/migrations/2026_11_23_000003_create_order_notifications.php",
+        "sha256": "b9c7908f82d6919afb3a8af47bfe03b867f956b5f8305ded2f8c542f4aa64937"
+      },
+      {
+        "path": "database/seeders/DatabaseSeeder.php",
+        "sha256": "f4b876adbc34f71a6c36fdb729d41272bd459ea20e7b99cbdd076541cc08cce5"
+      },
+      {
+        "path": "resources/js/admin.jsx",
+        "sha256": "1c4714a927553e2a552dd610dc5e360dd08a2580a62dc29061ae91ba63bbc0de"
+      },
+      {
+        "path": "resources/js/app.jsx",
+        "sha256": "ecdf62caf64a01d15a72f0472dc51e924e1fe86f0ad922aa0253b5a7c1ca6df7"
+      },
+      {
+        "path": "resources/js/checkout.jsx",
+        "sha256": "73dfa00b6e3f289e4b9a6ac054dae8af809604acc82dcce970fb0699a29ed647"
+      },
+      {
+        "path": "routes/web.php",
+        "sha256": "00800873c3b759131727cbd04a7684a3a8e31324477c2faf60a6d5f6e72a006f"
+      },
+      {
+        "path": "tests/Feature/BakeryTest.php",
+        "sha256": "93d397cd9b20304798a1e30eb7358a9359ef85b2dbe0062060d4ec2d98dbe8e0"
+      },
+      {
+        "path": "tests/Feature/ConcurrentOrderRequestsTest.php",
+        "sha256": "f345ed9412dc879de127fbdffa6e363402ad04c1e5c18160e2e168b0aabf6238"
+      },
+      {
+        "path": "tests/Feature/OrderLifecycleTest.php",
+        "sha256": "16329cf7b1e082abe5d75c767e58e60f560e0f168cd5b12d51cd8c1d38871da3"
+      },
+      {
+        "path": "tests/Feature/OrderNotificationsTest.php",
+        "sha256": "d1dc804cbd2d61582b3ecf2c06b4ba728a9b12417f70e4b245ba39890e667fdf"
+      },
+      {
+        "path": "tests/Feature/OrderRequestsTest.php",
+        "sha256": "7fa8517a79444e87e31ad3d3f0ab933e8e33f4028d7d5a322c3a365818c7aecd"
+      },
+      {
+        "path": "tests/Support/order_request_worker.php",
+        "sha256": "c2ff3d47d3e65c244ad095fde11b353d29b8960d7138c13b5fd788aab0e3d7e7"
+      }
+    ]
+  },
+  "validation": {
+    "pint": "passed",
+    "eslint": "passed",
+    "vite_build": "passed",
+    "sqlite": {
+      "total": 68,
+      "passed": 61,
+      "skipped_mysql_only": 7,
+      "assertions": 1308,
+      "log_sha256": "504a517da2d39e47060dedfd74efcd2f1820b76000eb7b31a8969babe184b84d"
+    },
+    "mysql": {
+      "total": 68,
+      "passed": 68,
+      "skipped": 0,
+      "assertions": 1365,
+      "two_process_tests": 7,
+      "schema": "tiembanh_stage7_phpunit_test",
+      "log_sha256": "bca9d69e2a2f62dc1c74eafd7e7b373a6488f13ff7e8803feee91c8e30afa238"
+    }
+  },
+  "screenshots": [
+    {
+      "path": "desktop-approved.jpg",
+      "sha256": "dca27c175fa47871e7c06d05b67dd18244b618a0425a1ccde3d0afd298161f4e",
+      "captured_at_utc": "2026-11-23T05:52:05.1229003Z"
+    },
+    {
+      "path": "desktop-prepay.jpg",
+      "sha256": "fde735bc08304229727927f719594904c50d6a8b1186cf89054082eabd2454bf",
+      "captured_at_utc": "2026-11-23T05:53:09.8478258Z"
+    },
+    {
+      "path": "desktop-waste.jpg",
+      "sha256": "8d50e746cc03bb9b5120d557bc7105f0fb5859b9a7348da6f8b6ba1a9a7fbc79",
+      "captured_at_utc": "2026-11-23T05:56:25.7371692Z"
+    },
+    {
+      "path": "mobile-approved.jpg",
+      "sha256": "98a407da071e74d908755132327607141414024190d0d86db7ebe00cbad1b2e2",
+      "captured_at_utc": "2026-11-23T05:53:58.9662987Z"
+    },
+    {
+      "path": "mobile-cancelled.jpg",
+      "sha256": "fa7b63ce233e9b5b21852eab090bef5a6bb05a5c46d0e7fd69458cd419eafb6e",
+      "captured_at_utc": "2026-11-23T05:56:49.9793284Z"
+    },
+    {
+      "path": "mobile-expired.jpg",
+      "sha256": "7922904e768b32ae70cef81defe216c30a9e9165a029a8302a5994359e37891a",
+      "captured_at_utc": "2026-11-23T05:57:03.9711692Z"
+    },
+    {
+      "path": "mobile-request.jpg",
+      "sha256": "c880b23e4c0391934e64b444973cc53097e580fe35942a9c8c86a5f26d45e8b8",
+      "captured_at_utc": "2026-11-23T05:50:09.9836928Z"
+    }
+  ],
+  "expired_link_check": {
+    "status": 410,
+    "cache_control": "no-store, private",
+    "environment": "explicitly expired local fixture",
+    "tester": "Codex"
+  }
+}

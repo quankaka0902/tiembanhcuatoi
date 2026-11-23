@@ -4,6 +4,8 @@ Hồ sơ này dùng để chốt bản phát hành, nghiệm thu cùng nhân vi�
 
 Hồ sơ mới nhất là [biên bản nghiệm thu một cơ sở ngày 23/11/2026](nghiem-thu-mo-ban-mot-co-so.md). Biên bản gắn kết quả với bản mã local `5de11c0`, tách bằng chứng local khỏi dịch vụ thật và liệt kê từng đầu vào, đầu mối còn chờ. Các kết quả chặng 9–11 bên dưới được giữ làm lịch sử.
 
+Sau biên bản đó, luồng đơn được cập nhật theo [vòng đời đơn, đổi lịch và thông báo](vong-doi-don.md). Dùng bảng quyền và kết quả mới này khi nghiệm thu hủy sau làm, tồn, trả trước, bằng chứng hoàn và yêu cầu khách. Giữ phần thử cũ để đối chiếu lịch sử phiên bản.
+
 ## Chặng 9 · Chốt bản dùng để nghiệm thu
 
 1. Ghi mã commit sẽ dùng cho cả kiểm thử và bàn giao. Xem kết quả [Bakery CI](https://github.com/quankaka0902/tiembanhcuatoi/actions/workflows/ci.yml) của chính commit đó. CI chạy Pint, ESLint, build Vite, PHPUnit trên SQLite và MySQL. Các bài hai tiến trình phải chạy trên MySQL.
