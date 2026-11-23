@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Jobs\SendOrderEmail;
 use App\Services\Catalog;
 use App\Services\Checkout;
+use App\Services\OrderRequests;
 use App\Services\Orders;
 use App\Services\Store;
 use Illuminate\Http\Request;
@@ -217,7 +218,7 @@ class Storefront extends Controller
             'code' => 'required|string|max:22|regex:/^[a-zA-Z0-9-]+$/',
             'email' => 'required|email|max:254',
         ]);
-        $order = DB::table('orders')->where('code', Str::upper($fields['code']))->first(['id', 'email']);
+        $order = Orders::query()->where('code', Str::upper($fields['code']))->first(['id', 'email']);
         if ($order && hash_equals(Str::lower(trim($order->email)), Str::lower($fields['email']))) {
             try {
                 Bus::dispatch(new SendOrderEmail($order->id));
@@ -231,7 +232,7 @@ class Storefront extends Controller
 
     public function tracked(string $token)
     {
-        $order = DB::table('orders')->where('tracking_token', $token)->first();
+        $order = Orders::query()->where('tracking_token', $token)->first();
         abort_unless($order, 404);
 
         return $this->orderResponse($order);
@@ -239,7 +240,7 @@ class Storefront extends Controller
 
     public function history(Request $request)
     {
-        $orders = DB::table('orders')->where('user_id', $request->user()->id)->latest('id')
+        $orders = Orders::query()->where('user_id', $request->user()->id)->latest('id')
             ->paginate(12, ['code', 'status', 'payment', 'total', 'created_at']);
 
         return Inertia::render('History', ['orders' => $orders, 'statuses' => Orders::STATUSES])->toResponse($request)->header('Cache-Control', 'private, no-store');
@@ -270,7 +271,7 @@ class Storefront extends Controller
 
     private function ownedOrder(Request $request, string $code): object
     {
-        $order = DB::table('orders')->where('user_id', $request->user()->id)->where('code', $code)->first();
+        $order = Orders::query()->where('user_id', $request->user()->id)->where('code', $code)->first();
         abort_unless($order, 404);
 
         return $order;
@@ -281,6 +282,7 @@ class Storefront extends Controller
         return Inertia::render('Order', [
             'order' => Orders::detail($order, owner: $canReorder), 'statuses' => Orders::STATUSES, 'payments' => Orders::PAYMENTS,
             'trackingLink' => Orders::link($order), 'canReorder' => $canReorder,
+            ...OrderRequests::customerData($order, $canReorder ? request()->user() : null),
         ])->toResponse(request())->header('Cache-Control', 'private, no-store')
             ->header('Referrer-Policy', 'no-referrer')->header('X-Robots-Tag', 'noindex, nofollow');
     }

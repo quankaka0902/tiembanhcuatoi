@@ -1,7 +1,7 @@
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import { ArrowLeft, ArrowUpRight, Banknote, CakeSlice, CalendarDays, ChartNoAxesCombined, ClipboardList, Download, LayoutDashboard, Package, Plus, Settings, Ticket, Users } from 'lucide-react';
 import { Brand, ButtonLink, date as formatDate, dateTime, ErrorList, Field, Image, money, Pagination, Pill } from './ui';
-import { OrderEvents, OrderItems, Totals } from './checkout';
+import { ChangeRequestHistory, OrderEvents, OrderItems, Totals } from './checkout';
 
 const root = '/quan-tri';
 const scheduleUrl = root + '/lich-lam-banh';
@@ -107,15 +107,18 @@ function IntakeControl({ intake }) {
     </section>;
 }
 
-export function AdminInbox({ filter, newCount, overdueCount, refundCount, orders, payments, intake }) {
+export function AdminInbox({ filter, newCount, overdueCount, refundCount, requestCount = 0, exceptionCount = 0, inventoryCount = 0, orders, payments, statuses, intake }) {
     const { auth } = usePage().props;
     const isAdmin = auth.role === 'admin';
     const tabs = [
         ['new', 'Chưa xác nhận', newCount, 'Giờ đặt', 'created_at', 'Hiện không có đơn chờ xác nhận.'],
         ['overdue', 'Chuyển khoản quá hạn', overdueCount, 'Hạn chuyển khoản', 'bank_due_at', 'Hiện không có chuyển khoản quá hạn.'],
         ['refund', 'Chờ hoàn tiền', refundCount, 'Giờ hủy', 'updated_at', 'Hiện không có đơn chờ hoàn tiền.'],
+        ['requests', 'Yêu cầu của khách', requestCount, 'Cập nhật lúc', 'updated_at', 'Hiện không có yêu cầu chờ xử lý.'],
+        ['exception', 'Chưa giao / chưa nhận', exceptionCount, 'Cập nhật lúc', 'updated_at', 'Hiện không có đơn giao hoặc nhận cần xử lý lại.'],
+        ['inventory', 'Bánh sau hủy', inventoryCount, 'Giờ hủy', 'updated_at', 'Hiện không có bánh sau hủy chờ quản lý kiểm tra.'],
     ];
-    const [, , , dateLabel, dateField, empty] = tabs.find(([key]) => key === filter);
+    const [, , , dateLabel, dateField, empty] = tabs.find(([key]) => key === filter) ?? tabs[0];
     return <Admin title="Đơn cần xử lý"
         action={isAdmin && <ButtonLink href={mailUrl} secondary>Email đơn hàng</ButtonLink>}>
         {!intake.accepting_orders && <p className="warning" role="status">Tiệm đang tạm ngừng nhận đơn mới.</p>}
@@ -129,7 +132,7 @@ export function AdminInbox({ filter, newCount, overdueCount, refundCount, orders
                 rows={orders.data.map(order => [order.id,
                     <Link className="table-link" href={root + '/don-hang/' + order.id}>{order.code}</Link>,
                     money(order.total),
-                    <>{order.method === 'bank' ? 'Chuyển khoản' : 'COD'}<small><Pill value={order.payment} labels={payments} /></small></>,
+                    <>{order.method === 'bank' ? 'Chuyển khoản' : 'COD'}<small><Pill value={order.payment} labels={payments} /></small>{filter === 'exception' && statuses && <small><Pill value={order.status} labels={statuses} /></small>}</>,
                     <>{dateTime(order.scheduled_at)}<small>{order.fulfillment === 'delivery' ? 'Giao tận nơi' : 'Nhận tại tiệm'}</small></>,
                     dateTime(order[dateField]),
                 ])} />
@@ -194,7 +197,7 @@ export function AdminInventory({ movements, filters, reasons, product }) {
             <Table headers={['Thời điểm', 'Bánh', 'Thay đổi', 'Nguyên nhân', 'Người thực hiện']} empty="Chưa có thay đổi tồn kho theo bộ lọc."
                 rows={movements.data.map(item => [item.id, dateTime(item.created_at),
                     <><Link className="table-link" href={root + '/san-pham/' + item.product_id}>{item.product_name}</Link><small>{item.variant_name}</small></>,
-                    <><strong>{item.stock_after > item.stock_before ? '+' : ''}{item.stock_after - item.stock_before}</strong><small>{item.stock_before} → {item.stock_after}</small></>,
+                    <><strong>{item.reason === 'waste' ? `${item.affected_quantity} bánh tiêu hao` : `${item.stock_after > item.stock_before ? '+' : ''}${item.stock_after - item.stock_before}`}</strong><small>Tồn bán {item.stock_before} → {item.stock_after}</small></>,
                     <>{reasons[item.reason]}{item.order_code && <small><Link className="table-link" href={root + '/don-hang/' + item.order_id}>{item.order_code}</Link></small>}{item.note && <small>{item.note}</small>}</>,
                     item.actor ?? 'Hệ thống',
                 ])} />
@@ -317,17 +320,105 @@ function RescheduleOrder({ schedule, slots, url }) {
                 {slots.map(slot => <option key={slot} value={slot}>{dateTime(slot)}</option>)}
             </select></Field>
             <Text form={form} field="note" label="Lý do đổi giờ" required maxLength={200} />
-            <button className="button secondary" disabled={form.processing}>Lưu giờ mới</button>
+            <ErrorList errors={form.errors} />
+            <button className="button secondary" disabled={form.processing || !form.data.slot}>{form.processing ? 'Đang lưu…' : 'Lưu giờ mới'}</button>
         </form> : <p className="muted">Hiện chưa có khung giờ khác còn chỗ.</p>}
     </section>;
 }
 
-export function AdminOrder({ order, statuses, payments, next, reconcile, rescheduleSlots }) {
+function ResolveChangeRequest({ request }) {
+    const form = useForm({ decision: '', note: '' });
+    return <form className="form-stack" onSubmit={event => {
+        event.preventDefault();
+        form.patch(root + '/yeu-cau-don/' + request.id, { preserveScroll: true });
+    }}>
+        <h3>{request.kind === 'reschedule' ? 'Duyệt đổi giờ' : 'Duyệt hủy đơn'} · #{request.id}</h3>
+        {request.kind === 'reschedule' && <p className="muted">Khung giờ sẽ được kiểm tra lại khi duyệt. Nếu đã hết chỗ hoặc đơn đã đổi, giờ cũ được giữ nguyên.</p>}
+        <Field label="Quyết định" error={form.errors.decision}><select required value={form.data.decision} onChange={event => form.setData('decision', event.target.value)}>
+            <option value="">Chọn cách xử lý</option><option value="approved">Chấp nhận yêu cầu</option><option value="rejected">Không chấp nhận</option>
+        </select></Field>
+        <Field label="Phản hồi cho khách" error={form.errors.note}><textarea required minLength={3} maxLength={200} rows="2" value={form.data.note} onChange={event => form.setData('note', event.target.value)} /></Field>
+        <ErrorList errors={form.errors} /><button className="button secondary" disabled={form.processing || !form.data.decision}>{form.processing ? 'Đang xử lý…' : 'Lưu quyết định và thông báo khách'}</button>
+    </form>;
+}
+
+function ReviewCancelledInventory({ order, url }) {
+    const dispatched = Boolean(order.dispatched_at) || order.events.some(event => event.kind === 'status' && event.value === 'shipping');
+    const form = useForm({ items: order.items.map(item => ({ item_id: item.id, unmade: dispatched ? 0 : '', sellable: '', waste: '' })), note: '' });
+    const remaining = item => Number(order.items.find(row => row.id === item.item_id).quantity) - Number(item.unmade || 0) - Number(item.sellable || 0) - Number(item.waste || 0);
+    const complete = form.data.items.every(item => remaining(item) === 0 && ['unmade', 'sellable', 'waste'].every(field => item[field] !== '' && Number(item[field]) >= 0));
+    function change(index, field, value) {
+        form.setData('items', form.data.items.map((item, i) => i === index ? { ...item, [field]: value } : item));
+    }
+    return <section className="panel form-stack"><h2>Kiểm tra bánh sau hủy</h2>
+        <p className="warning">Đơn đã vào khâu làm bánh. Tồn bán chưa được tự tăng. Quản lý kiểm tra thực tế rồi phân loại từng bánh, chỉ lưu một lần.</p>
+        {dispatched && <p className="warning">Bánh đã được xuất giao. Phần chưa làm phải bằng 0. Chỉ phân loại bánh nhận lại đã kiểm tra còn bán được hoặc phần hỏng / tiêu hao.</p>}
+        <form className="form-stack" onSubmit={event => {
+            event.preventDefault();
+            form.post(url + '/ton-huy', { preserveScroll: true });
+        }}>
+            {form.data.items.map((item, index) => {
+                const original = order.items.find(row => row.id === item.item_id);
+                return <fieldset className="form-stack" key={item.item_id}><legend>{original.product_name} · {original.variant_name} · {original.quantity} bánh</legend>
+                    <Field label="Chưa làm — giải phóng phần giữ" error={form.errors[`items.${index}.unmade`]}><input required readOnly={dispatched} type="number" min="0" max={dispatched ? 0 : original.quantity} value={item.unmade} onChange={event => change(index, 'unmade', event.target.value)} /></Field>
+                    <Field label="Đã làm, còn đủ điều kiện bán — nhập lại" error={form.errors[`items.${index}.sellable`]}><input required type="number" min="0" max={original.quantity} value={item.sellable} onChange={event => change(index, 'sellable', event.target.value)} /></Field>
+                    <Field label="Hỏng / tiêu hao / không thể bán lại" error={form.errors[`items.${index}.waste`]}><input required type="number" min="0" max={original.quantity} value={item.waste} onChange={event => change(index, 'waste', event.target.value)} /></Field>
+                    <small className={remaining(item) === 0 ? 'muted' : 'field-error'}>{remaining(item) === 0 ? 'Đã phân loại đủ số lượng.' : remaining(item) > 0 ? `Còn ${remaining(item)} bánh chưa phân loại.` : 'Tổng phân loại vượt số bánh trong đơn.'}</small>
+                </fieldset>;
+            })}
+            <Field label="Kết quả kiểm tra và lý do" error={form.errors.note}><textarea required minLength={3} maxLength={250} rows="3" value={form.data.note} onChange={event => form.setData('note', event.target.value)} /></Field>
+            <ErrorList errors={form.errors} /><button className="button secondary" disabled={form.processing || !complete}>{form.processing ? 'Đang ghi nhận…' : 'Chốt phân loại và cập nhật tồn'}</button>
+        </form>
+    </section>;
+}
+
+function InventoryDispositionHistory({ order }) {
+    return <section className="panel form-stack"><h2>Kết quả kiểm tra bánh sau hủy</h2>
+        <ul className="summary-lines">{order.inventory_dispositions.map(row => {
+            const item = order.items.find(item => item.id === row.order_item_id);
+            return <li key={row.id}><div className="form-stack">
+                <strong>{item ? item.product_name + ' · ' + item.variant_name : 'Dòng bánh #' + row.order_item_id}</strong>
+                <small>{dateTime(row.created_at)} · {row.actor}</small>
+                <p>Chưa làm: {row.unmade} · Còn bán được: {row.sellable} · Hỏng / tiêu hao: {row.waste}</p>
+                <p>Lý do: {row.reason}</p>
+            </div></li>;
+        })}</ul>
+    </section>;
+}
+
+function PrepaymentException({ url }) {
+    const form = useForm({ kind: 'prepay_exception', value: 'granted', note: '' });
+    return <form className="form-stack" onSubmit={event => {
+        event.preventDefault();
+        form.patch(url, { preserveScroll: true });
+    }}>
+        <Field label="Lý do quản lý cho phép làm / giao khi chưa thu đủ" error={form.errors.note}><textarea required minLength={3} maxLength={250} rows="2" value={form.data.note} onChange={event => form.setData('note', event.target.value)} /></Field>
+        <ErrorList errors={form.errors} /><button className="button secondary" disabled={form.processing}>{form.processing ? 'Đang lưu…' : 'Duyệt ngoại lệ trả trước cho đơn này'}</button>
+    </form>;
+}
+
+function LegacyLeadTime({ url }) {
+    const form = useForm({ kind: 'lead_time', value: '', note: '' });
+    return <section className="panel form-stack"><h2>Đơn cũ chưa lưu thời gian chuẩn bị</h2>
+        <p className="muted">Quản lý cần đối chiếu bánh đã đặt và ghi thời gian chuẩn bị trước khi cho đổi giờ. Việc sửa menu sau này không thay đổi mốc đã xác nhận này.</p>
+        <form className="form-stack" onSubmit={event => { event.preventDefault(); form.patch(url, { preserveScroll: true }); }}>
+            <Text form={form} field="value" label="Thời gian chuẩn bị (phút)" type="number" required min="0" max="10080" />
+            <TextArea form={form} field="note" label="Căn cứ xác nhận" required minLength={3} maxLength={250} />
+            <ErrorList errors={form.errors} /><button className="button secondary" disabled={form.processing}>Lưu thời gian cho đơn cũ</button>
+        </form>
+    </section>;
+}
+
+export function AdminOrder({ order, statuses, payments, next, reconcile, rescheduleSlots, manager = false, prepayRequired = false, prepayExceptionAllowed = false, changeRequests = [] }) {
     const transition = useForm({ kind: 'status', value: '', note: '' });
-    const payment = useForm({ kind: 'payment', value: '', note: '' });
+    const payment = useForm({ kind: 'payment', value: '', note: '', refund_method: order.method === 'bank' ? 'bank' : 'cash', refund_reference: '', refund_amount: order.total, refund_verified: false });
     const url = root + '/don-hang/' + order.id;
-    const canPay = order.payment === 'unpaid' && order.status !== 'cancelled' && (order.method === 'bank' ? reconcile : ['ready', 'shipping', 'completed'].includes(order.status));
+    const canPay = order.payment === 'unpaid' && order.status !== 'cancelled' && (order.method === 'bank' ? reconcile : ['ready', 'shipping', 'completed', 'delivery_failed', 'uncollected'].includes(order.status));
     const canRefund = reconcile && order.payment === 'paid' && order.status === 'cancelled';
+    const started = Boolean(order.production_started_at) || ['preparing', 'ready', 'shipping', 'delivery_failed', 'uncollected'].includes(order.status);
+    const availableNext = next.filter(value => value !== 'cancelled' || !started || manager);
+    const blockedByPayment = order.method === 'bank' && prepayRequired && order.payment !== 'paid' && !order.prepayment_waived_at;
+    const reasonRequired = ['cancelled', 'delivery_failed', 'uncollected'].includes(transition.data.value) || ['delivery_failed', 'uncollected'].includes(order.status);
     return <Admin title={'Đơn ' + order.code} action={<ButtonLink href={root + '/don-hang'} secondary><ArrowLeft size={17} />Danh sách đơn</ButtonLink>}>
         <div className="row-actions admin-pills"><Pill value={order.status} labels={statuses} /><Pill value={order.payment} labels={payments} /></div>
         <div className="admin-columns">
@@ -336,19 +427,36 @@ export function AdminOrder({ order, statuses, payments, next, reconcile, resched
                     <p>{order.fulfillment === 'delivery' ? 'Giao đến ' + order.address + ' · ' + order.region_label : 'Nhận tại tiệm'}</p><p>Giờ nhận {dateTime(order.scheduled_at)}</p>
                 </section>
                 <section className="panel form-stack"><h2>Bánh đã đặt</h2><OrderItems items={order.items} /><Totals {...order} />{order.coupon_code && <p>Mã đã sử dụng <b>{order.coupon_code}</b></p>}</section>
+                <section className="panel form-stack"><h2>Yêu cầu đổi / hủy của khách</h2>
+                    <ChangeRequestHistory requests={changeRequests} />
+                    {changeRequests.filter(request => request.status === 'pending').map(request => <ResolveChangeRequest key={request.id} request={request} />)}
+                </section>
                 <section className="panel form-stack"><h2>Lịch sử thay đổi</h2><OrderEvents events={order.events} statuses={statuses} payments={payments} /></section>
             </div>
             <div className="form-stack">
                 <section className="panel form-stack"><h2>Xử lý đơn</h2>
-                    {next.length ? <form className="form-stack" onSubmit={e => { e.preventDefault(); transition.patch(url, { preserveScroll: true, onSuccess: () => transition.reset() }); }}>
+                    {['delivery_failed', 'uncollected'].includes(order.status) && <p className="warning">Liên hệ khách và ghi rõ kết quả. Có thể giao / nhận lại, hoặc chuyển quản lý duyệt hủy sau làm. Hoàn tất khi đã bàn giao và đã thu tiền.</p>}
+                    {started && !manager && <p className="muted">Đơn đã vào khâu làm bánh. Chỉ quản lý được duyệt hủy và kiểm tra tồn sau hủy.</p>}
+                    {blockedByPayment && order.status !== 'cancelled' && <p className="warning">Đơn chuyển khoản cần được đối soát đã thu trước khi đưa vào làm hoặc giao. Ngoại lệ chỉ được quản lý duyệt khi cấu hình tiệm cho phép.</p>}
+                    {order.prepayment_waived_at && <p className="warning">Quản lý đã duyệt ngoại lệ trả trước cho đơn này. Thanh toán vẫn phải được đối chiếu trước khi hoàn tất.</p>}
+                    {availableNext.length ? <form className="form-stack" onSubmit={e => {
+                        e.preventDefault();
+                        transition.transform(data => ({ ...data, expected_status: order.status }));
+                        transition.patch(url, { preserveScroll: true, onSuccess: () => transition.reset() });
+                    }}>
                         <Field label="Trạng thái tiếp theo"><select required value={transition.data.value} onChange={e => transition.setData('value', e.target.value)}>
-                            <option value="">Chọn trạng thái</option>{next.map(value => <option key={value} value={value} disabled={value === 'completed' && order.payment !== 'paid'}>{statuses[value]}</option>)}</select></Field>
+                            <option value="">Chọn trạng thái</option>{availableNext.map(value => <option key={value} value={value} disabled={(value === 'completed' && order.payment !== 'paid') || (blockedByPayment && ['preparing', 'shipping'].includes(value))}>{statuses[value]}</option>)}</select></Field>
                         {next.includes('completed') && order.payment !== 'paid' && <p className="muted">Cần xác nhận thanh toán trước khi hoàn tất.</p>}
-                        <Field label="Ghi chú nội bộ"><textarea rows="2" maxLength={250} value={transition.data.note} onChange={e => transition.setData('note', e.target.value)} /></Field>
-                        <ErrorList errors={transition.errors} /><button className="button" disabled={transition.processing}>Cập nhật trạng thái</button>
-                    </form> : <p className="muted">Đơn đã kết thúc.</p>}
+                        {transition.data.value === 'cancelled' && started && <p className="warning">Hủy sau làm sẽ đưa bánh sang chờ quản lý phân loại. Tồn bán không tự tăng.</p>}
+                        <Field label={reasonRequired ? 'Lý do xử lý (bắt buộc)' : 'Ghi chú nội bộ'}><textarea required={reasonRequired} minLength={reasonRequired ? 3 : undefined} rows="2" maxLength={250} value={transition.data.note} onChange={e => transition.setData('note', e.target.value)} /></Field>
+                        <ErrorList errors={transition.errors} /><button className="button" disabled={transition.processing || !transition.data.value}>{transition.processing ? 'Đang cập nhật…' : 'Cập nhật trạng thái'}</button>
+                    </form> : <p className="muted">Không có bước xử lý tiếp theo cho quyền của bạn ở trạng thái hiện tại.</p>}
                 </section>
+                {manager && prepayExceptionAllowed && blockedByPayment && ['pending', 'confirmed'].includes(order.status) && <section className="panel form-stack"><h2>Ngoại lệ trả trước</h2><PrepaymentException url={url} /></section>}
+                {manager && order.prep_minutes_snapshot == null && ['pending', 'confirmed'].includes(order.status) && <LegacyLeadTime url={url} />}
                 {rescheduleSlots && <RescheduleOrder key={order.scheduled_at} schedule={order.scheduled_at} slots={rescheduleSlots} url={url} />}
+                {order.status === 'cancelled' && order.inventory_review_required && !order.inventory_processed_at && (manager ? <ReviewCancelledInventory order={order} url={url} /> : <p className="warning">Bánh sau hủy đang chờ quản lý kiểm tra. Chưa có tồn nào tự được nhập lại.</p>)}
+                {order.inventory_dispositions?.length > 0 && <InventoryDispositionHistory order={order} />}
                 <section className="panel form-stack"><h2>Thanh toán</h2>
                     <p>{order.method === 'bank' ? 'Chuyển khoản thủ công' : 'Thanh toán khi nhận bánh'}</p>
                     {order.bank_due_at && order.payment === 'unpaid' && order.status !== 'cancelled' && <p className="muted">Hạn chuyển khoản · {dateTime(order.bank_due_at)}</p>}
@@ -357,13 +465,27 @@ export function AdminOrder({ order, statuses, payments, next, reconcile, resched
                         <div><dt>{canRefund ? 'Số tiền hoàn' : 'Tổng thanh toán'}</dt><dd>{money(order.total)}</dd></div>
                     </dl>}
                     {order.bank_snapshot?.demo && <p className="warning">Thông tin chuyển khoản mẫu.</p>}
+                    {order.refund_evidence && <dl className="totals payment-review">
+                        <div><dt>Phương thức đã hoàn</dt><dd>{order.refund_evidence.method === 'bank' ? 'Chuyển khoản' : 'Tiền mặt'}</dd></div>
+                        <div><dt>Số tiền đã hoàn</dt><dd>{money(order.refund_evidence.amount)}</dd></div>
+                        <div><dt>Tham chiếu đã đối chiếu</dt><dd>{order.refund_evidence.reference}</dd></div>
+                        <div><dt>Ghi nhận lúc</dt><dd>{dateTime(order.refund_evidence.verified_at?.replace('T', ' '))}</dd></div>
+                        <div><dt>Kết quả kiểm tra</dt><dd>{order.refund_evidence.note}</dd></div>
+                    </dl>}
                     {(canPay || canRefund) && <form className="form-stack" onSubmit={e => {
                         e.preventDefault();
                         payment.transform(data => ({ ...data, value: canPay ? 'paid' : 'refunded' }));
                         payment.patch(url, { preserveScroll: true, onSuccess: () => payment.reset() });
                     }}>
-                        <Field label="Ghi chú thanh toán"><input maxLength={250} value={payment.data.note} onChange={e => payment.setData('note', e.target.value)} /></Field>
-                        <ErrorList errors={payment.errors} /><button className="button secondary" disabled={payment.processing}>{canPay ? 'Xác nhận đã thanh toán' : 'Ghi nhận đã hoàn tiền'}</button>
+                        {canRefund && <>
+                            <p className="warning">Thực hiện hoàn tiền bên ngoài ứng dụng, đối chiếu đúng người nhận và số tiền rồi mới ghi nhận tại đây.</p>
+                            <Field label="Phương thức hoàn"><input readOnly value={order.method === 'bank' ? 'Chuyển khoản về người thanh toán' : 'Tiền mặt'} /></Field>
+                            <Text form={payment} field="refund_amount" label="Số tiền đã hoàn (₫)" type="number" required min={order.total} max={order.total} />
+                            <Text form={payment} field="refund_reference" label={order.method === 'bank' ? 'Mã giao dịch hoàn / chứng từ đối chiếu' : 'Mã phiếu chi / xác nhận nhận tiền mặt'} required minLength={order.method === 'bank' ? 6 : 3} maxLength={120} />
+                            <Flag form={payment} field="refund_verified" label="Đã kiểm tra bằng chứng hoàn đúng phương thức và đủ số tiền" />
+                        </>}
+                        <Field label={canRefund ? 'Ghi chú đối chiếu hoàn tiền' : 'Ghi chú thanh toán'}><input required={canRefund} minLength={canRefund ? 3 : undefined} maxLength={250} value={payment.data.note} onChange={e => payment.setData('note', e.target.value)} /></Field>
+                        <ErrorList errors={payment.errors} /><button className="button secondary" disabled={payment.processing || (canRefund && !payment.data.refund_verified)}>{payment.processing ? 'Đang ghi nhận…' : canPay ? 'Xác nhận đã thanh toán' : 'Ghi nhận đã hoàn tiền'}</button>
                     </form>}
                 </section>
             </div>
@@ -520,6 +642,13 @@ export function AdminSettings({ settings }) {
                 <div className="three-fields"><Text form={form} field="bank_name" label="Ngân hàng" /><Text form={form} field="bank_account" label="Số tài khoản" /><Text form={form} field="bank_holder" label="Chủ tài khoản" /></div>
                 <Text form={form} field="bank_due_minutes" label="Thời hạn chuyển khoản (phút)" type="number" required min="1" max="1440" />
                 <Flag form={form} field="bank_demo" label="Hiển thị cảnh báo thông tin chuyển khoản mẫu" />
+                <Flag form={form} field="bank_prepay_required" label="Đơn chuyển khoản phải được đối soát đã thu trước khi làm hoặc giao" />
+                <Flag form={form} field="allow_payment_override" label="Cho quản lý duyệt ngoại lệ trả trước theo từng đơn, kèm lý do" />
+                <p className="muted">Ngoại lệ không ghi nhận đã thanh toán. Đơn vẫn cần thu đủ và đối chiếu trước khi hoàn tất.</p>
+            </section>
+            <section className="panel form-stack"><h2>Hủy đơn và mã giảm giá</h2>
+                <Flag form={form} field="coupon_return_on_early_cancel" label="Trả lượt mã giảm khi hủy trước khi bắt đầu làm" />
+                <p className="muted">Lượt mã giảm được xử lý riêng với tồn. Hủy sau khi bắt đầu làm không tự nhập bánh vào tồn bán, quản lý phải kiểm tra và ghi rõ phần chưa làm, còn bán được hoặc hỏng.</p>
             </section>
             <ErrorList errors={form.errors} /><button className="button" disabled={form.processing}>{form.processing ? 'Đang lưu…' : 'Lưu cấu hình'}</button>
         </form>

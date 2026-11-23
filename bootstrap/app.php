@@ -22,6 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->dontFlash(['code']);
         $exceptions->report(function (Throwable $exception) {
             if (! app()->runningInConsole() && request()->is('tra-cuu', 'tra-cuu/*', 'dat-lai-mat-khau', 'dat-lai-mat-khau/*', 'quen-mat-khau',
+                'thao-tac-don/*', 'don-cua-toi', 'don-cua-toi/*', 'quan-tri/yeu-cau-don/*',
                 'dat-banh', 'dat-banh/*', 'dang-nhap', 'xac-thuc-hai-buoc', 'quan-tri/don-hang', 'quan-tri/don-hang/*')) {
                 Log::error('Lỗi xử lý yêu cầu riêng tư.', [
                     'route' => request()->route()?->uri(),

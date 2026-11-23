@@ -2,13 +2,10 @@
 
 namespace App\Jobs;
 
-use App\Services\Orders;
+use App\Services\OrderNotices;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Mail;
-use RuntimeException;
-use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
+use Illuminate\Support\Str;
 
 class SendOrderEmail implements ShouldQueue
 {
@@ -24,11 +21,15 @@ class SendOrderEmail implements ShouldQueue
 
     public int $timeout = 60;
 
+    public string $deliveryKey;
+
     public function __construct(
         public int $orderId,
         public ?string $status = null,
+        public ?int $noticeId = null,
     ) {
         $this->onConnection(self::CONNECTION);
+        $this->deliveryKey = (string) Str::uuid();
     }
 
     public function backoff(): array
@@ -38,28 +39,10 @@ class SendOrderEmail implements ShouldQueue
 
     public function handle(): void
     {
-        $order = DB::table('orders')->find($this->orderId, ['code', 'email', 'status', 'total', 'tracking_token']);
-        if (! $order || ($order->status === 'cancelled' && in_array($this->status, self::STATUS_UPDATES, true))) {
-            return;
-        }
-
-        [$subject, $body] = match ($this->status) {
-            null => ['Liên kết tra cứu đơn '.$order->code, "Đây là liên kết tra cứu cho đơn {$order->code} mà bạn đã yêu cầu."],
-            self::RECEIPT => [
-                'Đã nhận đơn '.$order->code,
-                "Tiệm đã nhận đơn {$order->code} và sẽ xác nhận sau.\nTổng tiền: ".number_format($order->total, 0, ',', '.').' ₫',
-            ],
-            default => [
-                Orders::STATUSES[$this->status].' · Đơn '.$order->code,
-                "Đơn {$order->code} đã được cập nhật sang trạng thái ".Orders::STATUSES[$this->status].'.',
-            ],
-        };
-
-        try {
-            Mail::raw($body."\n\nXem tình trạng đơn tại ".Orders::link($order),
-                fn ($message) => $message->to($order->email)->subject($subject));
-        } catch (TransportExceptionInterface $exception) {
-            throw new RuntimeException('SMTP từ chối hoặc không nhận được email đơn hàng ('.class_basename($exception).').');
+        $noticeId = $this->noticeId ?? OrderNotices::legacy($this->orderId, $this->status,
+            $this->deliveryKey ?? ('old-job:'.($this->job?->uuid() ?? $this->job?->getJobId() ?? $this->orderId.':'.$this->status)));
+        if ($noticeId !== null) {
+            OrderNotices::deliver($noticeId);
         }
     }
 }

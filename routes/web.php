@@ -5,6 +5,7 @@ use App\Http\Controllers\AdminCatalog;
 use App\Http\Controllers\AdminConfig;
 use App\Http\Controllers\AdminOrders;
 use App\Http\Controllers\AdminSchedule;
+use App\Http\Controllers\OrderChanges;
 use App\Http\Controllers\Storefront;
 use App\Http\Middleware\VerifyStaffFactor;
 use Illuminate\Support\Facades\Route;
@@ -26,10 +27,18 @@ Route::controller(Storefront::class)->group(function () {
     Route::post('/tra-cuu', 'track')->middleware('throttle:tracking');
     Route::post('/tra-cuu/gui-lai', 'resendTracking')->middleware('throttle:tracking-resend');
     Route::get('/tra-cuu/{token}', 'tracked')->where('token', '[a-f0-9]{64}')->middleware('throttle:tracking')->name('tracking.show');
+    Route::post('/tra-cuu/{trackingToken}/lien-ket-thao-tac', [OrderChanges::class, 'sendLink'])
+        ->where('trackingToken', '[a-f0-9]{64}')->middleware('throttle:order-action-link');
+    Route::get('/thao-tac-don/{token}', [OrderChanges::class, 'guestForm'])
+        ->where('token', '[a-f0-9]{64}')->middleware('throttle:order-actions');
+    Route::post('/thao-tac-don/{token}', [OrderChanges::class, 'guestStore'])
+        ->where('token', '[a-f0-9]{64}')->middleware('throttle:order-actions')->block();
     Route::middleware(['auth', 'can:active-account'])->group(function () {
         Route::get('/don-cua-toi', 'history');
         Route::get('/don-cua-toi/{code}', 'ownOrder');
         Route::post('/don-cua-toi/{code}/mua-lai', 'reorder')->block();
+        Route::get('/don-cua-toi/{code}/yeu-cau', [OrderChanges::class, 'ownerForm']);
+        Route::post('/don-cua-toi/{code}/yeu-cau', [OrderChanges::class, 'ownerStore'])->middleware('throttle:order-actions')->block();
     });
 });
 
@@ -55,6 +64,7 @@ Route::middleware('guest')->group(function () {
 Route::post('/dang-xuat', [Accounts::class, 'logout'])->middleware('auth');
 
 Route::prefix('quan-tri')->middleware(['auth', 'can:staff', VerifyStaffFactor::class])->group(function () {
+    Route::patch('/yeu-cau-don/{requestId}', [OrderChanges::class, 'resolve'])->whereNumber('requestId');
     Route::get('/lich-lam-banh', AdminSchedule::class);
 
     Route::controller(AdminOrders::class)->group(function () {
@@ -67,6 +77,7 @@ Route::prefix('quan-tri')->middleware(['auth', 'can:staff', VerifyStaffFactor::c
         Route::get('/don-hang/{order}', 'show')->whereNumber('order');
         Route::patch('/don-hang/{order}', 'change')->whereNumber('order');
         Route::patch('/don-hang/{order}/doi-gio', 'reschedule')->whereNumber('order');
+        Route::post('/don-hang/{order}/ton-huy', 'disposeInventory')->whereNumber('order');
     });
 
     Route::middleware('can:admin')->group(function () {

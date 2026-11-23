@@ -98,6 +98,11 @@ class DatabaseSeeder extends Seeder
                 $date = now()->subDays($index);
                 $scheduledAt = $date->copy()->addDay()->setTime(14, 0)->toDateTimeString();
                 $id = DB::table('orders')->insertGetId([
+                    'location_id' => Store::locationId(), 'prep_minutes_snapshot' => $product->prep_minutes,
+                    'bank_prepay_required' => $method === 'bank' && $settings['bank_prepay_required'],
+                    'production_started_at' => in_array($status, ['preparing', 'ready', 'shipping', 'completed'], true) ? $date : null,
+                    'dispatched_at' => $status === 'shipping' ? $date : null,
+                    'inventory_processed_at' => $status === 'cancelled' ? $date : null,
                     'code' => 'NB-DEMO00'.($index + 1), 'tracking_token' => bin2hex(random_bytes(32)), 'request_key' => bin2hex(random_bytes(32)),
                     'name' => $customer->name, 'email' => $customer->email, 'phone' => '0900123456', 'user_id' => $customer->id,
                     'fulfillment' => $fee ? 'delivery' : 'pickup', 'address' => $fee ? '24 Nguyễn Thiệp' : null,

@@ -30,5 +30,8 @@ return [
         'bank_holder' => '',
         'bank_due_minutes' => 60,
         'bank_demo' => false,
+        'bank_prepay_required' => true,
+        'allow_payment_override' => false,
+        'coupon_return_on_early_cancel' => true,
     ],
 ];

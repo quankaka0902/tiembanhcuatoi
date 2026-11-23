@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Jobs\SendOrderEmail;
 use App\Services\Checkout;
+use App\Services\OrderRequests;
 use App\Services\Orders;
 use App\Services\Store;
 use Carbon\CarbonImmutable;
@@ -19,14 +20,14 @@ class AdminOrders extends Controller
     public function dashboard(Request $request)
     {
         $filters = $this->filters($request);
-        $orders = $this->dateRange(DB::table('orders'), $filters, 'created_at');
+        $orders = $this->dateRange(Orders::query(), $filters, 'created_at');
         $revenue = $this->dateRange($this->completedSales(), $filters, 'completed_at');
         $low = DB::table('variants')->join('products', 'products.id', '=', 'variants.product_id')
             ->where('products.active', true)->where('variants.active', true)->where('variants.stock', '<=', 5);
 
         return Inertia::render('AdminDashboard', [
             'filters' => $filters, 'total' => (clone $orders)->count(), 'revenue' => (int) $revenue->sum('total'),
-            'working' => (clone $orders)->whereIn('status', ['pending', 'confirmed', 'preparing', 'ready', 'shipping'])->count(),
+            'working' => (clone $orders)->whereIn('status', ['pending', 'confirmed', 'preparing', 'ready', 'shipping', 'delivery_failed', 'uncollected'])->count(),
             'lowCount' => (clone $low)->count(),
             'low' => $low->orderBy('variants.stock')->limit(25)->get(['products.id as product_id', 'products.name as product_name', 'variants.name', 'variants.stock']),
             'recent' => $orders->latest('id')->limit(6)->get(['id', 'code', 'name', 'status', 'payment', 'total']),
@@ -46,14 +47,21 @@ class AdminOrders extends Controller
 
     public function inbox(Request $request)
     {
-        $fields = $request->validate(['filter' => 'nullable|in:new,overdue,refund']);
+        $fields = $request->validate(['filter' => 'nullable|in:new,overdue,refund,requests,exception,inventory']);
         $filter = $fields['filter'] ?? 'new';
-        $new = DB::table('orders')->where('status', 'pending');
+        $new = Orders::query()->where('status', 'pending');
         $overdue = $this->unpaidTransfers()->where('bank_due_at', '<=', now()->toDateTimeString());
-        $refund = DB::table('orders')->where('status', 'cancelled')->where('payment', 'paid');
+        $refund = Orders::query()->where('status', 'cancelled')->where('payment', 'paid');
+        $requests = Orders::query()->whereExists(fn ($q) => $q->selectRaw('1')->from('order_change_requests')
+            ->whereColumn('order_change_requests.order_id', 'orders.id')->where('order_change_requests.status', 'pending'));
+        $exceptions = Orders::query()->whereIn('status', ['delivery_failed', 'uncollected']);
+        $inventory = Orders::query()->where('status', 'cancelled')->where('inventory_review_required', true)->whereNull('inventory_processed_at');
         $orders = match ($filter) {
             'overdue' => (clone $overdue)->orderBy('bank_due_at'),
             'refund' => (clone $refund)->orderBy('updated_at'),
+            'requests' => (clone $requests)->orderBy('updated_at'),
+            'exception' => (clone $exceptions)->orderBy('updated_at'),
+            'inventory' => (clone $inventory)->orderBy('updated_at'),
             default => (clone $new)->orderBy('scheduled_at'),
         };
         $settings = Store::settings();
@@ -61,8 +69,10 @@ class AdminOrders extends Controller
         return Inertia::render('AdminInbox', [
             'filter' => $filter, 'newCount' => $new->count(), 'overdueCount' => $overdue->count(),
             'refundCount' => $refund->count(),
-            'orders' => $orders->orderBy('id')->paginate(15, ['id', 'code', 'method', 'payment', 'fulfillment', 'total', 'created_at', 'scheduled_at', 'bank_due_at', 'updated_at'])->withQueryString(),
+            'requestCount' => $requests->count(), 'exceptionCount' => $exceptions->count(), 'inventoryCount' => $inventory->count(),
+            'orders' => $orders->orderBy('id')->paginate(15, ['id', 'code', 'status', 'method', 'payment', 'fulfillment', 'total', 'created_at', 'scheduled_at', 'bank_due_at', 'updated_at'])->withQueryString(),
             'payments' => Orders::PAYMENTS,
+            'statuses' => Orders::STATUSES,
             'intake' => ['accepting_orders' => $settings['accepting_orders'], 'pause_message' => $settings['pause_message']],
         ])->toResponse($request)->header('Cache-Control', 'private, no-store');
     }
@@ -140,14 +150,25 @@ class AdminOrders extends Controller
 
     public function show(Request $request, int $order, Checkout $checkout)
     {
-        $row = DB::table('orders')->find($order);
+        $row = Orders::query()->find($order);
         abort_unless($row, 404);
 
+        $manager = $request->user()->role === 'admin';
+        $settings = Store::settings();
+        $detail = Orders::detail($row, internal: true);
+        if (! Orders::canReconcile($request->user())) {
+            unset($detail['refund_evidence']);
+        }
+
         return Inertia::render('AdminOrder', [
-            'order' => Orders::detail($row, internal: true), 'statuses' => Orders::STATUSES, 'payments' => Orders::PAYMENTS,
-            'next' => Orders::next($row), 'reconcile' => Orders::canReconcile($request->user()),
-            'rescheduleSlots' => Orders::canReschedule($row)
-                ? array_values(array_diff($checkout->availableSlots(Store::settings(), Orders::prepMinutes($order)), [substr($row->scheduled_at, 0, 16)]))
+            'order' => $detail, 'statuses' => Orders::STATUSES, 'payments' => Orders::PAYMENTS,
+            'next' => array_values(array_filter(Orders::next($row), fn ($next) => $next !== 'cancelled' || $manager || Orders::canCustomerRequest($row))),
+            'reconcile' => Orders::canReconcile($request->user()),
+            'manager' => $manager, 'prepayRequired' => Orders::prepayRequired($row, $settings),
+            'prepayExceptionAllowed' => (bool) $settings['allow_payment_override'],
+            'changeRequests' => OrderRequests::history($order, internal: true),
+            'rescheduleSlots' => Orders::canReschedule($row, $manager) && $row->prep_minutes_snapshot !== null && ($manager || Orders::canCustomerRequest($row))
+                ? array_values(array_diff($checkout->availableSlots($settings, Orders::prepMinutes($order)), [substr($row->scheduled_at, 0, 16)]))
                 : null,
         ])->toResponse($request)->header('Cache-Control', 'private, no-store');
     }
@@ -157,7 +178,10 @@ class AdminOrders extends Controller
         $url = '/quan-tri/don-hang/'.$order;
         try {
             $fields = $request->validate([
-                'kind' => 'required|in:status,payment', 'value' => 'required|string|max:16', 'note' => 'nullable|string|max:250',
+                'kind' => 'required|in:status,payment,lead_time,prepay_exception', 'value' => 'required|string|max:16', 'note' => 'nullable|string|max:250',
+                'expected_status' => ['sometimes', Rule::in(array_keys(Orders::STATUSES))],
+                'refund_method' => 'nullable|in:bank,cash', 'refund_reference' => 'nullable|string|max:160',
+                'refund_amount' => 'nullable|integer|min:0|max:10000000000', 'refund_verified' => 'nullable|boolean',
             ]);
             Orders::change($order, $request->user(), $fields);
         } catch (ValidationException $failure) {
@@ -165,6 +189,21 @@ class AdminOrders extends Controller
         }
 
         return redirect($url)->with('notice', 'Đã cập nhật đơn.');
+    }
+
+    public function disposeInventory(Request $request, int $order)
+    {
+        abort_unless($request->user()->role === 'admin', 403);
+        $fields = $request->validate([
+            'items' => 'required|array|min:1|max:100', 'items.*' => 'required|array:item_id,unmade,sellable,waste',
+            'items.*.item_id' => 'required|integer|distinct|min:1',
+            'items.*.unmade' => 'required|integer|min:0|max:65535',
+            'items.*.sellable' => 'required|integer|min:0|max:65535',
+            'items.*.waste' => 'required|integer|min:0|max:65535', 'note' => 'required|string|max:250',
+        ]);
+        Orders::disposeInventory($order, $request->user(), $fields);
+
+        return redirect('/quan-tri/don-hang/'.$order)->with('notice', 'Đã chốt kiểm kê bánh của đơn hủy.');
     }
 
     public function reschedule(Request $request, int $order, Checkout $checkout)
@@ -220,12 +259,12 @@ class AdminOrders extends Controller
 
     private function completedSales(): Builder
     {
-        return DB::table('orders')->where('orders.status', 'completed')->where('orders.payment', 'paid');
+        return Orders::query()->where('orders.status', 'completed')->where('orders.payment', 'paid');
     }
 
     private function filtered(array $filters): Builder
     {
-        return $this->dateRange(DB::table('orders'), $filters, 'created_at')
+        return $this->dateRange(Orders::query(), $filters, 'created_at')
             ->when($filters['code'] ?? null, fn ($query, $code) => $query->where('code', 'like', strtoupper($code).'%'))
             ->when($filters['status'] ?? null, fn ($query, $status) => $query->where('status', $status))
             ->latest('id');

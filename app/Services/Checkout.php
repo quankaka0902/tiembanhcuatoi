@@ -2,9 +2,7 @@
 
 namespace App\Services;
 
-use App\Jobs\SendOrderEmail;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -190,7 +188,7 @@ class Checkout
             // Catalog/configuration edits and cancellations take the same lock first.
             $settings = Store::settings(lock: true);
             $requestKey = hash('sha256', $fields['key']);
-            $existing = DB::table('orders')->where('request_key', $requestKey)->first();
+            $existing = Orders::query()->where('request_key', $requestKey)->first();
             if ($existing) {
                 return [$existing, false];
             }
@@ -213,6 +211,8 @@ class Checkout
             $code = 'NB-'.$createdAt->format('ymd').'-'.strtoupper(bin2hex(random_bytes(5)));
             $id = DB::table('orders')->insertGetId([
                 ...$quote,
+                'location_id' => Store::locationId(), 'prep_minutes_snapshot' => max(array_column($lines, 'prep_minutes')),
+                'bank_prepay_required' => $fields['method'] === 'bank' && $settings['bank_prepay_required'],
                 'code' => $code, 'request_key' => $requestKey, 'tracking_token' => bin2hex(random_bytes(32)),
                 'user_id' => $userId, 'name' => $fields['name'], 'email' => $fields['email'], 'phone' => $fields['phone'],
                 'fulfillment' => $fields['fulfillment'], 'address' => $fields['fulfillment'] === 'delivery' ? $fields['address'] : null,
@@ -238,8 +238,8 @@ class Checkout
             if ($quote['coupon_id']) {
                 DB::table('coupons')->where('id', $quote['coupon_id'])->increment('used');
             }
-            Orders::event($id, null, 'status', 'pending');
-            Bus::dispatch(new SendOrderEmail($id, SendOrderEmail::RECEIPT));
+            $event = Orders::event($id, null, 'status', 'pending');
+            OrderNotices::record($id, 'pending', [], $event);
 
             return [DB::table('orders')->find($id), true];
         }, 5);

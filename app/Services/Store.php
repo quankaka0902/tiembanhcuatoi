@@ -7,6 +7,12 @@ use Illuminate\Support\Facades\DB;
 
 class Store
 {
+    // One active location today. Order children inherit this scope through order_id.
+    public static function locationId(): int
+    {
+        return 1;
+    }
+
     public static function settings(bool $lock = false): array
     {
         $query = DB::table('store_settings')->where('id', 1);

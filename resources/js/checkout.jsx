@@ -229,9 +229,26 @@ export function OrderItems({ items }) {
     return <ul className="summary-lines">{items.map(item => <li key={item.id}><div><strong>{item.quantity} × {item.product_name}</strong><small>{item.variant_name}{item.option_fee ? ' · Phí lời chúc ' + money(item.option_fee) + '/bánh' : ''}</small>{item.message && <small>Lời chúc: {item.message}</small>}{item.note && <small>Ghi chú: {item.note}</small>}</div><strong>{money((Number(item.unit_price) + Number(item.option_fee)) * item.quantity)}</strong></li>)}</ul>;
 }
 
+function eventTitle(event, statuses, payments) {
+    if (event.label) return event.label;
+    if (event.kind === 'schedule') return 'Đổi giờ sang ' + dateTime(event.value);
+    if (event.kind === 'payment') return payments[event.value] ?? event.value;
+    if (event.kind === 'status') return statuses[event.value] ?? event.value;
+    if (event.kind === 'request') return { reschedule: 'Khách yêu cầu đổi giờ', cancel: 'Khách yêu cầu hủy đơn', approved: 'Tiệm chấp nhận yêu cầu', rejected: 'Tiệm không chấp nhận yêu cầu' }[event.value] ?? 'Yêu cầu thay đổi đơn';
+    const labels = {
+        request: 'Yêu cầu thay đổi đơn', request_created: 'Khách gửi yêu cầu',
+        request_approved: 'Đã duyệt yêu cầu', request_rejected: 'Đã từ chối yêu cầu',
+        prepay_exception: 'Quản lý duyệt ngoại lệ trả trước', lead_time: 'Xác nhận thời gian chuẩn bị',
+        inventory: 'Kiểm tra bánh sau hủy', inventory_disposition: 'Đã phân loại bánh sau hủy',
+        coupon: 'Xử lý lượt mã giảm giá',
+    };
+    return labels[event.kind] ?? statuses[event.value] ?? payments[event.value] ?? 'Cập nhật đơn';
+}
+
 export function OrderEvents({ events, statuses, payments }) {
     return <ol className="timeline">{events.map((event, i) => <li key={event.id ?? i}><span></span><div>
-        <strong>{event.kind === 'schedule' ? 'Đổi giờ sang ' + dateTime(event.value) : (event.kind === 'payment' ? payments : statuses)[event.value]}</strong>
+        <strong>{eventTitle(event, statuses, payments)}</strong>
+        {event.kind === 'schedule' && event.previous_value && <small>Giờ cũ: {dateTime(event.previous_value)}</small>}
         <small>{dateTime(event.created_at)}{event.actor ? ' · ' + event.actor : ''}</small>{event.note && <p>{event.note}</p>}
     </div></li>)}</ol>;
 }
@@ -252,7 +269,81 @@ function CopyValue({ value, label }) {
     </span>;
 }
 
-export function Order({ order, statuses, payments, trackingLink, canReorder }) {
+const requestLabels = { pending: 'Chờ tiệm xử lý', approved: 'Đã chấp nhận', rejected: 'Không chấp nhận' };
+
+export function ChangeRequestHistory({ requests = [] }) {
+    return requests.length ? <ul className="summary-lines">{requests.map(request => <li key={request.id}>
+        <div className="form-stack">
+            <strong>{request.kind === 'reschedule' ? 'Yêu cầu đổi giờ' : 'Yêu cầu hủy đơn'}</strong>
+            <span className={'pill state-' + (request.status === 'approved' ? 'completed' : request.status === 'rejected' ? 'cancelled' : 'pending')}>{requestLabels[request.status] ?? request.status}</span>
+            <small>Gửi lúc {dateTime(request.created_at)}{request.requester_name ? ' · ' + request.requester_name : ''}</small>
+            {!request.requester_name && request.actor && <small>{request.actor}</small>}
+            {request.previous_slot && <small>Giờ hiện tại khi gửi: {dateTime(request.previous_slot)}</small>}
+            {request.requested_slot && <small>Giờ đề nghị: {dateTime(request.requested_slot)}</small>}
+            {request.reason && <p>Lý do: {request.reason}</p>}
+            {request.response_message && <p>Tiệm phản hồi: {request.response_message}</p>}
+            {request.handled_at && <small>Xử lý lúc {dateTime(request.handled_at)}{request.handler_name ? ' · ' + request.handler_name : ''}</small>}
+        </div>
+    </li>)}</ul> : <p className="muted">Chưa có yêu cầu đổi giờ hoặc hủy đơn.</p>;
+}
+
+function CustomerChangeForm({ changeRequest, expiresAt }) {
+    const form = useForm({ request_key: changeRequest.requestKey, kind: 'reschedule', previous_slot: changeRequest.previousSlot, requested_slot: '', reason: '' });
+    const slots = changeRequest.slots ?? [];
+    const days = [...new Set(slots.map(slot => slot.slice(0, 10)))];
+    const [day, setDay] = useState('');
+    const selectedDay = days.includes(day) ? day : '';
+    return <form className="form-stack" onSubmit={event => {
+        event.preventDefault();
+        form.post(changeRequest.submitUrl, { preserveScroll: true });
+    }}>
+        {expiresAt && <p className="warning">Liên kết thao tác dùng một lần, hết hạn lúc {dateTime(expiresAt)}. Liên kết tra cứu cũ vẫn xem được đơn.</p>}
+        <p className="muted">Tiệm sẽ xem xét yêu cầu. Giờ nhận và trạng thái đơn chỉ thay đổi sau khi được tiệm chấp nhận.</p>
+        {changeRequest.cutoffAt && <p className="muted">Có thể gửi yêu cầu trước {dateTime(changeRequest.cutoffAt)}, khi đơn chưa bắt đầu chuẩn bị.</p>}
+        <Field label="Bạn muốn thay đổi gì?" error={form.errors.kind}><select value={form.data.kind} onChange={event => form.setData('kind', event.target.value)}>
+            <option value="reschedule">Đổi giờ giao hoặc nhận</option><option value="cancel">Hủy đơn</option>
+        </select></Field>
+        {form.data.kind === 'reschedule' && (slots.length ? <div className="two-fields">
+            <Field label="Ngày mới"><select required value={selectedDay} onChange={event => { setDay(event.target.value); form.setData('requested_slot', ''); }}>
+                <option value="">Chọn ngày</option>{days.map(value => <option key={value} value={value}>{formatDate(value)}</option>)}
+            </select></Field>
+            <Field label="Giờ mới" error={form.errors.requested_slot}><select required disabled={!selectedDay} value={form.data.requested_slot} onChange={event => form.setData('requested_slot', event.target.value)}>
+                <option value="">Chọn giờ</option>{slots.filter(slot => slot.startsWith(selectedDay)).map(slot => <option key={slot} value={slot}>{slot.slice(11, 16)}</option>)}
+            </select></Field>
+        </div> : <p className="warning">Hiện chưa có giờ khác còn chỗ. Bạn có thể liên hệ tiệm hoặc chọn yêu cầu hủy đơn.</p>)}
+        <Field label="Lý do yêu cầu" error={form.errors.reason}><textarea required minLength={3} maxLength={200} rows="3" value={form.data.reason} onChange={event => form.setData('reason', event.target.value)} /></Field>
+        <ErrorList errors={form.errors} />
+        <button className="button secondary" disabled={form.processing || (form.data.kind === 'reschedule' && !form.data.requested_slot)}>{form.processing ? 'Đang gửi…' : 'Gửi yêu cầu cho tiệm'}</button>
+    </form>;
+}
+
+function GuestActionLink({ url }) {
+    const form = useForm({ email: '' });
+    const [sent, setSent] = useState(false);
+    return <form className="form-stack" onSubmit={event => {
+        event.preventDefault();
+        form.post(url, { preserveScroll: true, onSuccess: () => { setSent(true); form.reset(); } });
+    }}>
+        <p>Để yêu cầu đổi giờ hoặc hủy, hãy xác minh bằng email đã đặt đơn. Liên kết tra cứu chỉ dùng để xem đơn.</p>
+        <Field label="Email đã đặt đơn" error={form.errors.email}><input required type="email" autoComplete="email" maxLength={254} value={form.data.email} onChange={event => form.setData('email', event.target.value)} /></Field>
+        <ErrorList errors={form.errors} />
+        <button className="button secondary" disabled={form.processing}>{form.processing ? 'Đang tiếp nhận…' : 'Gửi liên kết thao tác qua email'}</button>
+        {sent && <p className="muted" role="status">Nếu thông tin phù hợp, tiệm sẽ gửi liên kết thao tác đến email đã đặt đơn. Hãy kiểm tra cả thư rác.</p>}
+    </form>;
+}
+
+export function OrderAction({ expired, ...props }) {
+    if (expired || !props.order) return <Layout title="Liên kết thao tác đã hết hạn"><div className="wrap page">
+        <div className="panel auth-card form-stack"><h1>Liên kết không còn hiệu lực</h1>
+            <p>Liên kết thao tác đã hết hạn hoặc đã được sử dụng. Đơn và liên kết tra cứu của bạn vẫn được giữ nguyên.</p>
+            <p>Mở đơn từ liên kết tra cứu cũ rồi yêu cầu gửi một liên kết thao tác mới đến email đã đặt đơn.</p>
+            <ButtonLink href="/tra-cuu">Tra cứu đơn</ButtonLink>
+        </div>
+    </div></Layout>;
+    return <Order {...props} actionMode />;
+}
+
+export function Order({ order, statuses, payments, trackingLink, canReorder, changeRequest, changeRequests = [], expiresAt, actionMode = false }) {
     const { shop } = usePage().props;
     const reorder = useForm({});
     const awaitingTransfer = order.bank_snapshot && order.payment === 'unpaid' && order.status !== 'cancelled';
@@ -262,6 +353,9 @@ export function Order({ order, statuses, payments, trackingLink, canReorder }) {
         preparing: 'Tiệm đang làm bánh. Bạn có thể xem giờ hẹn bên dưới.',
         ready: 'Bánh đã sẵn sàng. Hãy mang mã đơn khi đến tiệm nhận bánh.',
         shipping: 'Bánh đang được giao. Hãy giữ điện thoại để nhận cuộc gọi khi giao bánh.',
+        delivery_failed: 'Tiệm chưa giao được bánh. Vui lòng liên hệ tiệm để xác nhận cách giao lại hoặc xử lý đơn.',
+        uncollected: 'Tiệm chưa bàn giao được bánh tại giờ hẹn. Vui lòng liên hệ để thống nhất thời gian nhận và cách xử lý.',
+        completed: 'Đơn đã hoàn tất. Cảm ơn bạn đã đặt bánh tại tiệm.',
     }[order.status];
     return <Layout title={'Đơn ' + order.code}><div className="wrap page">
         <Breadcrumb>{canReorder ? <Link href="/don-cua-toi">Đơn của tôi</Link> : <Link href="/tra-cuu">Tra cứu đơn</Link>}<span aria-hidden="true">/</span><span>{order.code}</span></Breadcrumb>
@@ -281,6 +375,16 @@ export function Order({ order, statuses, payments, trackingLink, canReorder }) {
                     <p className="muted">Tiệm cập nhật thanh toán sau khi nhân viên đối soát.</p>
                 </section>}
                 <section className="panel form-stack"><h2>Cách nhận bánh</h2><p className="icon-text"><MapPin size={19} />{order.fulfillment === 'pickup' ? 'Nhận tại tiệm · ' + shop.address : (order.address || 'Giao tận nơi') + ' · ' + order.region_label}</p><p className="icon-text"><CalendarClock size={19} />{dateTime(order.scheduled_at)}</p></section>
+                {order.status === 'cancelled' && order.payment === 'paid' && <p className="warning" role="status">Đơn đã hủy và đang chờ tiệm xử lý hoàn tiền. Tiệm chỉ ghi nhận đã hoàn sau khi xác minh việc hoàn trả.</p>}
+                {order.payment === 'refunded' && <p className="warning" role="status">Tiệm đã ghi nhận hoàn tiền. Nếu chưa nhận được khoản hoàn, vui lòng liên hệ tiệm kèm mã đơn.</p>}
+                {changeRequest && <section className="panel form-stack"><h2>{actionMode ? 'Gửi yêu cầu thay đổi đơn' : 'Đổi giờ hoặc hủy đơn'}</h2>
+                    {changeRequest.canRequest && changeRequest.eligible && changeRequest.submitUrl ?
+                        <CustomerChangeForm key={changeRequest.requestKey} changeRequest={changeRequest} expiresAt={expiresAt} /> :
+                        changeRequest.actionLinkUrl ? <GuestActionLink url={changeRequest.actionLinkUrl} /> :
+                            <p className="muted">Đơn hiện chưa thể gửi thêm yêu cầu trực tuyến. Nếu đơn đang được làm, đã đến hạn xử lý hoặc có yêu cầu đang chờ, hãy liên hệ tiệm để được hỗ trợ.</p>}
+                    {shop.phone && <a className="subtle-link" href={`tel:${shop.phone.replace(/[^+\d]/g, '')}`}>Gọi tiệm {shop.phone}</a>}
+                </section>}
+                {changeRequest && <section className="panel form-stack"><h2>Yêu cầu đã gửi</h2><ChangeRequestHistory requests={changeRequests} /></section>}
                 <section className="panel form-stack"><h2>Lịch sử đơn</h2><OrderEvents events={order.events} statuses={statuses} payments={payments} /></section>
             </div>
             <aside className="panel order-summary"><h2>Chi tiết thanh toán</h2><OrderItems items={order.items} /><Totals {...order} />
@@ -291,8 +395,8 @@ export function Order({ order, statuses, payments, trackingLink, canReorder }) {
                     <button className="button" disabled={reorder.processing}><ShoppingCart size={17} />{reorder.processing ? 'Đang thêm…' : 'Mua lại bánh'}</button>
                     <small className="muted">Thêm bánh còn bán theo giá và tồn hiện tại. Bạn có thể nhập lời chúc và ghi chú mới trong giỏ.</small>
                 </form>}
-                <Field label="Liên kết tra cứu"><input readOnly value={trackingLink} onFocus={e => e.target.select()} /></Field>
-                <CopyValue value={trackingLink} label="liên kết" />
+                {trackingLink && <><Field label="Liên kết tra cứu"><input readOnly value={trackingLink} onFocus={e => e.target.select()} /></Field>
+                    <CopyValue value={trackingLink} label="liên kết" /></>}
             </aside>
         </div>
     </div></Layout>;

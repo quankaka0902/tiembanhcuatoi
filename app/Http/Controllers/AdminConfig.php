@@ -68,6 +68,9 @@ class AdminConfig extends Controller
             'bank_account' => 'nullable|required_with:bank_name,bank_holder|string|max:40',
             'bank_holder' => 'nullable|required_with:bank_name,bank_account|string|max:100', 'bank_demo' => 'required|boolean',
             'bank_due_minutes' => 'sometimes|required|integer|min:1|max:1440',
+            'bank_prepay_required' => 'sometimes|required|boolean',
+            'allow_payment_override' => 'sometimes|required|boolean',
+            'coupon_return_on_early_cancel' => 'sometimes|required|boolean',
         ]);
         $slotTimes = array_flip($fields['slots']);
         if (array_diff_key($fields['slot_limits'] ?? [], $slotTimes)) {
@@ -84,6 +87,9 @@ class AdminConfig extends Controller
                 'closed_dates' => $fields['closed_dates'] ?? [], 'regions' => $fields['regions'] ?? [],
                 'bank_due_minutes' => (int) ($fields['bank_due_minutes'] ?? $current['bank_due_minutes']),
                 'bank_demo' => (bool) $fields['bank_demo'],
+                'bank_prepay_required' => (bool) ($fields['bank_prepay_required'] ?? $current['bank_prepay_required']),
+                'allow_payment_override' => (bool) ($fields['allow_payment_override'] ?? $current['allow_payment_override']),
+                'coupon_return_on_early_cancel' => (bool) ($fields['coupon_return_on_early_cancel'] ?? $current['coupon_return_on_early_cancel']),
             ]);
             DB::table('store_settings')->where('id', 1)->update(['data' => json_encode($settings, JSON_THROW_ON_ERROR)]);
         });

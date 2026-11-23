@@ -125,11 +125,14 @@ class BakeryTest extends TestCase
             ->where('order.address', 'Địa chỉ riêng')->where('order.items.0.message', 'Lời chúc riêng'));
 
         $this->actingAs($this->account('doisoat'))->patch($url, ['kind' => 'payment', 'value' => 'paid'])->assertSessionHasNoErrors();
-        $this->patch($url, ['kind' => 'status', 'value' => 'cancelled'])->assertSessionHasNoErrors();
+        $this->patch($url, ['kind' => 'status', 'value' => 'cancelled', 'note' => 'Khách yêu cầu hủy trước chuẩn bị'])->assertSessionHasNoErrors();
         $inbox = '/quan-tri/viec-can-xu-ly?filter=refund';
         $this->get($inbox)->assertInertia(fn (Assert $page) => $page->where('refundCount', 1)->where('orders.data.0.code', $order->code));
         $this->actingAs($this->account('nhanvien'))->patch($url, ['kind' => 'payment', 'value' => 'refunded'])->assertForbidden();
-        $this->actingAs($this->account('doisoat'))->patch($url, ['kind' => 'payment', 'value' => 'refunded'])->assertSessionHasNoErrors();
+        $this->actingAs($this->account('doisoat'))->patch($url, [
+            'kind' => 'payment', 'value' => 'refunded', 'refund_method' => 'bank', 'refund_reference' => 'GD-HOAN-THU-01',
+            'refund_amount' => $order->total, 'refund_verified' => true, 'note' => 'Đã đối chiếu chứng từ hoàn thử.',
+        ])->assertSessionHasNoErrors();
         $this->get($inbox)->assertInertia(fn (Assert $page) => $page->where('refundCount', 0));
     }
 
@@ -357,7 +360,7 @@ class BakeryTest extends TestCase
         $this->from('/dat-banh')->post('/dat-banh', $delivery)->assertRedirect('/dat-banh')->assertSessionHasErrors('slot');
         $this->assertDatabaseHas('variants', ['id' => $variant->id, 'stock' => $variant->stock - 1]);
 
-        $this->actingAs($this->account('nhanvien'))->patch('/quan-tri/don-hang/'.$order->id, ['kind' => 'status', 'value' => 'cancelled'])
+        $this->actingAs($this->account('nhanvien'))->patch('/quan-tri/don-hang/'.$order->id, ['kind' => 'status', 'value' => 'cancelled', 'note' => 'Khách yêu cầu hủy trước chuẩn bị'])
             ->assertSessionHasNoErrors();
         $this->actingAs($this->account('khach'))->get('/dat-banh')->assertInertia(fn (Assert $page) => $page
             ->where('slots', fn ($slots) => $slots->contains($pickup['slot'])));
@@ -414,7 +417,7 @@ class BakeryTest extends TestCase
 
         $this->actingAs($this->account('nhanvien'));
         $route = '/quan-tri/don-hang/'.$order->id;
-        $cancel = ['kind' => 'status', 'value' => 'cancelled'];
+        $cancel = ['kind' => 'status', 'value' => 'cancelled', 'note' => 'Khách yêu cầu hủy trước chuẩn bị'];
         $this->patch($route, $cancel)->assertSessionHasNoErrors();
         $this->patch($route, $cancel)->assertSessionHasErrors('value');
         $this->assertDatabaseHas('orders', ['id' => $order->id, 'status' => 'cancelled']);
@@ -443,7 +446,9 @@ class BakeryTest extends TestCase
         }
         $this->get('/tra-cuu/'.$order->tracking_token)->assertInertia(fn (Assert $page) => $page->where('order.status', 'completed')->where('order.payment', 'paid'));
         $this->assertDatabaseHas('order_events', ['order_id' => $order->id, 'actor_id' => $this->account('doisoat')->id, 'kind' => 'payment', 'value' => 'paid']);
-        $this->assertDatabaseCount('jobs', 3);
+        $this->assertDatabaseCount('jobs', 6);
+        $this->assertSame(['pending', 'payment_paid', 'confirmed', 'preparing', 'shipping', 'completed'],
+            DB::table('order_notifications')->where('order_id', $order->id)->orderBy('id')->pluck('type')->all());
     }
 
     public function test_bank_deadlines_filter_and_allow_late_reconciliation(): void
@@ -486,6 +491,7 @@ class BakeryTest extends TestCase
 
     public function test_status_email_is_queued_transactionally_and_retried_after_mail_failure(): void
     {
+        DB::table('orders')->where('code', 'NB-DEMO001')->update(['method' => 'cod']);
         $order = DB::table('orders')->where('code', 'NB-DEMO001')->first();
         $this->actingAs($this->account('nhanvien'));
         $url = '/quan-tri/don-hang/'.$order->id;
@@ -521,10 +527,11 @@ class BakeryTest extends TestCase
         $this->assertStringContainsString(route('tracking.show', $order->tracking_token), $mail->getTextBody());
 
         $this->patch($url, ['kind' => 'status', 'value' => 'preparing'])->assertSessionHasNoErrors();
-        $this->assertDatabaseCount('jobs', 0);
+        $this->assertDatabaseCount('jobs', 1);
+        $this->runOrderMailWorker();
         $this->patch($url, ['kind' => 'status', 'value' => 'ready'])->assertSessionHasNoErrors();
         $this->runOrderMailWorker();
-        $this->assertCount(2, $messages);
+        $this->assertCount(3, $messages);
         $this->assertStringContainsString('Sẵn sàng nhận', $messages->last()->getOriginalMessage()->getTextBody());
     }
 
@@ -640,7 +647,7 @@ class BakeryTest extends TestCase
         ]);
 
         $this->actingAs($this->account('nhanvien'));
-        $cancel = ['kind' => 'status', 'value' => 'cancelled'];
+        $cancel = ['kind' => 'status', 'value' => 'cancelled', 'note' => 'Khách yêu cầu hủy trước chuẩn bị'];
         $this->patch('/quan-tri/don-hang/'.$order->id, $cancel)->assertSessionHasNoErrors();
         $this->patch('/quan-tri/don-hang/'.$order->id, $cancel)->assertSessionHasErrors('value');
         $this->assertDatabaseHas('variants', ['id' => $variant->id, 'stock' => $variant->stock + 5]);
