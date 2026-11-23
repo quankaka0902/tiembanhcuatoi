@@ -124,6 +124,8 @@ Chặng 8 yêu cầu khách xác nhận lại khi báo giá đổi và bổ sung
 
 GitHub chạy [Bakery CI](https://github.com/quankaka0902/tiembanhcuatoi/actions/workflows/ci.yml) khi push lên `main` hoặc mở pull request. Workflow chạy lint, build và PHPUnit trên SQLite cùng MySQL độc lập. Các bước chốt phiên bản, chạy ca thử và bàn giao nằm trong [hồ sơ vận hành chặng 9–11](docs/ban-giao-van-hanh.md).
 
+Ca nghiệm thu một cơ sở ngày 23/11/2026 được ghi tại [biên bản mở bán](docs/nghiem-thu-mo-ban-mot-co-so.md), kèm ảnh và kết quả đã loại bí mật. Bản sửa local `5de11c0` bổ sung kiểm tra cookie, SMTP host và khả năng phát hiện sự cố sao lưu, thư lỗi. Trạng thái vẫn **chờ mở bán** vì chưa có dữ liệu, nhân sự và dịch vụ thật được tiệm xác nhận. Sandbox được tạm ngừng nhận đơn sau ca thử.
+
 ## Cấu hình cửa hàng thật
 
 Xem [hướng dẫn vận hành, kiểm tra cấu hình và phục hồi bản sao lưu](docs/van-hanh.md).

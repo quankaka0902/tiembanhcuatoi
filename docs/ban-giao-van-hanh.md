@@ -2,6 +2,8 @@
 
 Hồ sơ này dùng để chốt bản phát hành, nghiệm thu cùng nhân viên và quyết định khi nào tiệm bắt đầu nhận đơn. Phạm vi đang thực hiện là staging local với dữ liệu thử. Khi kết thúc ca thử, staging giữ trạng thái tạm ngừng nhận đơn.
 
+Hồ sơ mới nhất là [biên bản nghiệm thu một cơ sở ngày 23/11/2026](nghiem-thu-mo-ban-mot-co-so.md). Biên bản gắn kết quả với bản mã local `5de11c0`, tách bằng chứng local khỏi dịch vụ thật và liệt kê từng đầu vào, đầu mối còn chờ. Các kết quả chặng 9–11 bên dưới được giữ làm lịch sử.
+
 ## Chặng 9 · Chốt bản dùng để nghiệm thu
 
 1. Ghi mã commit sẽ dùng cho cả kiểm thử và bàn giao. Xem kết quả [Bakery CI](https://github.com/quankaka0902/tiembanhcuatoi/actions/workflows/ci.yml) của chính commit đó. CI chạy Pint, ESLint, build Vite, PHPUnit trên SQLite và MySQL. Các bài hai tiến trình phải chạy trên MySQL.

@@ -1,0 +1,493 @@
+{
+  "schema_version": 1,
+  "acceptance_date": "2026-11-23",
+  "timezone": "Asia/Ho_Chi_Minh",
+  "application_commit": "5de11c0c694ea8e784680e8c39e7bc2dc0b6eb31",
+  "git_tree": "3ef47e9c83bfedc47382058c01b5324ccf0485e1",
+  "decision": "WAIT_FOR_REAL_CONFIGURATION_AND_OWNER_APPROVAL",
+  "public_launch_approved": false,
+  "tester": "Codex technical acceptance; no shop representative assigned",
+  "provenance": {
+    "original_http_base_commit": "ef35bd2f86e624eb3dcb939f8b9ba768aae5c537",
+    "initial_cases": "S/F/M01/U ran on the working tree before the fix commit was created. Application fixes were written before the first case and subsequently recorded in application_commit.",
+    "commit_created_at": "2026-11-23T12:17:06+07:00",
+    "unchanged_application_source_at_final_verification": true,
+    "source_files": [
+      {
+        "path": "app/Services/LaunchReadiness.php",
+        "sha256": "41f0782d783ed8ce0114d5d874f2e83c3afb503026c942d5d69fa56fa8d40a2c",
+        "last_write_utc": "2026-11-23T05:09:26.3859241Z",
+        "git_blob": "9f83135951fed1da1703be53ad460229065b9277"
+      },
+      {
+        "path": "app/Services/BakeryBackup.php",
+        "sha256": "d8fa2a927e7a29bca3cfcbb821d7c06a721b70e881d40b11e30daf825e3a1ac4",
+        "last_write_utc": "2026-11-23T05:08:21.2613838Z",
+        "git_blob": "b3720340b462714024830d32471e883959d1641d"
+      },
+      {
+        "path": "app/Console/Commands/BakeryMonitor.php",
+        "sha256": "e22f873cd75306b5fbf17ab923f9f6a4f1c99ca9e29eb4f43d969d640be71011",
+        "last_write_utc": "2026-11-23T05:08:21.6503535Z",
+        "git_blob": "2c4c6afb7a5ce420235a459ac4c8c21e49292cb7"
+      },
+      {
+        "path": "tests/Feature/OperationsTest.php",
+        "sha256": "933ab4ac0a0d4afe35b1697a401eebe1d69570b397c273aeb6562ee5f3ba60ea",
+        "last_write_utc": "2026-11-23T05:08:44.6322646Z",
+        "git_blob": "f8fec925a1becf51ffcddc8cd7431059087e23c7"
+      },
+      {
+        "path": "tests/Feature/PrivateStagingTest.php",
+        "sha256": "55b95e6b3b15faff0cb62593b0f5b558c6c09156da5bc4d5f37d00e3ae50cf7c",
+        "last_write_utc": "2026-11-23T05:09:36.2974499Z",
+        "git_blob": "46aa0ed612631407e950cb092d0887ca4ea6d65c"
+      }
+    ],
+    "post_commit": "O01-O07, M02, guest order recheck, full restored item comparison and all five code checks ran after commit creation.",
+    "raw_http_finished_at": "2026-11-23T05:12:42.376Z",
+    "m01_supplement_completed_at": "2026-11-23T05:13:37.411Z",
+    "completed_at": "2026-11-23T05:29:24.969Z",
+    "note": "Original base commit and earlier finish timestamp retained. M01 was completed by a supplemental check after the initial harness corrected MIME quoted-printable decoding."
+  },
+  "environment": {
+    "app": "Laravel 13 / React 19 / Inertia",
+    "database": "MySQL 8.4",
+    "sales_schema": "tiembanh_acceptance_20261123_test",
+    "restore_schema": "tiembanh_acceptance_20261123_restore_test",
+    "phpunit_schema": "tiembanh_stage7_phpunit_test",
+    "https": "https://staging.localhost:18900",
+    "browser": "http://127.0.0.1:18904",
+    "access": "Loopback only; HTTPS proxy requires Basic for all paths; HTTP browser sandbox is a separate local-only process.",
+    "data": "Repository demo fixtures, no approved real shop menu/payment details",
+    "device_certificate_trust": "PENDING",
+    "external_services": "PENDING; SMTP, alert receiver and both backup copies are local"
+  },
+  "preflight": [
+    {
+      "environment": "APP_ENV=local, loopback URL, MAIL_MAILER=log",
+      "command": "php artisan bakery:preflight --staging",
+      "status": "passed_local_lightweight",
+      "output": [
+        "Cấu hình và dữ liệu qua kiểm tra. Dùng đơn thử để xác minh worker và luồng gửi thư."
+      ]
+    },
+    {
+      "environment": "APP_ENV=staging with demo data and local test mail sender",
+      "command": "php artisan bakery:preflight --staging",
+      "status": "blocked_as_expected",
+      "output": [
+        "Chọn đúng môi trường và tắt debug, dữ liệu mẫu.",
+        "Cấu hình SMTP và địa chỉ gửi thư của cửa hàng.",
+        "Điền liên hệ, địa chỉ, chính sách đặt bánh và thông báo xử lý dữ liệu.",
+        "Gỡ tài khoản mẫu và kiểm tra thông tin ngân hàng trước khi mở nhận đơn."
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "id": "S01",
+      "status": "passed_local",
+      "application_commit": "5de11c0c694ea8e784680e8c39e7bc2dc0b6eb31",
+      "runtime_head": "ef35bd2f86e624eb3dcb939f8b9ba768aae5c537",
+      "source_phase": "working-tree fixes subsequently recorded in application_commit",
+      "environment": "loopback HTTPS, explicit CA, demo MySQL schema",
+      "tester": "Codex automated HTTP acceptance",
+      "at": "2026-11-23T05:11:39.181Z",
+      "result": {
+        "initial": "TLS verified by supplied CA; HTTPS Basic, private static files, Secure/HttpOnly/SameSite and paused intake",
+        "post_commit_static_check": {
+          "tested_commit": "5de11c0c694ea8e784680e8c39e7bc2dc0b6eb31",
+          "tester": "Codex",
+          "environment": "local HTTPS proxy with explicit CA verification",
+          "at": "2026-11-23T05:29:24.969Z",
+          "status": "passed",
+          "resources": [
+            {
+              "path": "/images/strawberry.webp",
+              "without_access": 401,
+              "with_access": 200
+            },
+            {
+              "path": "/fonts/nuFiD-vYSZviVYUb_rj3ij__anPXDTjYgFE_.woff2",
+              "without_access": 401,
+              "with_access": 200
+            },
+            {
+              "path": "/build/assets/app-DsN2SIIu.js",
+              "without_access": 401,
+              "with_access": 200
+            },
+            {
+              "path": "/anh/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.webp",
+              "without_access": 401,
+              "with_access": 200
+            },
+            {
+              "path": "/up",
+              "without_access": 401,
+              "with_access": 200
+            }
+          ],
+          "intake_paused": true
+        }
+      }
+    },
+    {
+      "id": "S02",
+      "status": "passed_local",
+      "application_commit": "5de11c0c694ea8e784680e8c39e7bc2dc0b6eb31",
+      "runtime_head": "ef35bd2f86e624eb3dcb939f8b9ba768aae5c537",
+      "source_phase": "working-tree fixes subsequently recorded in application_commit",
+      "environment": "loopback HTTPS, explicit CA, demo MySQL schema",
+      "tester": "Codex automated HTTP acceptance",
+      "at": "2026-11-23T05:11:43.106Z",
+      "result": "Both staff roles passed TOTP; ordinary staff denied intake configuration"
+    },
+    {
+      "id": "F01",
+      "status": "passed_local",
+      "application_commit": "5de11c0c694ea8e784680e8c39e7bc2dc0b6eb31",
+      "runtime_head": "ef35bd2f86e624eb3dcb939f8b9ba768aae5c537",
+      "source_phase": "working-tree fixes subsequently recorded in application_commit",
+      "environment": "loopback HTTPS, explicit CA, demo MySQL schema",
+      "tester": "Codex automated HTTP acceptance",
+      "at": "2026-11-23T05:11:51.49Z",
+      "result": "Guest COD pickup completed and same checkout key replayed once"
+    },
+    {
+      "id": "F02",
+      "status": "passed_local",
+      "application_commit": "5de11c0c694ea8e784680e8c39e7bc2dc0b6eb31",
+      "runtime_head": "ef35bd2f86e624eb3dcb939f8b9ba768aae5c537",
+      "source_phase": "working-tree fixes subsequently recorded in application_commit",
+      "environment": "loopback HTTPS, explicit CA, demo MySQL schema",
+      "tester": "Codex automated HTTP acceptance",
+      "at": "2026-11-23T05:11:59.723Z",
+      "result": "Delivery fee 25000 VND; bank details explicitly demo; ordinary staff denied reconciliation; delivery completed"
+    },
+    {
+      "id": "F03",
+      "status": "passed_local",
+      "application_commit": "5de11c0c694ea8e784680e8c39e7bc2dc0b6eb31",
+      "runtime_head": "ef35bd2f86e624eb3dcb939f8b9ba768aae5c537",
+      "source_phase": "working-tree fixes subsequently recorded in application_commit",
+      "environment": "loopback HTTPS, explicit CA, demo MySQL schema",
+      "tester": "Codex automated HTTP acceptance",
+      "at": "2026-11-23T05:12:07.613Z",
+      "result": "Rescheduled before preparation; cancelled once; stock/coupon returned exactly once"
+    },
+    {
+      "id": "F04",
+      "status": "passed_local",
+      "application_commit": "5de11c0c694ea8e784680e8c39e7bc2dc0b6eb31",
+      "runtime_head": "ef35bd2f86e624eb3dcb939f8b9ba768aae5c537",
+      "source_phase": "working-tree fixes subsequently recorded in application_commit",
+      "environment": "loopback HTTPS, explicit CA, demo MySQL schema",
+      "tester": "Codex automated HTTP acceptance",
+      "at": "2026-11-23T05:12:21.963Z",
+      "result": "Current rule: cancellation after preparing restores all stock once; reschedule/refund permissions enforced"
+    },
+    {
+      "id": "F05",
+      "status": "passed_local",
+      "application_commit": "5de11c0c694ea8e784680e8c39e7bc2dc0b6eb31",
+      "runtime_head": "ef35bd2f86e624eb3dcb939f8b9ba768aae5c537",
+      "source_phase": "working-tree fixes subsequently recorded in application_commit",
+      "environment": "loopback HTTPS, explicit CA, demo MySQL schema",
+      "tester": "Codex automated HTTP acceptance",
+      "at": "2026-11-23T05:12:30.513Z",
+      "result": "Changed quote refused with no order; accepted only after refreshed price confirmation"
+    },
+    {
+      "id": "F06",
+      "status": "passed_local",
+      "application_commit": "5de11c0c694ea8e784680e8c39e7bc2dc0b6eb31",
+      "runtime_head": "ef35bd2f86e624eb3dcb939f8b9ba768aae5c537",
+      "source_phase": "working-tree fixes subsequently recorded in application_commit",
+      "environment": "loopback HTTPS, explicit CA, demo MySQL schema",
+      "tester": "Codex automated HTTP acceptance",
+      "at": "2026-11-23T05:12:36.696Z",
+      "result": "Paused intake refuses stale checkout and retains cart; existing orders remain accessible"
+    },
+    {
+      "id": "M01",
+      "status": "passed_local",
+      "application_commit": "5de11c0c694ea8e784680e8c39e7bc2dc0b6eb31",
+      "runtime_head": "ef35bd2f86e624eb3dcb939f8b9ba768aae5c537",
+      "source_phase": "working-tree fixes subsequently recorded in application_commit",
+      "environment": "loopback HTTPS, explicit CA, demo MySQL schema",
+      "tester": "Codex automated HTTP acceptance",
+      "at": "2026-11-23T05:13:37.411Z",
+      "result": "Receipt/status messages and neutral resend delivered through local SMTPS; password-reset link opened. MIME quoted-printable decoded before link assertion."
+    },
+    {
+      "id": "U01",
+      "status": "passed_local",
+      "application_commit": "5de11c0c694ea8e784680e8c39e7bc2dc0b6eb31",
+      "runtime_head": "ef35bd2f86e624eb3dcb939f8b9ba768aae5c537",
+      "source_phase": "working-tree fixes subsequently recorded in application_commit",
+      "environment": "HTTP loopback browser sandbox, separate cookie/process, same demo schema",
+      "tester": "Codex browser automation",
+      "at": "2026-11-23T05:14:39.4532352Z",
+      "viewport": "390x844",
+      "evidence": "mobile-cod.jpg",
+      "result": "UI: home/menu/product/cart/checkout to COD pickup order."
+    },
+    {
+      "id": "U02",
+      "status": "passed_local",
+      "application_commit": "5de11c0c694ea8e784680e8c39e7bc2dc0b6eb31",
+      "runtime_head": "ef35bd2f86e624eb3dcb939f8b9ba768aae5c537",
+      "source_phase": "working-tree fixes subsequently recorded in application_commit",
+      "environment": "HTTP loopback browser sandbox, separate cookie/process, same demo schema",
+      "tester": "Codex browser automation",
+      "at": "2026-11-23T05:16:38.3888738Z",
+      "viewport": "1366x900",
+      "evidence": "desktop-completed.jpg",
+      "result": "UI: staff confirmed, prepared, ready, paid COD and completed; guest tracking shows completed/paid."
+    },
+    {
+      "id": "U03",
+      "status": "passed_local",
+      "application_commit": "5de11c0c694ea8e784680e8c39e7bc2dc0b6eb31",
+      "runtime_head": "ef35bd2f86e624eb3dcb939f8b9ba768aae5c537",
+      "source_phase": "working-tree fixes subsequently recorded in application_commit",
+      "environment": "HTTP loopback browser sandbox, separate cookie/process, same demo schema",
+      "tester": "Codex browser automation",
+      "at": "2026-11-23T05:15:37.6369443Z",
+      "viewport": "390x844 and 1366x900",
+      "evidence": "mobile-inbox.jpg",
+      "result": "UI: staff inbox renders mobile cards and desktop table."
+    },
+    {
+      "id": "O01",
+      "status": "passed_local",
+      "application_commit": "5de11c0c694ea8e784680e8c39e7bc2dc0b6eb31",
+      "runtime_head": "5de11c0c694ea8e784680e8c39e7bc2dc0b6eb31",
+      "environment": "local demo schema; HTTPS receiver and secondary backup on same machine",
+      "tester": "Codex local operations",
+      "at": "2026-11-23T12:19:30.6552457+07:00",
+      "result": "Laravel scheduler ran backup into primary and local secondary directories."
+    },
+    {
+      "id": "O02",
+      "status": "passed_local",
+      "application_commit": "5de11c0c694ea8e784680e8c39e7bc2dc0b6eb31",
+      "runtime_head": "5de11c0c694ea8e784680e8c39e7bc2dc0b6eb31",
+      "environment": "local demo schema; HTTPS receiver and secondary backup on same machine",
+      "tester": "Codex local operations",
+      "at": "2026-11-23T12:19:39.5332677+07:00",
+      "result": "SMTPS returned 451; exhausted test email reached failed_jobs; monitor incident; retry and worker delivered, then recovered."
+    },
+    {
+      "id": "O03",
+      "status": "passed_local",
+      "application_commit": "5de11c0c694ea8e784680e8c39e7bc2dc0b6eb31",
+      "runtime_head": "5de11c0c694ea8e784680e8c39e7bc2dc0b6eb31",
+      "environment": "local demo schema; HTTPS receiver and secondary backup on same machine",
+      "tester": "Codex local operations",
+      "at": "2026-11-23T12:19:43.2874479+07:00",
+      "result": "Stopped-worker age simulated in local probe state, incident and actual queue probe recovery verified."
+    },
+    {
+      "id": "O04",
+      "status": "passed_local",
+      "application_commit": "5de11c0c694ea8e784680e8c39e7bc2dc0b6eb31",
+      "runtime_head": "5de11c0c694ea8e784680e8c39e7bc2dc0b6eb31",
+      "environment": "local demo schema; HTTPS receiver and secondary backup on same machine",
+      "tester": "Codex local operations",
+      "at": "2026-11-23T12:19:53.6157104+07:00",
+      "result": "Isolated monitor process used unavailable database port, reported incident; normal connection recovered."
+    },
+    {
+      "id": "O05",
+      "status": "passed_local",
+      "application_commit": "5de11c0c694ea8e784680e8c39e7bc2dc0b6eb31",
+      "runtime_head": "5de11c0c694ea8e784680e8c39e7bc2dc0b6eb31",
+      "environment": "local demo schema; HTTPS receiver and secondary backup on same machine",
+      "tester": "Codex local operations",
+      "at": "2026-11-23T12:20:03.5239484+07:00",
+      "result": "Separate same-host HTTPS receiver observed heartbeat gap and resume with accelerated 5-second threshold."
+    },
+    {
+      "id": "O06",
+      "status": "passed_local",
+      "application_commit": "5de11c0c694ea8e784680e8c39e7bc2dc0b6eb31",
+      "runtime_head": "5de11c0c694ea8e784680e8c39e7bc2dc0b6eb31",
+      "environment": "local demo schema; HTTPS receiver and secondary backup on same machine",
+      "tester": "Codex local operations",
+      "at": "2026-11-23T12:20:27.8035447+07:00",
+      "result": {
+        "drill": "Same-schema candidate intentionally returned 503; rollback selected stable and monitor verified HTTP 200 recovery.",
+        "post_rollback_guest_check": {
+          "status": "passed",
+          "orders": 6,
+          "result": "All six acceptance orders still accessible with matching code, order status and payment after rollback; /up=200."
+        },
+        "verified_at": "2026-11-23T05:25:18.748Z",
+        "schema_changes": "none; candidate intentionally changed /up only"
+      }
+    },
+    {
+      "id": "O07",
+      "status": "passed_local",
+      "application_commit": "5de11c0c694ea8e784680e8c39e7bc2dc0b6eb31",
+      "runtime_head": "5de11c0c694ea8e784680e8c39e7bc2dc0b6eb31",
+      "environment": "local demo schema; HTTPS receiver and secondary backup on same machine",
+      "tester": "Codex local operations",
+      "at": "2026-11-23T12:20:32.0365749+07:00",
+      "result": {
+        "orders": 13,
+        "items": 13,
+        "elapsed_seconds": 2.25,
+        "started_at": 1795411228,
+        "completed_at": 1795411228,
+        "files": {
+          "database.sql": {
+            "size": 52881,
+            "sha256": "610ee60db174c10f3c0edaa8e8dab1aa0d7b5b30f7f58d9801459c3c6d365b7a"
+          },
+          "images.zip": {
+            "size": 126096,
+            "sha256": "3591a38af82a428345360b59f4e000dd393a6d7ada414edc71d97be4df04f5a5"
+          }
+        },
+        "image_sha256": "05bbd7daf61c31af3a32bed060433c4070030877c0252d329c805f56ca096d14",
+        "note": "started_at is a pre-dump lower bound. Both copies on same machine. Restored worker remains stopped.",
+        "full_order_items_equal": true,
+        "latest_restored_order": {
+          "code": "NB-261123-1836D97BBA",
+          "scheduled_at": "2026-11-24 11:00:00",
+          "created_at": "2026-11-23 12:14:23",
+          "timezone": "Asia/Ho_Chi_Minh"
+        },
+        "verified_all_columns_at": "2026-11-23T12:25:19.759984+07:00"
+      }
+    },
+    {
+      "id": "M02",
+      "status": "passed_local",
+      "application_commit": "5de11c0c694ea8e784680e8c39e7bc2dc0b6eb31",
+      "runtime_head": "5de11c0c694ea8e784680e8c39e7bc2dc0b6eb31",
+      "environment": "local-demo HTTPS with explicit CA trust",
+      "tester": "Codex",
+      "at": "2026-11-23T05:25:18.748Z",
+      "result": "Reset email delivered to local SMTPS, link opened, new password accepted, token replay rejected, login with changed password succeeded."
+    },
+    {
+      "id": "T01",
+      "status": "passed_local_mysql",
+      "application_commit": "5de11c0c694ea8e784680e8c39e7bc2dc0b6eb31",
+      "runtime_head": "5de11c0c694ea8e784680e8c39e7bc2dc0b6eb31",
+      "environment": "MySQL 8.4, dedicated schema tiembanh_stage7_phpunit_test on 127.0.0.1:33317",
+      "tester": "Codex PHPUnit",
+      "at": "2026-11-23T12:24:12.3430956+07:00",
+      "result": "All five two-process tests ran: last variant, last coupon use, identical idempotency key, pickup/delivery last slot, checkout/reschedule last slot."
+    }
+  ],
+  "validation": [
+    {
+      "id": "pint",
+      "status": "passed",
+      "exit_code": 0,
+      "application_commit": "5de11c0c694ea8e784680e8c39e7bc2dc0b6eb31",
+      "tester": "Codex",
+      "environment": "local isolated test schemas",
+      "started_at": "2026-11-23T12:23:28.6787483+07:00",
+      "completed_at": "2026-11-23T12:23:29.5583736+07:00",
+      "result": "Pint --test passed",
+      "local_log_sha256": "acbf5da6385237b6f4cd342c4454d93f6c4df8bfcf1687838edb3b651981c4e1"
+    },
+    {
+      "id": "lint",
+      "status": "passed",
+      "exit_code": 0,
+      "application_commit": "5de11c0c694ea8e784680e8c39e7bc2dc0b6eb31",
+      "tester": "Codex",
+      "environment": "local isolated test schemas",
+      "started_at": "2026-11-23T12:23:29.5649323+07:00",
+      "completed_at": "2026-11-23T12:23:31.9982557+07:00",
+      "result": "ESLint passed",
+      "local_log_sha256": "55241ef505bfc0c9ffb708d17daaaaca70e6ac53f156dd06429296b197b087fb"
+    },
+    {
+      "id": "build",
+      "status": "passed",
+      "exit_code": 0,
+      "application_commit": "5de11c0c694ea8e784680e8c39e7bc2dc0b6eb31",
+      "tester": "Codex",
+      "environment": "local isolated test schemas",
+      "started_at": "2026-11-23T12:23:32.0002455+07:00",
+      "completed_at": "2026-11-23T12:23:33.6483452+07:00",
+      "result": "Vite production build passed",
+      "local_log_sha256": "e03d9c37eb5dabbc2d2e27bb52d958d95ca0521c97ad17663b91d5479804eb9c"
+    },
+    {
+      "id": "phpunit-sqlite",
+      "status": "passed",
+      "exit_code": 0,
+      "application_commit": "5de11c0c694ea8e784680e8c39e7bc2dc0b6eb31",
+      "tester": "Codex",
+      "environment": "local isolated test schemas",
+      "started_at": "2026-11-23T12:23:33.6518749+07:00",
+      "completed_at": "2026-11-23T12:23:39.4934592+07:00",
+      "result": "41 total: 36 passed, 5 MySQL-only skipped, 966 assertions",
+      "local_log_sha256": "7c3da1b3f588a1fd4c4030d5ec6d1a4c54376ec52b1fe46e8e782f1aca64e13b"
+    },
+    {
+      "id": "phpunit-mysql",
+      "status": "passed",
+      "exit_code": 0,
+      "application_commit": "5de11c0c694ea8e784680e8c39e7bc2dc0b6eb31",
+      "tester": "Codex",
+      "environment": "local isolated test schemas",
+      "started_at": "2026-11-23T12:23:39.5204972+07:00",
+      "completed_at": "2026-11-23T12:24:12.3430956+07:00",
+      "result": "41/41 passed, 1001 assertions, --fail-on-skipped",
+      "local_log_sha256": "b824d5976ca9a8a8d713e47af0ab2441732f8f8c3011152e518b6d372ed6c668"
+    }
+  ],
+  "screenshots": [
+    {
+      "path": "mobile-cod.jpg",
+      "sha256": "8df71a1d0e82cdf2156900a45c707d6c58f6dcdac2a9968baafa56fcf6cc4bcb",
+      "captured_at_utc": "2026-11-23T05:14:39.4532352Z",
+      "privacy": "Cropped to exclude bearer tracking links and private fields; demo shop data only."
+    },
+    {
+      "path": "desktop-inbox.jpg",
+      "sha256": "039e7c92721362a6482c8a5a92de06fd27cff012fb72d8176aba25c48822d576",
+      "captured_at_utc": "2026-11-23T05:15:31.9191159Z",
+      "privacy": "Cropped to exclude bearer tracking links and private fields; demo shop data only."
+    },
+    {
+      "path": "mobile-inbox.jpg",
+      "sha256": "3cd4082ad3fdc12252bad3d323da055061e055401dec6ddcba180fd88fd6dd6c",
+      "captured_at_utc": "2026-11-23T05:15:37.6369443Z",
+      "privacy": "Cropped to exclude bearer tracking links and private fields; demo shop data only."
+    },
+    {
+      "path": "desktop-completed.jpg",
+      "sha256": "6dd4cb15e06397637f43b2aa202352658bbdfb1b65d30dd377f810689157b373",
+      "captured_at_utc": "2026-11-23T05:16:38.3888738Z",
+      "privacy": "Cropped to exclude bearer tracking links and private fields; demo shop data only."
+    }
+  ],
+  "final_state": {
+    "paused": true,
+    "orders": 13,
+    "jobs": 0,
+    "failed": 0
+  },
+  "limitations": [
+    "Browser COD pickup and staff completion ran over HTTP loopback. Other sales/permission cases used HTTPS HTTP clients, with PHPUnit for concurrency. Repeat on trusted HTTPS shop devices with approved menu and services.",
+    "No off-machine monitoring, real SMTP delivery, external backup storage, supervisor or real scheduler outage has been accepted.",
+    "Worker failure was simulated by stale probe state; scheduler gap used a five-second local test threshold.",
+    "Restore elapsed time applies only to 13 small demo orders. Backup started_at is a pre-dump lower bound, not an exact transaction snapshot timestamp.",
+    "Existing cancellation restores all stock even after preparation; owner policy approval or implementation change is pending.",
+    "Daily cutoff and structured servings are not standalone fields; shop must decide requirements.",
+    "Real team members, backups, policies, product/price/allergen/address/delivery inputs remain unapproved.",
+    "Current local commit has not been pushed or run in GitHub Actions. Reviewed CI has separate SQLite/MySQL test steps and fails on skipped MySQL tests."
+  ]
+}
