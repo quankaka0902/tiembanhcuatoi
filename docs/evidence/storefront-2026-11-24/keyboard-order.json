@@ -1,0 +1,107 @@
+[
+  {
+    "id": "checkout-phone",
+    "label": "",
+    "outline": "solid",
+    "tag": "INPUT",
+    "type": "tel"
+  },
+  {
+    "id": "checkout-email",
+    "label": "",
+    "outline": "solid",
+    "tag": "INPUT",
+    "type": "email"
+  },
+  {
+    "id": "",
+    "label": "",
+    "outline": "solid",
+    "tag": "INPUT",
+    "type": "radio"
+  },
+  {
+    "id": "checkout-day",
+    "label": "Chọn ngày24/11/202625/11/202626/11/202627/11/202628/11/202629/11/20263",
+    "outline": "solid",
+    "tag": "SELECT",
+    "type": "select-one"
+  },
+  {
+    "id": "checkout-slot",
+    "label": "Chọn giờ11:0014:0016:0018:00",
+    "outline": "solid",
+    "tag": "SELECT",
+    "type": "select-one"
+  },
+  {
+    "id": "",
+    "label": "Cập nhật giờ còn chỗ",
+    "outline": "solid",
+    "tag": "BUTTON",
+    "type": "button"
+  },
+  {
+    "id": "",
+    "label": "",
+    "outline": "solid",
+    "tag": "INPUT",
+    "type": "radio"
+  },
+  {
+    "id": "checkout-coupon",
+    "label": "",
+    "outline": "solid",
+    "tag": "INPUT",
+    "type": "text"
+  },
+  {
+    "id": "",
+    "label": "Áp dụng",
+    "outline": "solid",
+    "tag": "BUTTON",
+    "type": "button"
+  },
+  {
+    "id": "",
+    "label": "Xác nhận đặt bánh",
+    "outline": "solid",
+    "tag": "BUTTON",
+    "type": "submit"
+  },
+  {
+    "id": "",
+    "label": "Tiệm Bánh Nhà Mình",
+    "outline": "solid",
+    "tag": "A",
+    "type": ""
+  },
+  {
+    "id": "",
+    "label": "0900 123 456",
+    "outline": "solid",
+    "tag": "A",
+    "type": ""
+  },
+  {
+    "id": "",
+    "label": "hello@tiembanh.example",
+    "outline": "solid",
+    "tag": "A",
+    "type": ""
+  },
+  {
+    "id": "",
+    "label": "Thực đơn",
+    "outline": "solid",
+    "tag": "A",
+    "type": ""
+  },
+  {
+    "id": "",
+    "label": "Tra cứu đơn",
+    "outline": "solid",
+    "tag": "A",
+    "type": ""
+  }
+]

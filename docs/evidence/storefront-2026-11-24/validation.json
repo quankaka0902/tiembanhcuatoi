@@ -1,0 +1,194 @@
+{
+  "source_commit": "5c8933a8a9e39928815160d24b30c70fde619379",
+  "base_commit": "d564afc8dc6f4ea86b6886af2e71298e1c1dcbf3",
+  "tested_date": "2026-11-24",
+  "timezone": "Asia/Ho_Chi_Minh",
+  "tester": "Codex, automated tests and browser interactions",
+  "scope": "Local loopback sandbox only. No public deployment or real store approval.",
+  "browser": "Codex in-app Chromium; viewport emulation, height 900",
+  "source_frozen": true,
+  "mysql": {
+    "version": "8.4.13",
+    "schema": "tiembanh_stage7_phpunit_test",
+    "passed": 84,
+    "assertions": 1735,
+    "skipped": 0,
+    "command": "php vendor/bin/phpunit --do-not-cache-result --colors=never --fail-on-skipped",
+    "result": "passed"
+  },
+  "sqlite": {
+    "passed": 77,
+    "total": 84,
+    "assertions": 1678,
+    "skipped_mysql_only": 7,
+    "result": "passed with expected skips"
+  },
+  "lint": "passed",
+  "build": "passed",
+  "pint": "passed",
+  "php_tests_run_before_final_css_only_contrast_change": true,
+  "final_css_validation": "ESLint and build passed after scoped CSS contrast change; final matrix screenshots captured after reload from source commit.",
+  "browser_cases": [
+    "Vietnamese unaccented search",
+    "same-variant 8 guests/budget/stock selection",
+    "URL filters and Back",
+    "pagination preserves sort and Back",
+    "word fee and approved accessory",
+    "phone server error focus and aria association",
+    "stale price blocked and retained form",
+    "occupied slot blocked and retained day/contact/coupon",
+    "quote network error and recovery with retained form",
+    "guest COD pickup order and token lookup reload",
+    "legacy unknown servings and sold-out disabled CTA",
+    "broken image and keyboard gallery",
+    "native keyboard radio, filters, mobile menu and checkout Tab order",
+    "admin password plus TOTP, metadata form save, signed out"
+  ],
+  "known_limits": [
+    "Actual screen-reader spoken output not verified",
+    "Physical iOS/Android and virtual keyboard not verified",
+    "Full WCAG 2.2 AA certification not performed",
+    "Real shop menu, image rights, servings, accessories, delivery and policies need shop approval",
+    "SMTP external delivery not verified: local log mailer only",
+    "Accessory stock is availability toggle, without separate quantity ledger"
+  ],
+  "build_manifest_sha256": "625fd5b8a44765135aa959cac7818019e801a5f5802f9be02f01058a1d58b938",
+  "artifacts": [
+    {
+      "file": "admin-metadata-1440.jpg",
+      "sha256": "b234e2d94d8f535da7dbf5361b72ee56bd69ea389cb0f3b3ec6f7c189cfee113"
+    },
+    {
+      "file": "catalog-1440.jpg",
+      "sha256": "613bd5d396f50cddc3fe3de74be51adc27664981e179345411a3c615fa07ebc3"
+    },
+    {
+      "file": "catalog-320.jpg",
+      "sha256": "000e354c0fca1613f3d9127ef153562f356f095640c20f2ad1d3a0db04c62cde"
+    },
+    {
+      "file": "catalog-390.jpg",
+      "sha256": "f3b7e20d3458481a81dfbfd93ff34e8ca921adc7e6896d8314a19fde6d8ade27"
+    },
+    {
+      "file": "catalog-768.jpg",
+      "sha256": "e4b2e7b3a9f76f7f3460b7b586e40de5fc00e3921e34dc18e501ff6e49e7550e"
+    },
+    {
+      "file": "catalog-empty-390.jpg",
+      "sha256": "16b8326977b798868645c49ad6952c9083f5bb1ac7e7d272d0dbb231a265d885"
+    },
+    {
+      "file": "check-build.txt",
+      "sha256": "e2a7a3a7002d0842e4c37731bcce327e5470b7fd3a5bd2c30fdce08440b0293f"
+    },
+    {
+      "file": "check-diff.txt",
+      "sha256": "a388444b0f0086a718e292069b7767f0b089767de0e91efb3672d0e852d0318a"
+    },
+    {
+      "file": "check-lint.txt",
+      "sha256": "209befbc94fb31ffa51e9ecc53c60521d2f13783999f35a25365156e23d59c4b"
+    },
+    {
+      "file": "check-mysql.txt",
+      "sha256": "ee01171b50c75e533c7cc6a9298d5576dbd7f6c5abd6eb405bc1e5ffa08632c3"
+    },
+    {
+      "file": "check-pint.txt",
+      "sha256": "9fa3c401d4d7dcf9d616a4e847f09d73bafe2397e5f1b5b77531e2516436ed5a"
+    },
+    {
+      "file": "check-sqlite.txt",
+      "sha256": "3265b8e8a155c1015d7d9c26e46c8c564f548b6c6f9bbf5fe62117d638531f63"
+    },
+    {
+      "file": "checkout-1440.jpg",
+      "sha256": "5ae758549aa2b0e3890c7282eb13a29b89e6b78da80ff36b5760ee7f5c323eae"
+    },
+    {
+      "file": "checkout-320.jpg",
+      "sha256": "dc71b4dbf975478e225627fc8fee449eba6ba11723f0b048e2046298cc9542d3"
+    },
+    {
+      "file": "checkout-390.jpg",
+      "sha256": "a949e7f28bf3b44776c9d17ad5f2ac17ef3970054b669351b83de75b6905fde6"
+    },
+    {
+      "file": "checkout-768.jpg",
+      "sha256": "ba52cc0e1a0c807b7882b9745dc01e8c7547b7bc4cf41e2170138c59ad358818"
+    },
+    {
+      "file": "checkout-network-error-390.jpg",
+      "sha256": "50646362c6d53473935f199dde6e23c5080c2a28b167be9afc765ee81ad043e5"
+    },
+    {
+      "file": "checkout-phone-error-390.jpg",
+      "sha256": "3580b7ebac501054c0e7a59dc2fe33de0076d5b00759fb6f871aefacea1484d6"
+    },
+    {
+      "file": "checkout-price-change-390.jpg",
+      "sha256": "1da584cb2aae37c41a613ad1d2021270fa2d7444a3d72b61e2b7208eba076489"
+    },
+    {
+      "file": "checkout-slot-full-390.jpg",
+      "sha256": "0f101928ef5a9adcb4dbe4678545b4182d3045fe8a3ddd4d0816dfdecbc14b7c"
+    },
+    {
+      "file": "database-audit.json",
+      "sha256": "f39c54c71d2ea3bbaf1e722a13b4727a362ff1a7cfbae1a4dbaec49ec2274c73"
+    },
+    {
+      "file": "gallery-image-error-390.jpg",
+      "sha256": "da7ef8c24ab4afd5be1da2c57840d3a10176e46644e27b32bc286775598e0f2a"
+    },
+    {
+      "file": "guest-order-390.jpg",
+      "sha256": "c821394e4d5ddb83f1d455af878a26450c9c463df12ddb4e1058964ceb105385"
+    },
+    {
+      "file": "home-1440.jpg",
+      "sha256": "5104972c2e1e87ee0747262ba9a18d843d475efe3c37769248ca40f8bb50e3f2"
+    },
+    {
+      "file": "home-320.jpg",
+      "sha256": "9a56953a234d5cba22b00bc74d1452d9a943cac1d5ec6135ec5db15e0b4df404"
+    },
+    {
+      "file": "home-390.jpg",
+      "sha256": "6a6253dd880a399da897b1e34c4a54f3f5cc78cca9d04b9ae560d55bc05e92bb"
+    },
+    {
+      "file": "home-768.jpg",
+      "sha256": "97980a594b9ca597736601ab807f5b1b33b029b885b5ffeb61d983142b7210ec"
+    },
+    {
+      "file": "keyboard-order.json",
+      "sha256": "ee8afa5b77ea9f2b6ed83a3189533a2b4352bf466796afbb31f04574b29eae36"
+    },
+    {
+      "file": "legacy-sold-out-390.jpg",
+      "sha256": "c7a56161cd39ba7bc6312439e1456ebc31bbcb4bd84c2ae5b095119842f86202"
+    },
+    {
+      "file": "product-1440.jpg",
+      "sha256": "d13538ee071bfa4c75d21b6561a2bcb9912f8f451341917e362ad1cb34f5ed21"
+    },
+    {
+      "file": "product-320.jpg",
+      "sha256": "f8c18b01c8c73610dbc46058409c9fd56865ee0d865b181aef7f78a1a3a33a56"
+    },
+    {
+      "file": "product-390.jpg",
+      "sha256": "ba2c9b5e39a24f5c52c2d219fcc27d63586b00d44caaded02df81b061d69d794"
+    },
+    {
+      "file": "product-768.jpg",
+      "sha256": "aad922b069d090b6a5b6fb4be068f89b0f7c2a4aa49da9940324cf3341a92f09"
+    },
+    {
+      "file": "viewport-checks.json",
+      "sha256": "504c6dcfb5e09ed5f37aed5087a020175b47961bc83f6fe93a333c96a14997ca"
+    }
+  ]
+}

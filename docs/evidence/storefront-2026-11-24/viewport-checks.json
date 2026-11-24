@@ -1,0 +1,162 @@
+[
+  {
+    "page": "home",
+    "documentWidth": 305,
+    "width": 320
+  },
+  {
+    "page": "home",
+    "documentWidth": 375,
+    "width": 390
+  },
+  {
+    "page": "home",
+    "documentWidth": 753,
+    "width": 768
+  },
+  {
+    "page": "home",
+    "documentWidth": 1425,
+    "width": 1440
+  },
+  {
+    "documentWidth": 305,
+    "page": "catalog",
+    "width": 320
+  },
+  {
+    "documentWidth": 375,
+    "page": "catalog",
+    "width": 390
+  },
+  {
+    "documentWidth": 753,
+    "page": "catalog",
+    "width": 768
+  },
+  {
+    "documentWidth": 1425,
+    "page": "catalog",
+    "width": 1440
+  },
+  {
+    "documentWidth": 305,
+    "page": "product",
+    "width": 320
+  },
+  {
+    "documentWidth": 375,
+    "page": "product",
+    "width": 390
+  },
+  {
+    "documentWidth": 753,
+    "page": "product",
+    "width": 768
+  },
+  {
+    "documentWidth": 1425,
+    "page": "product",
+    "width": 1440
+  },
+  {
+    "documentWidth": 305,
+    "page": "checkout",
+    "width": 320
+  },
+  {
+    "documentWidth": 375,
+    "page": "checkout",
+    "width": 390
+  },
+  {
+    "documentWidth": 753,
+    "page": "checkout",
+    "width": 768
+  },
+  {
+    "documentWidth": 1425,
+    "page": "checkout",
+    "width": 1440
+  },
+  {
+    "documentWidth": 305,
+    "page": "product-final",
+    "width": 320
+  },
+  {
+    "documentWidth": 375,
+    "page": "product-final",
+    "width": 390
+  },
+  {
+    "documentWidth": 753,
+    "page": "product-final",
+    "width": 768
+  },
+  {
+    "documentWidth": 1425,
+    "page": "product-final",
+    "width": 1440
+  },
+  {
+    "documentWidth": 305,
+    "page": "checkout-final",
+    "width": 320
+  },
+  {
+    "documentWidth": 375,
+    "page": "checkout-final",
+    "width": 390
+  },
+  {
+    "documentWidth": 753,
+    "page": "checkout-final",
+    "width": 768
+  },
+  {
+    "documentWidth": 1425,
+    "page": "checkout-final",
+    "width": 1440
+  },
+  {
+    "documentWidth": 305,
+    "page": "catalog-final",
+    "width": 320
+  },
+  {
+    "documentWidth": 375,
+    "page": "catalog-final",
+    "width": 390
+  },
+  {
+    "documentWidth": 753,
+    "page": "catalog-final",
+    "width": 768
+  },
+  {
+    "documentWidth": 1425,
+    "page": "catalog-final",
+    "width": 1440
+  },
+  {
+    "documentWidth": 305,
+    "page": "home-final",
+    "width": 320
+  },
+  {
+    "documentWidth": 375,
+    "page": "home-final",
+    "width": 390
+  },
+  {
+    "documentWidth": 753,
+    "page": "home-final",
+    "width": 768
+  },
+  {
+    "documentWidth": 1425,
+    "page": "home-final",
+    "width": 1440
+  }
+]

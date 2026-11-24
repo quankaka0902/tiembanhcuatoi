@@ -1,0 +1,55 @@
+{
+    "environment": "local loopback sandbox; fake data only; not public acceptance",
+    "database": "tiembanh_mobile_20261124_test",
+    "mysql_version": "8.4.13",
+    "timezone": "Asia\/Ho_Chi_Minh",
+    "accepting_orders": false,
+    "order_count": 8,
+    "queued_jobs": 0,
+    "failed_jobs": 0,
+    "accepted_order": {
+        "code": "NB-261124-AD449E9B76",
+        "fulfillment": "pickup",
+        "scheduled_at": "2026-11-25 11:00:00",
+        "method": "cod",
+        "payment": "unpaid",
+        "status": "pending",
+        "subtotal": 550000,
+        "discount": 55000,
+        "delivery_fee": 0,
+        "total": 495000
+    },
+    "item": {
+        "product_name": "Bánh dâu thử nghiệm 8 người",
+        "variant_name": "[THỬ] Bánh 8–10 người",
+        "unit_price": 510000,
+        "option_fee": 15000,
+        "quantity": 1,
+        "accessory_fee": 25000,
+        "accessories_snapshot": [
+            {
+                "id": 1,
+                "name": "[THỬ] Bộ nến",
+                "price": 25000
+            }
+        ]
+    },
+    "stock_movements": [
+        {
+            "stock_before": 8,
+            "stock_after": 7,
+            "reason": "order"
+        }
+    ],
+    "notification_statuses": [
+        {
+            "type": "pending",
+            "sent_at": "2026-11-24 13:55:14",
+            "attempts": 1,
+            "last_error": null
+        }
+    ],
+    "mail_transport": "log",
+    "outside_test_fixture_approved_photos": 0,
+    "outside_test_fixture_verified_servings": 0
+}
