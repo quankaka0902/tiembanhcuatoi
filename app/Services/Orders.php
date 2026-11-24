@@ -325,7 +325,13 @@ class Orders
         $showBank = $internal || ($order->status !== 'cancelled' && $order->payment === 'unpaid');
         $data['bank_snapshot'] = $showBank && $order->bank_snapshot ? json_decode($order->bank_snapshot, true, flags: JSON_THROW_ON_ERROR) : null;
         $data['items'] = DB::table('order_items')->where('order_id', $order->id)->orderBy('id')
-            ->get($internal || $owner ? ['*'] : ['id', 'product_name', 'variant_name', 'quantity', 'unit_price', 'option_fee']);
+            ->get($internal || $owner ? ['*'] : ['id', 'product_name', 'variant_name', 'quantity', 'unit_price', 'option_fee', 'accessory_fee', 'accessories_snapshot'])
+            ->map(function ($item) {
+                $item->accessories_snapshot = $item->accessories_snapshot ? json_decode($item->accessories_snapshot, true, flags: JSON_THROW_ON_ERROR) : [];
+                $item->line_total = ((int) $item->unit_price + (int) $item->option_fee + (int) $item->accessory_fee) * $item->quantity;
+
+                return $item;
+            });
         $events = DB::table('order_events')->where('order_id', $order->id)->orderBy('order_events.id');
         if ($internal) {
             $events->leftJoin('users', 'users.id', '=', 'order_events.actor_id')->select('order_events.*', 'users.name as actor');

@@ -508,8 +508,9 @@ function CategoryForm({ category }) {
 export function AdminProducts({ products, categories }) {
     return <Admin title="Sản phẩm" action={<ButtonLink href={root + '/san-pham/them'}><Plus size={18} />Thêm sản phẩm</ButtonLink>}>
         <div className="admin-columns">
-            <section className="panel"><h2>Danh sách bánh</h2><Table headers={['Tên bánh', 'Danh mục', 'Trạng thái']} rows={products.data.map(product => [product.id,
-                <Link className="table-link" href={root + '/san-pham/' + product.id}>{product.name}</Link>, product.category, product.active ? 'Đang bán' : 'Đã ẩn'])} /><Pagination page={products} /></section>
+            <section className="panel"><h2>Danh sách bánh</h2><Table headers={['Tên bánh', 'Danh mục', 'Trạng thái', 'Nội dung và ảnh']} rows={products.data.map(product => [product.id,
+                <Link className="table-link" href={root + '/san-pham/' + product.id}>{product.name}</Link>, product.category, product.active ? 'Đang bán' : 'Đã ẩn',
+                <><span>{product.details_verified ? 'Đã xác minh thông tin' : 'Chờ xác minh thông tin'}</span><small>{product.images_approved ? 'Ảnh đã được phép dùng' : 'Ảnh chờ duyệt quyền sử dụng'}</small></>])} /><Pagination page={products} /></section>
             <section className="panel form-stack"><h2>Danh mục</h2>
                 {categories.map(category => <details className="fold" key={category.id}><summary>{category.name}</summary><CategoryForm category={category} /></details>)}
                 <details className="fold"><summary>Thêm danh mục</summary><CategoryForm /></details>
@@ -518,7 +519,9 @@ export function AdminProducts({ products, categories }) {
     </Admin>;
 }
 
-const freshVariant = () => ({ name: '', price: '', stock: '', active: true });
+const freshVariant = () => ({ name: '', price: '', stock: '', active: true, size_label: '', servings_min: '', servings_max: '', servings_verified: false });
+const freshAccessory = () => ({ name: '', price: '', active: true, approved: false });
+const metadataLines = value => value.split(/[\n,]+/).map(line => line.trim()).filter(Boolean);
 
 function Text({ form, field, label, type = 'text', ...props }) {
     return <Field label={label} error={form.errors[field]}><input type={type} value={form.data[field] ?? ''} onChange={e => form.setData(field, e.target.value)} {...props} /></Field>;
@@ -536,28 +539,50 @@ export function AdminProduct({ product, categories }) {
     const form = useForm({
         name: product?.name ?? '', category_id: product?.category_id ?? '', description: product?.description ?? '',
         ingredients: product?.ingredients ?? '', allergens: product?.allergens ?? '', prep_minutes: product?.prep_minutes ?? 60,
+        occasions: (product?.occasions ?? []).join('\n'), flavors: (product?.flavors ?? []).join('\n'),
+        storage_instructions: product?.storage_instructions ?? '', details_verified: Boolean(product?.details_verified), images_approved: Boolean(product?.images_approved),
         message_fee: product?.message_fee ?? 0, active: Boolean(product?.active ?? true), featured: Boolean(product?.featured), customizable: Boolean(product?.customizable),
-        variants: product?.variants.map(({ id, name, price, stock, active }) => ({ id, name, price, stock, active: Boolean(active), expected_stock: stock })) ?? [freshVariant()],
+        variants: product?.variants.map(({ id, name, price, stock, active, size_label, servings_min, servings_max, servings_verified }) => ({ id, name, price, stock, active: Boolean(active), expected_stock: stock,
+            size_label: size_label ?? '', servings_min: servings_min ?? '', servings_max: servings_max ?? '', servings_verified: Boolean(servings_verified) })) ?? [freshVariant()],
+        accessories: product?.accessories.map(({ id, name, price, active, approved }) => ({ id, name, price, active: Boolean(active), approved: Boolean(approved) })) ?? [],
         uploads: [], removed: [],
     });
     function variantChange(index, key, value) {
-        form.setData('variants', form.data.variants.map((variant, i) => i === index ? { ...variant, [key]: value } : variant));
+        form.setData('variants', form.data.variants.map((variant, i) => i === index ? { ...variant, [key]: value,
+            ...(['size_label', 'servings_min', 'servings_max'].includes(key) && { servings_verified: false }) } : variant));
+    }
+    function accessoryChange(index, key, value) {
+        form.setData('accessories', form.data.accessories.map((accessory, i) => i === index ? { ...accessory, [key]: value,
+            ...(['name', 'price'].includes(key) && { approved: false }) } : accessory));
     }
     return <Admin title={product ? product.name : 'Thêm sản phẩm'} action={<div className="row-actions">
         {product && <ButtonLink href={inventoryUrl + '?product=' + product.id} secondary><Package size={17} />Nhật ký tồn kho</ButtonLink>}
         <ButtonLink href={root + '/san-pham'} secondary><ArrowLeft size={17} />Sản phẩm</ButtonLink>
     </div>}>
-        <form className="form-stack" onSubmit={e => { e.preventDefault(); form.post(root + '/san-pham' + (product ? '/' + product.id : ''), { forceFormData: true, preserveState: 'errors' }); }}>
+        <form className="form-stack" onSubmit={e => {
+            e.preventDefault();
+            form.transform(data => ({ ...data, occasions: JSON.stringify(metadataLines(data.occasions)), flavors: JSON.stringify(metadataLines(data.flavors)) }));
+            form.post(root + '/san-pham' + (product ? '/' + product.id : ''), { forceFormData: true, preserveState: 'errors' });
+        }}>
             <div className="admin-columns">
                 <section className="panel form-stack"><h2>Thông tin bánh</h2><Text form={form} field="name" label="Tên bánh" required maxLength={150} />
                     <Field label="Danh mục" error={form.errors.category_id}><select required value={form.data.category_id} onChange={e => form.setData('category_id', e.target.value)}><option value="">Chọn danh mục</option>{categories.map(category => <option key={category.id} value={category.id}>{category.name}</option>)}</select></Field>
                     <TextArea form={form} field="description" label="Mô tả" required maxLength={3000} />
-                    <TextArea form={form} field="ingredients" label="Thành phần" maxLength={1200} />
-                    <TextArea form={form} field="allergens" label="Cảnh báo dị ứng" maxLength={800} />
+                    <TextArea form={form} field="occasions" label="Dịp dùng bánh" placeholder="Mỗi dòng một dịp do tiệm cung cấp" />
+                    <TextArea form={form} field="flavors" label="Hương vị" placeholder="Mỗi dòng một hương vị thực tế" />
+                    <TextArea form={form} field="ingredients" label="Thành phần" maxLength={1200} required={form.data.details_verified}
+                        onChange={event => form.setData(data => ({ ...data, ingredients: event.target.value, details_verified: false }))} />
+                    <TextArea form={form} field="allergens" label="Cảnh báo dị ứng" maxLength={800} required={form.data.details_verified}
+                        onChange={event => form.setData(data => ({ ...data, allergens: event.target.value, details_verified: false }))} />
+                    <TextArea form={form} field="storage_instructions" label="Bảo quản và sử dụng" maxLength={1600} required={form.data.details_verified}
+                        onChange={event => form.setData(data => ({ ...data, storage_instructions: event.target.value, details_verified: false }))} />
+                    <Flag form={form} field="details_verified" label="Đã đối chiếu thành phần, dị ứng và cách bảo quản với người phụ trách của tiệm" />
+                    <p className="muted">Thông tin chưa xác minh và ảnh minh họa được giữ trạng thái chờ. Chỉ xác nhận khi tiệm đã cung cấp và duyệt dữ liệu.</p>
                 </section>
                 <section className="panel form-stack"><h2>Hình ảnh và hiển thị</h2>
-                    {product?.images.length > 0 && <div className="admin-images">{product.images.map(src => <label key={src}><Image src={src} /><input type="checkbox" checked={form.data.removed.includes(src)} onChange={e => form.setData('removed', e.target.checked ? [...form.data.removed, src] : form.data.removed.filter(image => image !== src))} /> Bỏ ảnh</label>)}</div>}
-                    <Field label="Tải ảnh lên" hint="Tối đa 5 ảnh JPEG, PNG hoặc WebP, 4 MB mỗi ảnh." error={form.errors.uploads}><input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={e => form.setData('uploads', [...e.target.files])} /></Field>
+                    {product?.images.length > 0 && <div className="admin-images">{product.images.map(src => <label key={src}><Image src={src} /><input type="checkbox" checked={form.data.removed.includes(src)} onChange={e => form.setData(data => ({ ...data, removed: e.target.checked ? [...data.removed, src] : data.removed.filter(image => image !== src), images_approved: false }))} /> Bỏ ảnh</label>)}</div>}
+                    <Field label="Tải ảnh lên" hint="Tối đa 5 ảnh JPEG, PNG hoặc WebP, 4 MB mỗi ảnh." error={form.errors.uploads}><input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={e => form.setData(data => ({ ...data, uploads: [...e.target.files], images_approved: false }))} /></Field>
+                    <Flag form={form} field="images_approved" label="Bộ ảnh hiện tại đã được tiệm xác nhận quyền sử dụng" />
                     <Text form={form} field="prep_minutes" label="Thời gian làm bánh (phút)" type="number" min="0" max="14400" required />
                     <Flag form={form} field="active" label="Hiển thị và bán trên cửa hàng" /><Flag form={form} field="featured" label="Hiển thị trong bánh nổi bật" /><Flag form={form} field="customizable" label="Cho phép ghi lời chúc" />
                     <Text form={form} field="message_fee" label="Phí ghi lời chúc (₫)" type="number" min="0" max="1000000" required />
@@ -566,6 +591,10 @@ export function AdminProduct({ product, categories }) {
             <section className="panel form-stack"><h2>Phiên bản bánh</h2>
                 {form.data.variants.map((variant, index) => <div className="variant-edit" key={variant.id ?? index}>
                     {[['name', 'Tên phiên bản', 'text'], ['price', 'Giá (₫)', 'number'], ['stock', 'Tồn kho', 'number']].map(([field, label, type]) => <Field key={field} label={label} error={form.errors['variants.' + index + '.' + field]}><input required type={type} min={type === 'number' ? '0' : undefined} value={variant[field]} onChange={e => variantChange(index, field, e.target.value)} /></Field>)}
+                    <Field label="Kích thước hoặc khối lượng" error={form.errors['variants.' + index + '.size_label']}><input maxLength={80} value={variant.size_label} onChange={e => variantChange(index, 'size_label', e.target.value)} placeholder="Để trống nếu tiệm chưa xác nhận" /></Field>
+                    <Field label="Khẩu phần tối thiểu (người)" error={form.errors['variants.' + index + '.servings_min']}><input type="number" min="1" max="200" required={variant.servings_verified} value={variant.servings_min} onChange={e => variantChange(index, 'servings_min', e.target.value)} /></Field>
+                    <Field label="Khẩu phần tối đa (người)" error={form.errors['variants.' + index + '.servings_max']}><input type="number" min="1" max="200" required={variant.servings_verified} value={variant.servings_max} onChange={e => variantChange(index, 'servings_max', e.target.value)} /></Field>
+                    <label className="checkbox"><input type="checkbox" checked={variant.servings_verified} onChange={e => variantChange(index, 'servings_verified', e.target.checked)} />Tiệm đã xác nhận khẩu phần này</label>
                     <label className="checkbox"><input type="checkbox" checked={variant.active} onChange={e => variantChange(index, 'active', e.target.checked)} />Đang bán</label>
                     {!variant.id && form.data.variants.length > 1 && <button type="button" className="text-action danger" onClick={() => form.setData('variants', form.data.variants.filter((_, i) => i !== index))}>Bỏ dòng</button>}
                     {variant.stock !== '' && Number(variant.stock) !== Number(variant.expected_stock ?? 0) && <div className="stock-note">
@@ -575,6 +604,20 @@ export function AdminProduct({ product, categories }) {
                     </div>}
                 </div>)}
                 <button type="button" className="button secondary compact" disabled={form.data.variants.length >= 30} onClick={() => form.setData('variants', [...form.data.variants, freshVariant()])}><Plus size={16} />Thêm phiên bản</button>
+            </section>
+            <section className="panel form-stack"><h2>Phụ kiện theo bánh</h2>
+                <p className="muted">Nhập tên và giá do tiệm cung cấp. Chỉ phụ kiện vừa bật bán vừa được duyệt mới xuất hiện cho khách. Giá tính cho mỗi bánh trong dòng giỏ hàng.</p>
+                {form.data.accessories.length === 0 && <p className="inline-empty">Chưa có phụ kiện. Không tự thêm hoặc áp giá khi tiệm chưa duyệt.</p>}
+                {form.data.accessories.map((accessory, index) => <fieldset className="form-stack" key={accessory.id ?? 'new-' + index}><legend>Phụ kiện {index + 1}</legend>
+                    <div className="two-fields">
+                        <Field label="Tên phụ kiện" error={form.errors['accessories.' + index + '.name']}><input required maxLength={100} value={accessory.name} onChange={e => accessoryChange(index, 'name', e.target.value)} /></Field>
+                        <Field label="Giá mỗi bánh (₫)" error={form.errors['accessories.' + index + '.price']}><input required type="number" min="0" max="100000000" value={accessory.price} onChange={e => accessoryChange(index, 'price', e.target.value)} /></Field>
+                    </div>
+                    <label className="checkbox"><input type="checkbox" checked={accessory.active} onChange={e => accessoryChange(index, 'active', e.target.checked)} />Đang bán cùng bánh này</label>
+                    <label className="checkbox"><input type="checkbox" checked={accessory.approved} onChange={e => accessoryChange(index, 'approved', e.target.checked)} />Tiệm đã duyệt tên và giá phụ kiện</label>
+                    {!accessory.id && <button type="button" className="text-action danger" onClick={() => form.setData('accessories', form.data.accessories.filter((_, i) => i !== index))}>Bỏ dòng phụ kiện</button>}
+                </fieldset>)}
+                <button type="button" className="button secondary compact" disabled={form.data.accessories.length >= 20} onClick={() => form.setData('accessories', [...form.data.accessories, freshAccessory()])}><Plus size={16} />Thêm phụ kiện</button>
             </section>
             <ErrorList errors={form.errors} /><button className="button" disabled={form.processing}>{form.processing ? 'Đang lưu…' : 'Lưu sản phẩm'}</button>
         </form>

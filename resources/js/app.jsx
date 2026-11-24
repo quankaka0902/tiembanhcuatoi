@@ -1,4 +1,6 @@
 import '../css/app.css';
+import '../css/storefront-mobile.css';
+import '../css/checkout-accessibility.css';
 import { createInertiaApp } from '@inertiajs/react';
 import { createRoot } from 'react-dom/client';
 

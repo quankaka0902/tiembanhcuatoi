@@ -7,6 +7,7 @@ use App\Services\Catalog;
 use App\Services\Checkout;
 use App\Services\OrderRequests;
 use App\Services\Orders;
+use App\Services\ProductMetadata;
 use App\Services\Store;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Bus;
@@ -24,30 +25,16 @@ class Storefront extends Controller
         return Inertia::render('Home', [
             'categories' => DB::table('categories')->orderBy('id')->get(),
             'featured' => Catalog::listings()->where('products.featured', true)->orderBy('products.id')->limit(4)->get()->map(Catalog::images(...)),
+            'occasions' => Catalog::filterOptions()['occasions'], 'currentLocation' => Catalog::currentLocation(),
         ]);
     }
 
     public function catalog(Request $request)
     {
-        $filters = $request->validate([
-            'q' => 'nullable|string|max:100', 'category' => 'nullable|string|max:120',
-            'min' => 'nullable|integer|min:0|max:100000000',
-            'max' => 'nullable|integer|min:0|max:100000000'.($request->filled('min') ? '|gte:min' : ''),
-            'sort' => 'nullable|in:featured,new,price_asc,price_desc', 'page' => 'nullable|integer|min:1',
-        ]);
-        $query = Catalog::listings();
-        if (! empty($filters['q'])) {
-            $search = '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $filters['q']).'%';
-            $query->where(fn ($q) => $q->whereRaw("products.name LIKE ? ESCAPE '!'", [$search])
-                ->orWhereRaw("products.description LIKE ? ESCAPE '!'", [$search]));
-        }
-        $query->when($filters['category'] ?? null, fn ($q, $category) => $q->where('categories.slug', $category));
-        if (isset($filters['min'])) {
-            $query->where('availability.price', '>=', (int) $filters['min']);
-        }
-        if (isset($filters['max'])) {
-            $query->where('availability.price', '<=', (int) $filters['max']);
-        }
+        $rules = Catalog::filterRules();
+        $rules['max'] = 'nullable|integer|min:0|max:100000000'.($request->filled('min') ? '|gte:min' : '');
+        $filters = $request->validate($rules);
+        $query = Catalog::listings($filters);
         match ($filters['sort'] ?? 'featured') {
             'price_asc' => $query->orderByRaw('availability.price IS NULL')->orderBy('availability.price'),
             'price_desc' => $query->orderByDesc('availability.price'),
@@ -58,10 +45,11 @@ class Storefront extends Controller
         return Inertia::render('Catalog', [
             'products' => $query->orderBy('products.id')->paginate(8)->withQueryString()->through(Catalog::images(...)),
             'categories' => DB::table('categories')->orderBy('id')->get(), 'filters' => $filters,
+            'filterOptions' => Catalog::filterOptions(), 'currentLocation' => Catalog::currentLocation(),
         ]);
     }
 
-    public function product(string $slug)
+    public function product(Request $request, string $slug)
     {
         $product = DB::table('products')->join('categories', 'categories.id', '=', 'products.category_id')
             ->where('products.slug', $slug)->where('products.active', true)
@@ -69,9 +57,19 @@ class Storefront extends Controller
         abort_unless($product, 404);
         $product = Catalog::images($product);
         $product->variants = DB::table('variants')->where('product_id', $product->id)->where('active', true)
-            ->orderBy('id')->get(['id', 'name', 'price', 'stock']);
+            ->orderBy('id')->get(['id', 'name', 'price', 'stock', 'size_label', 'servings_min', 'servings_max', 'servings_verified']);
+        $rules = Catalog::filterRules();
+        $rules['max'] = 'nullable|integer|min:0|max:100000000'.($request->filled('min') ? '|gte:min' : '');
+        $filters = $request->validate($rules);
+        $suggestion = Catalog::variants($filters)->where('product_id', $product->id);
+        if (($filters['availability'] ?? 'all') === 'available') {
+            $suggestion->where('stock', '>', 0);
+        } elseif (($filters['availability'] ?? 'all') === 'sold_out') {
+            $suggestion->where('stock', 0);
+        }
+        $product->accessories = ProductMetadata::accessories($product->id);
 
-        return Inertia::render('Product', ['product' => $product]);
+        return Inertia::render('Product', ['product' => $product, 'suggestedVariantId' => $suggestion->orderByRaw('stock > 0 DESC')->orderBy('price')->orderBy('id')->value('id'), 'selectionFilters' => $filters]);
     }
 
     public function cart(Request $request, Checkout $checkout)
@@ -86,10 +84,12 @@ class Storefront extends Controller
         $data = $request->validate([
             'variant_id' => 'required|integer|exists:variants,id', 'quantity' => 'required|integer|min:1|max:30',
             'message' => 'nullable|string|max:60', 'note' => 'nullable|string|max:250',
+            'accessories' => 'sometimes|array|max:20', 'accessories.*' => 'required|integer|distinct|min:1',
         ]);
         $data = [
             'variant_id' => (int) $data['variant_id'], 'quantity' => (int) $data['quantity'],
             'message' => $data['message'] ?? null, 'note' => $data['note'] ?? null,
+            'accessories' => array_map('intval', $data['accessories'] ?? []),
         ];
 
         if ($line !== null) {
@@ -104,6 +104,9 @@ class Storefront extends Controller
             throw ValidationException::withMessages(['quantity' => 'Giỏ hàng chỉ hỗ trợ tối đa 30 dòng bánh.']);
         }
         $updated = collect($checkout->cart($cart))->firstWhere('key', $key);
+        if (! $updated['accessories_available']) {
+            throw ValidationException::withMessages(['accessories' => 'Có phụ kiện chưa được duyệt, ngừng cung cấp hoặc không thuộc bánh này. Vui lòng chọn lại.']);
+        }
         if (! $updated['available']) {
             throw ValidationException::withMessages(['quantity' => 'Bánh đã hết hoặc không đủ số lượng cho giỏ của bạn.']);
         }
@@ -162,6 +165,8 @@ class Storefront extends Controller
         return response()->json([
             ...$quote,
             'line_totals' => array_column($lines, 'subtotal', 'key'),
+            'slots' => $lines && ! collect($lines)->contains('available', false)
+                ? $checkout->availableSlots(Store::settings(), max(array_column($lines, 'prep_minutes'))) : [],
             'quote_token' => $checkout->quoteToken($quote, $lines, $key),
         ])->header('Cache-Control', 'private, no-store');
     }

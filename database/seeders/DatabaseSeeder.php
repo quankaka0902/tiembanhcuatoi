@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\User;
+use App\Services\Catalog;
 use App\Services\Orders;
 use App\Services\Store;
 use Illuminate\Database\Seeder;
@@ -60,7 +61,7 @@ class DatabaseSeeder extends Seeder
             ] as $index => [$category, $name, $slug, $image, $description, $price, $prep, $custom, $stock]) {
                 $product = DB::table('products')->insertGetId([
                     'name' => $name, 'slug' => $slug, 'category_id' => $categories[$category],
-                    'description' => $description, 'ingredients' => match ($category) {
+                    'description' => $description, 'search_text' => Catalog::searchText($name, $description), 'ingredients' => match ($category) {
                         0 => 'Bột mì, trứng, đường, kem sữa'.($index === 3 ? ', cacao.' : ', dâu tươi.'),
                         1 => 'Bột mì, bơ, men, đường và trứng.',
                         2 => 'Kem phô mai, trứng, đường và bột mì.'.($index === 2 ? ' Xốt việt quất.' : ' Cà phê và cacao.'),

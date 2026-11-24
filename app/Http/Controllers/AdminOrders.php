@@ -181,7 +181,7 @@ class AdminOrders extends Controller
                 'kind' => 'required|in:status,payment,lead_time,prepay_exception', 'value' => 'required|string|max:16', 'note' => 'nullable|string|max:250',
                 'expected_status' => ['sometimes', Rule::in(array_keys(Orders::STATUSES))],
                 'refund_method' => 'nullable|in:bank,cash', 'refund_reference' => 'nullable|string|max:160',
-                'refund_amount' => 'nullable|integer|min:0|max:10000000000', 'refund_verified' => 'nullable|boolean',
+                'refund_amount' => 'nullable|integer|min:0', 'refund_verified' => 'nullable|boolean',
             ]);
             Orders::change($order, $request->user(), $fields);
         } catch (ValidationException $failure) {

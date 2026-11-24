@@ -1,27 +1,45 @@
-import { Link, useForm, usePage } from '@inertiajs/react';
+import { Link, router, useForm, usePage } from '@inertiajs/react';
 import { ArrowLeft, ArrowRight, Banknote, CalendarClock, Check, Clipboard, CreditCard, MapPin, Search, ShoppingBag, ShoppingCart, Store, Trash2, Truck } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Breadcrumb, ButtonLink, date as formatDate, dateTime, Empty, ErrorList, Field, Image, Layout, money, Pagination, Pill } from './ui';
 
 function CartLine({ line }) {
-    const form = useForm({ variant_id: line.variant_id, quantity: line.quantity, message: line.message ?? '', note: line.note ?? '' });
+    const form = useForm({ variant_id: line.variant_id, quantity: line.quantity, message: line.message ?? '', note: line.note ?? '', accessories: (line.accessories ?? []).map(item => Number(item.id)) });
     const variant = line.choices.find(choice => Number(choice.id) === Number(form.data.variant_id));
+    const choices = line.accessory_choices ?? [];
+    const stockUnavailable = line.stock_available === undefined ? !line.available : !line.stock_available;
+    const accessoryChoices = [...choices, ...(line.accessories ?? []).filter(item => !choices.some(choice => Number(choice.id) === Number(item.id))).map(item => ({ ...item, unavailable: true }))];
+    const fieldIds = Object.fromEntries(['variant_id', 'quantity', 'message', 'note', 'accessories'].map(field => [field, `cart-${line.key}-${field}`]));
+    const accessoryError = form.errors.accessories ?? Object.entries(form.errors).find(([field]) => field.startsWith('accessories.'))?.[1];
+    Object.keys(form.errors).filter(field => field.startsWith('accessories.')).forEach(field => { fieldIds[field] = fieldIds.accessories; });
     return <article className="panel cart-line">
         <Image src={line.image} alt="" />
-        <form className="form-stack" onSubmit={e => { e.preventDefault(); form.patch('/gio-hang/' + line.key, { preserveScroll: true }); }}>
+        <form className="form-stack" aria-label={`Cập nhật ${line.product_name}`} onSubmit={e => { e.preventDefault(); form.patch('/gio-hang/' + line.key, { preserveScroll: true, onError: () => focusCheckout(`cart-${line.key}-errors`) }); }}>
             <div className="section-head"><h3>{line.slug ? <Link href={'/banh/' + line.slug}>{line.product_name}</Link> : line.product_name}</h3><strong>{money(line.subtotal)}</strong></div>
-            {!line.available && <p className="warning">Bánh hoặc số lượng này không còn khả dụng. Hãy đổi lựa chọn hoặc bỏ khỏi giỏ.</p>}
+            {stockUnavailable && <p className="warning">Bánh hoặc số lượng này không còn khả dụng. Hãy đổi lựa chọn hoặc bỏ khỏi giỏ.</p>}
+            {line.accessories_available === false && <p className="warning" role="status">Một phụ kiện đã chọn không còn được cung cấp. Bấm Cập nhật để bỏ phụ kiện đó và xem lại giá; các lựa chọn còn lại được giữ.</p>}
             <div className="two-fields">
-                <Field label="Phiên bản bánh"><select value={form.data.variant_id} onChange={e => form.setData('variant_id', e.target.value)}>
+                <Field label="Phiên bản bánh" error={form.errors.variant_id}><select id={fieldIds.variant_id} value={form.data.variant_id} onChange={e => form.setData('variant_id', e.target.value)}>
                     {!line.choices.some(choice => Number(choice.id) === Number(line.variant_id)) && <option value={line.variant_id}>{line.variant_name || 'Ngừng bán'}</option>}
                     {line.choices.map(choice => <option key={choice.id} value={choice.id}>{choice.name} – {money(choice.price)}{choice.stock <= 0 ? ' (Hết hàng)' : ''}</option>)}
                 </select></Field>
-                <Field label="Số lượng"><input type="number" min="1" max={Math.min(30, variant?.stock || 1)} required value={form.data.quantity} onChange={e => form.setData('quantity', e.target.value)} /></Field>
+                <Field label="Số lượng" error={form.errors.quantity}><input id={fieldIds.quantity} type="number" min="1" max={Math.min(30, variant?.stock || 1)} required value={form.data.quantity} onChange={e => form.setData('quantity', e.target.value)} /></Field>
             </div>
-            {line.customizable && <Field label="Lời chúc" hint={line.message_fee ? 'Phụ phí ' + money(line.message_fee) + ' mỗi bánh' : undefined}><input maxLength={60} value={form.data.message} onChange={e => form.setData('message', e.target.value)} /></Field>}
-            <Field label="Ghi chú"><input maxLength={250} value={form.data.note} onChange={e => form.setData('note', e.target.value)} /></Field>
-            <ErrorList errors={form.errors} />
-            <div className="row-actions"><button className="button secondary compact" disabled={!form.isDirty || form.processing}>{form.processing ? 'Đang lưu…' : 'Cập nhật'}</button>
+            {line.customizable && <Field label="Lời chúc" error={form.errors.message} hint={line.message_fee ? 'Phụ phí ' + money(line.message_fee) + ' mỗi bánh' : undefined}><input id={fieldIds.message} maxLength={60} value={form.data.message} onChange={e => form.setData('message', e.target.value)} /></Field>}
+            {accessoryChoices.length > 0 && <fieldset className="accessory-choices" id={fieldIds.accessories} tabIndex={-1} aria-invalid={accessoryError ? true : undefined} aria-describedby={accessoryError ? `${fieldIds.accessories}-error` : undefined}>
+                <legend>Phụ kiện đi kèm mỗi bánh</legend>
+                {accessoryChoices.map(choice => {
+                    const checked = form.data.accessories.includes(Number(choice.id));
+                    return <label key={choice.id} className="checkbox"><input type="checkbox" checked={checked} disabled={choice.unavailable && !checked} onChange={event => form.setData('accessories', event.target.checked ? [...form.data.accessories, Number(choice.id)] : form.data.accessories.filter(id => id !== Number(choice.id)))} />
+                        <span>{choice.name} · {money(choice.price)}{choice.unavailable ? ' (Ngừng bán, hãy bỏ chọn)' : ''}</span>
+                    </label>;
+                })}
+                {accessoryError && <small id={`${fieldIds.accessories}-error`} className="field-error">{accessoryError}</small>}
+            </fieldset>}
+            <Field label="Ghi chú" error={form.errors.note}><input id={fieldIds.note} maxLength={250} value={form.data.note} onChange={e => form.setData('note', e.target.value)} /></Field>
+            {form.isDirty && <p className="muted" role="status">Bấm Cập nhật để lưu lựa chọn và xem lại giá từ tiệm.</p>}
+            <ErrorList errors={form.errors} fieldIds={fieldIds} id={`cart-${line.key}-errors`} focusable />
+            <div className="row-actions"><button className="button secondary compact" disabled={(!form.isDirty && line.accessories_available !== false) || form.processing}>{form.processing ? 'Đang lưu…' : 'Cập nhật'}</button>
                 <Link className="text-action danger" as="button" method="delete" href={'/gio-hang/' + line.key} preserveScroll><Trash2 size={16} /> Bỏ bánh</Link></div>
         </form>
     </article>;
@@ -41,7 +59,7 @@ export function Cart({ lines }) {
     const subtotal = lines.reduce((sum, line) => sum + Number(line.subtotal), 0);
     return <Layout title="Giỏ hàng"><div className="wrap page">
         <Breadcrumb><span>Giỏ hàng</span></Breadcrumb><div className="page-heading"><h1>Giỏ hàng</h1></div>
-        {lines.length ? <div className="order-grid"><div className="form-stack">{lines.map(line => <CartLine key={line.key + JSON.stringify([line.variant_id, line.quantity, line.message, line.note])} line={line} />)}</div>
+        {lines.length ? <div className="order-grid"><div className="form-stack">{lines.map(line => <CartLine key={line.key + JSON.stringify([line.variant_id, line.quantity, line.message, line.note, line.accessories])} line={line} />)}</div>
             <aside className="panel order-summary"><h2>Tóm tắt đơn</h2><Totals subtotal={subtotal} />
                 <p className="muted">Mã giảm giá và phí giao được tính khi bạn chọn cách nhận bánh.</p>
                 {shop.accepting_orders && lines.every(line => line.available) && <ButtonLink href="/dat-banh">Tiến hành đặt bánh <ArrowRight size={18} /></ButtonLink>}
@@ -51,26 +69,42 @@ export function Cart({ lines }) {
     </div></Layout>;
 }
 
-function CheckoutSchedule({ slots, form, selectedSlot }) {
-    const [day, setDay] = useState('');
+function focusCheckout(id) {
+    requestAnimationFrame(() => {
+        const target = document.getElementById(id);
+        target?.focus();
+        target?.scrollIntoView({ block: 'center' });
+    });
+}
+
+const checkoutFieldIds = {
+    name: 'checkout-name', phone: 'checkout-phone', email: 'checkout-email',
+    fulfillment: 'checkout-fulfillment', region: 'checkout-region', address: 'checkout-address',
+    slot: 'checkout-schedule', method: 'checkout-method', coupon: 'checkout-coupon',
+    cart: 'checkout-items', quote_token: 'checkout-feedback', key: 'checkout-feedback',
+};
+
+function CheckoutSchedule({ slots, form, selectedSlot, refreshing, onRefresh, onChoose }) {
+    const [day, setDay] = useState(() => form.data.slot.slice(0, 10));
     const days = [...new Set(slots.map(slot => slot.slice(0, 10)))];
     const selectedDay = days.includes(day) ? day : '';
     const times = selectedDay ? slots.filter(slot => slot.startsWith(selectedDay)) : [];
-
-    if (!days.length) return <p className="warning" id="checkout-schedule" tabIndex={-1}>Tiệm chưa có lịch nhận phù hợp trong 14 ngày tới. Vui lòng liên hệ để đặt bánh.</p>;
-
-    return <div className="two-fields checkout-schedule" id="checkout-schedule" tabIndex={-1}>
-        <Field label="Ngày giao hoặc nhận" error={!selectedDay ? form.errors.slot : undefined}>
-            <select required value={selectedDay} onChange={event => { setDay(event.target.value); form.setData('slot', ''); form.clearErrors('slot'); }}>
-                <option value="">Chọn ngày</option>{days.map(value => <option key={value} value={value}>{formatDate(value)}</option>)}
-            </select>
-        </Field>
-        <Field label="Giờ giao hoặc nhận" error={selectedDay ? form.errors.slot : undefined}>
-            <select required disabled={!selectedDay} value={selectedSlot} onChange={event => { form.setData('slot', event.target.value); form.clearErrors('slot'); }}>
-                <option value="">Chọn giờ</option>{times.map(slot => <option key={slot} value={slot}>{slot.slice(11)}</option>)}
-            </select>
-        </Field>
-    </div>;
+    return <fieldset className="checkout-schedule form-stack" id="checkout-schedule" tabIndex={-1} aria-busy={refreshing}>
+        <legend>Ngày và giờ giao hoặc nhận</legend>
+        {!days.length ? <p className="warning">Tiệm chưa có lịch nhận phù hợp trong 14 ngày tới. Bạn có thể chọn bánh khác hoặc liên hệ tiệm.</p> : <div className="two-fields">
+            <Field label="Ngày giao hoặc nhận" error={!selectedDay ? form.errors.slot : undefined}>
+                <select id="checkout-day" name="day" required value={selectedDay} onChange={event => { setDay(event.target.value); form.setData('slot', ''); form.clearErrors('slot'); onChoose(); }}>
+                    <option value="">Chọn ngày</option>{days.map(value => <option key={value} value={value}>{formatDate(value)}</option>)}
+                </select>
+            </Field>
+            <Field label="Giờ giao hoặc nhận" error={selectedDay ? form.errors.slot : undefined} hint={!selectedDay ? 'Chọn ngày trước để xem giờ còn chỗ.' : undefined}>
+                <select id="checkout-slot" name="slot" required disabled={!selectedDay} value={selectedSlot} onChange={event => { form.setData('slot', event.target.value); form.clearErrors('slot'); onChoose(); }}>
+                    <option value="">Chọn giờ</option>{times.map(slot => <option key={slot} value={slot}>{slot.slice(11)}</option>)}
+                </select>
+            </Field>
+        </div>}
+        <button type="button" className="text-action schedule-refresh" disabled={refreshing} onClick={onRefresh}>{refreshing ? 'Đang cập nhật lịch…' : 'Cập nhật giờ còn chỗ'}</button>
+    </fieldset>;
 }
 
 export function Checkout({ lines, slots, regions, bankEnabled, keyToken, policy, privacy }) {
@@ -78,15 +112,39 @@ export function Checkout({ lines, slots, regions, bankEnabled, keyToken, policy,
     const subtotal = lines.reduce((sum, line) => sum + Number(line.subtotal), 0);
     const form = useForm({ key: keyToken, name: auth?.name ?? '', email: auth?.email ?? '', phone: '', fulfillment: 'pickup', region: '', address: '', slot: '', method: 'cod', coupon: '' });
     const { fulfillment, region } = form.data;
-    const selectedSlot = slots.includes(form.data.slot) ? form.data.slot : '';
     const [appliedCode, setAppliedCode] = useState('');
     const [quoteAttempt, setQuoteAttempt] = useState(0);
     const [quoteResult, setQuoteResult] = useState(null);
+    const [scheduleNotice, setScheduleNotice] = useState('');
+    const [refreshingSlots, setRefreshingSlots] = useState(false);
+    const [submissionError, setSubmissionError] = useState('');
+    const submissionActive = useRef(false);
+    const scheduleRefreshActive = useRef(false);
     const quoteKey = JSON.stringify({ fulfillment, region, coupon: appliedCode });
     const attemptKey = JSON.stringify([keyToken, quoteKey, quoteAttempt]);
     const waitingForRegion = fulfillment === 'delivery' && !region;
     const displayed = quoteResult?.key === attemptKey ? quoteResult : null;
+    const availableSlots = Array.isArray(displayed?.data?.slots) ? displayed.data.slots : slots;
+    const selectedSlot = availableSlots.includes(form.data.slot) ? form.data.slot : '';
+    const staleSlot = Boolean(form.data.slot && !selectedSlot);
+    const quoteErrors = displayed?.error && displayed.field ? { [displayed.field]: displayed.error } : {};
+    const fieldErrors = { ...quoteErrors, ...form.errors };
+    const canPlace = shop.accepting_orders && !form.processing && !refreshingSlots && displayed?.data && selectedSlot;
     const retryQuote = () => setQuoteAttempt(value => value + 1);
+
+    useEffect(() => router.on('exception', event => {
+        const exception = event.detail.exception;
+        const networkFailure = !exception.response && ['ERR_NETWORK', 'ECONNABORTED', 'ETIMEDOUT'].includes(exception.code);
+        if (submissionActive.current && networkFailure) {
+            event.preventDefault();
+            setSubmissionError('Chưa nhận được xác nhận đặt bánh. Thông tin vẫn được giữ. Bạn có thể thử gửi lại; nếu tiệm đã nhận yêu cầu, mã đơn sẽ được giữ nguyên.');
+            focusCheckout('checkout-feedback');
+        } else if (scheduleRefreshActive.current && networkFailure) {
+            event.preventDefault();
+            setScheduleNotice('Chưa cập nhật được lịch. Thông tin vẫn được giữ; hãy thử cập nhật lại khi có kết nối.');
+            focusCheckout('checkout-schedule');
+        }
+    }), []);
 
     useEffect(() => {
         if (waitingForRegion || !shop.accepting_orders) return;
@@ -105,10 +163,14 @@ export function Checkout({ lines, slots, regions, bankEnabled, keyToken, policy,
             if (response.status !== 422 && !response.ok) return { error: connectionError };
             const data = await response.json();
             if (response.ok && typeof data.quote_token === 'string') return { data };
-            const field = data.errors?.coupon ? 'coupon' : data.errors?.cart ? 'cart' : null;
-            return { field, error: (field && data.errors[field][0]) || connectionError };
+            const field = ['coupon', 'cart', 'region', 'fulfillment'].find(name => data.errors?.[name]);
+            const error = field && data.errors[field];
+            return { field, error: (Array.isArray(error) ? error[0] : error) || connectionError };
         }).then(result => {
-            if (!abort.signal.aborted) setQuoteResult({ key: attemptKey, ...result });
+            if (!abort.signal.aborted) {
+                setQuoteResult({ key: attemptKey, ...result });
+                if (result.error && result.field === 'coupon') focusCheckout('checkout-coupon');
+            }
         }).catch(() => {
             if (!abort.signal.aborted) setQuoteResult({ key: attemptKey, error: connectionError });
         }).finally(() => clearTimeout(timeout));
@@ -118,57 +180,108 @@ export function Checkout({ lines, slots, regions, bankEnabled, keyToken, policy,
         };
     }, [attemptKey, quoteKey, waitingForRegion, shop.accepting_orders]);
 
-    function place(event) {
-        event.preventDefault();
-        if (!displayed?.data || !selectedSlot || form.processing || !shop.accepting_orders) return;
-        form.transform(fields => ({ ...fields, coupon: appliedCode, quote_token: displayed.data.quote_token }));
-        form.post('/dat-banh', {
-            preserveScroll: true,
-            onError: errors => {
-                if (errors.quote_token || errors.coupon) retryQuote();
-                const target = errors.slot ? 'checkout-schedule' : 'checkout-feedback';
-                requestAnimationFrame(() => document.getElementById(target)?.focus());
+    function refreshSchedule() {
+        if (refreshingSlots) return;
+        scheduleRefreshActive.current = true;
+        setRefreshingSlots(true);
+        setScheduleNotice('Đang cập nhật lịch còn chỗ. Thông tin bạn đã nhập vẫn được giữ.');
+        retryQuote();
+        router.reload({
+            only: ['slots'], preserveState: true, preserveScroll: true,
+            onSuccess: () => {
+                setScheduleNotice('Lịch nhận đã được cập nhật. Chọn lại giờ còn chỗ; thông tin liên hệ và cách thanh toán vẫn được giữ.');
+                focusCheckout('checkout-schedule');
             },
+            onError: () => setScheduleNotice('Chưa cập nhật được lịch. Thông tin vẫn được giữ; hãy thử cập nhật lại.'),
+            onFinish: () => { setRefreshingSlots(false); scheduleRefreshActive.current = false; },
         });
     }
 
-    return <Layout title="Đặt bánh"><div className="wrap page">
+    function applyCoupon() {
+        setAppliedCode(form.data.coupon.trim());
+        form.clearErrors('coupon');
+        retryQuote();
+    }
+
+    function place(event) {
+        event.preventDefault();
+        if (!canPlace) return;
+        submissionActive.current = true;
+        setSubmissionError('');
+        form.transform(fields => ({ ...fields, coupon: appliedCode, quote_token: displayed.data.quote_token }));
+        form.post('/dat-banh', {
+            preserveScroll: true, preserveState: true,
+            onError: errors => {
+                if (errors.slot) {
+                    refreshSchedule();
+                } else if (errors.quote_token || errors.coupon || errors.cart) {
+                    retryQuote();
+                    focusCheckout('checkout-feedback');
+                } else {
+                    const field = Object.keys(errors).find(name => checkoutFieldIds[name]);
+                    focusCheckout(checkoutFieldIds[field] ?? 'checkout-feedback');
+                }
+            },
+            onFinish: () => { submissionActive.current = false; },
+        });
+    }
+
+    const quoteStatus = !shop.accepting_orders ? 'Tiệm đang tạm ngừng nhận đơn mới.' : waitingForRegion ? 'Chọn khu vực để tính phí giao và tổng tiền.' :
+        displayed?.error ? displayed.error : displayed?.data ? `Tổng thanh toán đã cập nhật: ${money(displayed.data.total)}${appliedCode ? ', mã ' + appliedCode : ''}.` : 'Đang tính tổng tiền từ tiệm…';
+
+    return <Layout title="Đặt bánh"><div className="wrap page checkout-page">
         <Breadcrumb><Link href="/gio-hang">Giỏ hàng</Link><span aria-hidden="true">/</span><span>Đặt bánh</span></Breadcrumb>
         <div className="page-heading"><h1>Đặt bánh</h1><p>Chọn cách nhận bánh và giờ phù hợp với bạn.</p></div>
-        <form onSubmit={place} className="order-grid checkout-grid">
+        <form onSubmit={place} className="order-grid checkout-grid" aria-label="Đặt bánh">
             <div className="form-stack checkout-fields">
                 <section className="panel form-stack"><h2>Thông tin liên hệ</h2>
-                    <Field label="Họ và tên" error={form.errors.name}><input autoComplete="name" required value={form.data.name} onChange={e => form.setData('name', e.target.value)} /></Field>
+                    <Field label="Họ và tên" error={form.errors.name}><input id="checkout-name" name="name" autoComplete="name" maxLength={120} required value={form.data.name} onChange={e => { form.setData('name', e.target.value); form.clearErrors('name'); }} /></Field>
                     <div className="two-fields">
-                        <Field label="Số điện thoại" error={form.errors.phone}><input type="tel" autoComplete="tel" required value={form.data.phone} onChange={e => form.setData('phone', e.target.value)} /></Field>
-                        <Field label="Email nhận mã đơn" error={form.errors.email}><input type="email" autoComplete="email" required value={form.data.email} onChange={e => form.setData('email', e.target.value)} /></Field>
+                        <Field label="Số điện thoại" error={form.errors.phone} hint="Bắt đầu bằng 0 hoặc +84."><input id="checkout-phone" name="phone" type="tel" inputMode="tel" autoComplete="tel" maxLength={20} required value={form.data.phone} onChange={e => { form.setData('phone', e.target.value); form.clearErrors('phone'); }} /></Field>
+                        <Field label="Email nhận mã đơn" error={form.errors.email}><input id="checkout-email" name="email" type="email" autoComplete="email" maxLength={254} required value={form.data.email} onChange={e => { form.setData('email', e.target.value); form.clearErrors('email'); }} /></Field>
                     </div>
                     {privacy && <details className="fold"><summary>Tiệm sử dụng thông tin của bạn thế nào?</summary><p className="policy-text">{privacy}</p></details>}
                 </section>
                 <section className="panel form-stack"><h2>Cách nhận bánh</h2>
-                    <div className="choices">
-                        <label><input type="radio" name="fulfillment" value="pickup" checked={fulfillment === 'pickup'} onChange={e => form.setData('fulfillment', e.target.value)} /><Store size={19} />Nhận tại tiệm</label>
-                        <label><input type="radio" name="fulfillment" value="delivery" checked={fulfillment === 'delivery'} onChange={e => form.setData('fulfillment', e.target.value)} disabled={!regions.length} /><Truck size={19} />Giao tận nơi</label>
-                    </div>
+                    <fieldset className="checkout-choice-group" id="checkout-fulfillment" tabIndex={-1} aria-describedby={fieldErrors.fulfillment ? 'checkout-fulfillment-error' : undefined}>
+                        <legend className="visually-hidden">Chọn cách nhận bánh</legend>
+                        <div className="choices">
+                            <label><input type="radio" name="fulfillment" value="pickup" checked={fulfillment === 'pickup'} onChange={e => { form.setData('fulfillment', e.target.value); form.clearErrors('fulfillment', 'region', 'address'); }} /><Store size={19} aria-hidden="true" />Nhận tại tiệm</label>
+                            <label><input type="radio" name="fulfillment" value="delivery" checked={fulfillment === 'delivery'} onChange={e => { form.setData('fulfillment', e.target.value); form.clearErrors('fulfillment'); }} disabled={!regions.length} /><Truck size={19} aria-hidden="true" />Giao tận nơi</label>
+                        </div>
+                        {fieldErrors.fulfillment && <small className="field-error" id="checkout-fulfillment-error">{fieldErrors.fulfillment}</small>}
+                    </fieldset>
+                    {fulfillment === 'pickup' && shop.address && <p className="muted">Địa chỉ nhận bánh: {shop.address}</p>}
+                    {!regions.length && <p className="muted">Tiệm hiện nhận bánh tại cửa hàng.</p>}
                     {fulfillment === 'delivery' && <div className="two-fields">
-                        <Field label="Khu vực giao" error={form.errors.region}><select required value={region} onChange={e => form.setData('region', e.target.value)}><option value="">Chọn khu vực</option>{regions.map(area => <option key={area.key} value={area.key}>{area.name}</option>)}</select></Field>
-                        <Field label="Địa chỉ giao bánh" error={form.errors.address}><input autoComplete="street-address" required value={form.data.address} onChange={e => form.setData('address', e.target.value)} /></Field>
+                        <Field label="Khu vực giao" error={fieldErrors.region}><select id="checkout-region" name="region" required value={region} onChange={e => { form.setData('region', e.target.value); form.clearErrors('region'); }}><option value="">Chọn khu vực</option>{regions.map(area => <option key={area.key} value={area.key}>{area.name}</option>)}</select></Field>
+                        <Field label="Địa chỉ giao bánh" error={form.errors.address}><input id="checkout-address" name="address" autoComplete="street-address" maxLength={250} required value={form.data.address} onChange={e => { form.setData('address', e.target.value); form.clearErrors('address'); }} /></Field>
                     </div>}
-                    <CheckoutSchedule slots={slots} form={form} selectedSlot={selectedSlot} />
+                    <CheckoutSchedule slots={availableSlots} form={form} selectedSlot={selectedSlot} refreshing={refreshingSlots} onRefresh={refreshSchedule} onChoose={() => setScheduleNotice('')} />
+                    <p className="schedule-status" role="status" aria-live="polite" aria-atomic="true">{scheduleNotice || (staleSlot ? 'Khung giờ đã chọn không còn chỗ hoặc không còn phù hợp. Hãy chọn lại giờ; các thông tin khác vẫn được giữ.' : selectedSlot ? 'Giờ đang chọn: ' + dateTime(selectedSlot) : '')}</p>
                 </section>
-                <section className="panel form-stack"><h2>Thanh toán</h2><div className="choices">
-                    <label><input type="radio" name="method" value="cod" checked={form.data.method === 'cod'} onChange={e => form.setData('method', e.target.value)} /><Banknote size={19} />Khi nhận bánh</label>
-                    {bankEnabled && <label><input type="radio" name="method" value="bank" checked={form.data.method === 'bank'} onChange={e => form.setData('method', e.target.value)} /><CreditCard size={19} />Chuyển khoản</label>}
-                </div>{form.data.method === 'bank' && <p className="muted">Bạn sẽ thấy thông tin ngân hàng và nội dung chuyển khoản sau khi đặt đơn.</p>}</section>
+                <section className="panel form-stack"><h2>Thanh toán</h2>
+                    <fieldset className="checkout-choice-group" id="checkout-method" tabIndex={-1} aria-describedby={form.errors.method ? 'checkout-method-error' : undefined}>
+                        <legend className="visually-hidden">Chọn phương thức thanh toán</legend><div className="choices">
+                            <label><input type="radio" name="method" value="cod" checked={form.data.method === 'cod'} onChange={e => { form.setData('method', e.target.value); form.clearErrors('method'); }} /><Banknote size={19} aria-hidden="true" />Khi nhận bánh</label>
+                            {bankEnabled && <label><input type="radio" name="method" value="bank" checked={form.data.method === 'bank'} onChange={e => { form.setData('method', e.target.value); form.clearErrors('method'); }} /><CreditCard size={19} aria-hidden="true" />Chuyển khoản</label>}
+                        </div>
+                        {form.errors.method && <small className="field-error" id="checkout-method-error">{form.errors.method}</small>}
+                    </fieldset>
+                    {form.data.method === 'bank' && <p className="muted">Bạn sẽ thấy thông tin ngân hàng, số tiền và nội dung chuyển khoản sau khi đặt đơn. Tiệm xác nhận sau khi đối soát.</p>}
+                </section>
             </div>
             <aside className="panel order-summary">
                 <h2>Đơn bánh của bạn</h2>
-                <ul className="summary-lines">{lines.map(line => <li key={line.key}><span>{line.quantity} × {line.product_name}<small>{line.variant_name}</small></span><strong>{money(displayed?.data?.line_totals?.[line.key] ?? line.subtotal)}</strong></li>)}</ul>
-                <div className="coupon-row"><Field label="Mã giảm giá" error={form.errors.coupon}><input maxLength={32} value={form.data.coupon} onChange={e => form.setData('coupon', e.target.value)} placeholder="Nhập mã nếu có" /></Field><button type="button" className="button secondary compact" onClick={() => { setAppliedCode(form.data.coupon.trim()); form.clearErrors('coupon'); retryQuote(); }}>Áp dụng</button></div>
-                <Totals subtotal={subtotal} {...displayed?.data} />
+                <ul className="summary-lines" id="checkout-items" tabIndex={-1}>{lines.map(line => <li key={line.key}><span>{line.quantity} × {line.product_name}<small>{line.variant_name}</small>{(line.accessories ?? []).map(item => <small key={item.id}>Phụ kiện: {item.name}</small>)}</span><strong>{money(displayed?.data?.line_totals?.[line.key] ?? line.subtotal)}</strong></li>)}</ul>
+                <div className="coupon-row"><Field label="Mã giảm giá" error={fieldErrors.coupon}><input id="checkout-coupon" name="coupon" maxLength={32} autoCapitalize="characters" value={form.data.coupon} onChange={e => { form.setData('coupon', e.target.value); form.clearErrors('coupon'); }} onKeyDown={event => {
+                    if (event.key === 'Enter' && !event.nativeEvent.isComposing) { event.preventDefault(); applyCoupon(); }
+                }} placeholder="Nhập mã nếu có" /></Field><button type="button" className="button secondary compact" onClick={applyCoupon}>Áp dụng</button></div>
+                {appliedCode && displayed?.data && <p className="muted">Mã đang áp dụng: <strong>{appliedCode}</strong></p>}
+                <div aria-busy={shop.accepting_orders && !waitingForRegion && !displayed}><Totals subtotal={displayed?.data?.subtotal ?? subtotal} {...displayed?.data} /></div>
                 <div className="checkout-feedback" id="checkout-feedback" tabIndex={-1}>
-                    {waitingForRegion && <p className="muted">Chọn khu vực để xem phí giao và tổng tiền.</p>}
-                    {shop.accepting_orders && !waitingForRegion && !displayed && <p className="muted" role="status">Đang tính tổng tiền…</p>}
+                    <p className="quote-status" role="status" aria-live="polite" aria-atomic="true">{quoteStatus}</p>
+                    {shop.accepting_orders && !waitingForRegion && !displayed && <span className="quote-skeleton" aria-hidden="true"></span>}
                     {displayed?.error && <div className="warning quote-warning"><p role="alert">{displayed.error}</p>
                         {displayed.field === 'cart' ? <Link className="text-action" href="/gio-hang">Mở giỏ hàng</Link> :
                             <button type="button" className="text-action" onClick={() => {
@@ -176,14 +289,16 @@ export function Checkout({ lines, slots, regions, bankEnabled, keyToken, policy,
                                 retryQuote();
                             }}>{displayed.field === 'coupon' ? 'Bỏ mã giảm giá' : 'Thử tính lại'}</button>}
                     </div>}
-                    <ErrorList errors={form.errors} />
+                    {submissionError && <p className="warning" role="alert">{submissionError}</p>}
+                    <ErrorList errors={form.errors} fieldIds={checkoutFieldIds} id="checkout-errors" focusable />
                 </div>
                 {policy && <details className="fold"><summary>Chính sách đặt bánh</summary><p className="policy-text">{policy}</p></details>}
             </aside>
             <div className="checkout-actions">
                 <p className="checkout-action-total"><small>Tổng thanh toán</small><strong>{displayed?.data ? money(displayed.data.total) : 'Chưa tính'}</strong></p>
-                <button className="button" disabled={!shop.accepting_orders || form.processing || !displayed?.data || !selectedSlot}><ShoppingBag size={19} />{form.processing ? 'Đang đặt bánh…' : form.errors.quote_token ? 'Xác nhận giá mới' : 'Xác nhận đặt bánh'}</button>
+                <button className="button" aria-describedby="checkout-submit-help" disabled={!canPlace}><ShoppingBag size={19} aria-hidden="true" />{form.processing ? 'Đang đặt bánh…' : submissionError ? 'Thử gửi lại đơn' : form.errors.quote_token ? 'Xác nhận giá mới' : 'Xác nhận đặt bánh'}</button>
             </div>
+            <p id="checkout-submit-help" className="checkout-submit-help">{!shop.accepting_orders ? 'Tiệm đang tạm ngừng nhận đơn mới.' : !selectedSlot ? 'Chọn ngày và giờ nhận bánh để tiếp tục.' : !displayed?.data ? 'Cần tính được tổng tiền trước khi xác nhận.' : 'Kiểm tra bánh, giờ nhận và tổng tiền trước khi xác nhận.'}</p>
         </form>
     </div></Layout>;
 }
@@ -226,7 +341,11 @@ export function Tracking() {
 }
 
 export function OrderItems({ items }) {
-    return <ul className="summary-lines">{items.map(item => <li key={item.id}><div><strong>{item.quantity} × {item.product_name}</strong><small>{item.variant_name}{item.option_fee ? ' · Phí lời chúc ' + money(item.option_fee) + '/bánh' : ''}</small>{item.message && <small>Lời chúc: {item.message}</small>}{item.note && <small>Ghi chú: {item.note}</small>}</div><strong>{money((Number(item.unit_price) + Number(item.option_fee)) * item.quantity)}</strong></li>)}</ul>;
+    return <ul className="summary-lines">{items.map(item => <li key={item.id}><div><strong>{item.quantity} × {item.product_name}</strong>
+        <small>{item.variant_name}{item.option_fee ? ' · Phí lời chúc ' + money(item.option_fee) + '/bánh' : ''}</small>
+        {(Array.isArray(item.accessories_snapshot) ? item.accessories_snapshot : []).map(accessory => <small key={accessory.id ?? accessory.name}>Phụ kiện: {accessory.name}{accessory.price ? ' · ' + money(accessory.price) + '/bánh' : ''}</small>)}
+        {item.message && <small>Lời chúc: {item.message}</small>}{item.note && <small>Ghi chú: {item.note}</small>}
+    </div><strong>{money(item.line_total ?? (Number(item.unit_price) + Number(item.option_fee) + Number(item.accessory_fee ?? 0)) * item.quantity)}</strong></li>)}</ul>;
 }
 
 function eventTitle(event, statuses, payments) {

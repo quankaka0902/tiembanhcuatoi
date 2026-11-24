@@ -1,5 +1,6 @@
 import { Head, Link, usePage } from '@inertiajs/react';
 import { ArrowRight, CakeSlice, Check, Clock3, Cookie, Croissant, CupSoda, LayoutDashboard, MapPin, Menu, Phone, Search, ShoppingBag, UserRound } from 'lucide-react';
+import { Children, cloneElement, isValidElement, useId, useState } from 'react';
 
 export const money = value => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(value));
 export const date = value => value ? `${value.slice(8, 10)}/${value.slice(5, 7)}/${value.slice(0, 4)}` : '';
@@ -42,7 +43,7 @@ export function Layout({ title, children }) {
                 </div>
             </div>
         </header>
-        <main id="main">
+        <main id="main" tabIndex={-1}>
             {!shop.accepting_orders && <div className="wrap pause-wrap"><p className="warning pause-banner" role="status">
                 <span>{shop.pause_message}</span>
                 {shop.phone && <a className="subtle-link" href={`tel:${shop.phone.replace(/[^+\d]/g, '')}`}>Gọi tiệm {shop.phone}</a>}
@@ -69,13 +70,44 @@ export function Breadcrumb({ children }) {
     return <div className="breadcrumbs"><Link href="/">Trang chủ</Link><span aria-hidden="true">/</span>{children}</div>;
 }
 
-export function Field({ label, error, children, hint }) {
-    return <label className="field"><span>{label}</span>{children}{hint && <small>{hint}</small>}{error && <small className="field-error" role="alert">{error}</small>}</label>;
+export function Field({ label, error, children, hint, id }) {
+    const generatedId = useId();
+    const childList = Children.toArray(children);
+    const control = childList.find(child => isValidElement(child) && ['input', 'select', 'textarea'].includes(child.type));
+    const controlId = control?.props.id ?? id ?? `field-${generatedId}`;
+    const hintId = `${controlId}-hint`;
+    const errorId = `${controlId}-error`;
+    const describedBy = [...new Set([control?.props['aria-describedby'], hint && hintId, error && errorId].filter(Boolean).join(' ').split(/\s+/).filter(Boolean))].join(' ') || undefined;
+    return <div className="field">
+        {control ? <label htmlFor={controlId}>{label}</label> : <span>{label}</span>}
+        {childList.map(child => child === control ? cloneElement(child, {
+            id: controlId,
+            'aria-invalid': error ? true : child.props['aria-invalid'],
+            'aria-describedby': describedBy,
+        }) : child)}
+        {hint && <small id={hintId}>{hint}</small>}
+        {error && <small id={errorId} className="field-error">{error}</small>}
+    </div>;
 }
 
-export function ErrorList({ errors = {} }) {
-    const values = [...new Set(Object.values(errors).flat())];
-    return values.length ? <ul className="error-list" role="alert">{values.map(value => <li key={value}>{value}</li>)}</ul> : null;
+export function ErrorList({ errors = {}, fieldIds = {}, id, focusable = false }) {
+    const seen = new Set();
+    const entries = Object.entries(errors).flatMap(([field, values]) => [values].flat().map(message => ({ field, message })))
+        .filter(({ field, message }) => {
+            const key = `${fieldIds[field] ?? ''}:${message}`;
+            if (!message || seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
+    return entries.length ? <ul id={id} className="error-list" role="alert" aria-label="Thông tin cần kiểm tra" tabIndex={focusable ? -1 : undefined}>
+        {entries.map(({ field, message }) => <li key={`${field}:${message}`}>{fieldIds[field] ? <a href={`#${fieldIds[field]}`} onClick={event => {
+            event.preventDefault();
+            const control = document.getElementById(fieldIds[field]);
+            const target = control?.disabled ? control.closest('[tabindex="-1"]') : control;
+            target?.focus();
+            target?.scrollIntoView({ block: 'center' });
+        }}>{message}</a> : message}</li>)}
+    </ul> : null;
 }
 
 export function Empty({ title, text, href, label }) {
@@ -92,7 +124,13 @@ export function Pagination({ page }) {
 }
 
 export function Image({ src, alt = '', className = '', loading = 'lazy' }) {
-    return src ? <img className={className} src={src} alt={alt} loading={loading} /> : <span className={`image-placeholder ${className}`} aria-label={alt}><CakeSlice size={32} strokeWidth={1.5} /></span>;
+    return <ImageContent key={src ?? ''} src={src} alt={alt} className={className} loading={loading} />;
+}
+
+function ImageContent({ src, alt, className, loading }) {
+    const [failed, setFailed] = useState(false);
+    return src && !failed ? <img className={className} src={src} alt={alt} loading={loading} onError={() => setFailed(true)} /> :
+        <span className={`image-placeholder ${className}`} role={alt ? 'img' : undefined} aria-label={alt || undefined} aria-hidden={alt ? undefined : true}><CakeSlice size={32} strokeWidth={1.5} aria-hidden="true" /></span>;
 }
 
 export function Pill({ value, labels }) {

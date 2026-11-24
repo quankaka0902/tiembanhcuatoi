@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\Catalog;
 use App\Services\Inventory;
+use App\Services\ProductMetadata;
 use App\Services\Store;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -21,7 +22,7 @@ class AdminCatalog extends Controller
     {
         return Inertia::render('AdminProducts', [
             'products' => DB::table('products')->join('categories', 'categories.id', '=', 'products.category_id')
-                ->select('products.id', 'products.name', 'products.active', 'products.featured', 'categories.name as category')
+                ->select('products.id', 'products.name', 'products.active', 'products.featured', 'products.details_verified', 'products.images_approved', 'categories.name as category')
                 ->latest('products.id')->paginate(20),
             'categories' => DB::table('categories')->orderBy('id')->get(),
         ]);
@@ -32,8 +33,9 @@ class AdminCatalog extends Controller
         $row = $product ? DB::table('products')->find($product) : null;
         abort_if($product && ! $row, 404);
         if ($row) {
-            $row = Catalog::images($row);
+            $row = ProductMetadata::hydrate(Catalog::images($row));
             $row->variants = DB::table('variants')->where('product_id', $product)->orderBy('id')->get();
+            $row->accessories = ProductMetadata::accessories($product, publicOnly: false);
         }
 
         return Inertia::render('AdminProduct', ['product' => $row, 'categories' => DB::table('categories')->orderBy('id')->get()]);
@@ -66,6 +68,11 @@ class AdminCatalog extends Controller
 
     public function save(Request $request, ?int $product = null)
     {
+        foreach (['occasions', 'flavors'] as $field) {
+            if ($request->exists($field)) {
+                $request->merge([$field => ProductMetadata::listInput($request->input($field))]);
+            }
+        }
         $data = $request->validate([
             'name' => 'required|string|max:150', 'category_id' => 'required|exists:categories,id',
             'description' => 'required|string|max:3000', 'ingredients' => 'nullable|string|max:1200', 'allergens' => 'nullable|string|max:800',
@@ -73,12 +80,13 @@ class AdminCatalog extends Controller
             'active' => 'required|boolean', 'featured' => 'required|boolean', 'customizable' => 'required|boolean',
             'uploads' => 'nullable|array|max:5', 'uploads.*' => self::IMAGE_RULES,
             'removed' => 'nullable|array|max:5', 'removed.*' => 'string|max:255',
-            'variants' => 'required|array|min:1|max:30', 'variants.*' => 'required|array:id,name,price,stock,expected_stock,active,stock_note',
+            'variants' => 'required|array|min:1|max:30', 'variants.*' => 'required|array:id,name,price,stock,expected_stock,active,stock_note,size_label,servings_min,servings_max,servings_verified',
             'variants.*.id' => 'nullable|integer|distinct', 'variants.*.name' => 'required|string|max:100',
             'variants.*.price' => 'required|integer|min:0|max:100000000',
             'variants.*.stock' => 'required|integer|min:0|max:1000000', 'variants.*.expected_stock' => 'nullable|integer|min:0',
             'variants.*.active' => 'required|boolean',
             'variants.*.stock_note' => 'nullable|string|max:250',
+            ...ProductMetadata::rules(),
         ]);
 
         $actorId = $request->user()->id;
@@ -100,17 +108,30 @@ class AdminCatalog extends Controller
                     throw ValidationException::withMessages(["variants.{$index}.stock" => 'Tồn kho vừa thay đổi. Hãy tải lại trang trước khi sửa tồn.']);
                 }
             }
+            $accessories = $existing ? ProductMetadata::accessories($product, publicOnly: false)->keyBy('id') : collect();
+            foreach ($data['accessories'] ?? [] as $index => $accessory) {
+                if (! empty($accessory['id']) && ! $accessories->has($accessory['id'])) {
+                    throw ValidationException::withMessages(["accessories.{$index}.id" => 'Phụ kiện không thuộc bánh đang sửa. Vui lòng tải lại trang.']);
+                }
+            }
             $images = $existing ? json_decode($existing->images, true, flags: JSON_THROW_ON_ERROR) : [];
+            $originalImages = $images;
             $images = array_values(array_diff($images, $data['removed'] ?? []));
             if (count($images) + count($data['uploads'] ?? []) > 5) {
                 throw ValidationException::withMessages(['uploads' => 'Mỗi sản phẩm có tối đa 5 ảnh.']);
+            }
+            $metadata = ProductMetadata::productFields($data, $existing, count($images) + count($data['uploads'] ?? []), $originalImages !== $images || ! empty($data['uploads']));
+            $variantMetadata = [];
+            foreach ($data['variants'] as $index => $variant) {
+                $variantMetadata[$index] = ProductMetadata::variantFields($variant, ! empty($variant['id']) ? $previous->get($variant['id']) : null, $index);
             }
             foreach ($data['uploads'] ?? [] as $file) {
                 $images[] = $this->uploadedImage($file);
             }
 
             $fields = array_intersect_key($data, array_flip(['name', 'category_id', 'description', 'ingredients', 'allergens', 'prep_minutes', 'message_fee', 'active', 'featured', 'customizable']));
-            $fields += ['images' => json_encode($images, JSON_THROW_ON_ERROR), 'updated_at' => now()];
+            $fields += $metadata + ['images' => json_encode($images, JSON_THROW_ON_ERROR), 'updated_at' => now()];
+            $fields['search_text'] = Catalog::searchText($data['name'], $data['description'], ProductMetadata::stringList($metadata['occasions']), ProductMetadata::stringList($metadata['flavors']));
             if ($existing) {
                 DB::table('products')->where('id', $product)->update($fields);
             } else {
@@ -120,8 +141,8 @@ class AdminCatalog extends Controller
                 ]);
             }
 
-            foreach ($data['variants'] as $variant) {
-                $fields = array_intersect_key($variant, array_flip(['name', 'price', 'active', 'stock']));
+            foreach ($data['variants'] as $index => $variant) {
+                $fields = array_intersect_key($variant, array_flip(['name', 'price', 'active', 'stock'])) + $variantMetadata[$index];
                 if (! empty($variant['id'])) {
                     $id = (int) $variant['id'];
                     $after = (int) $variant['stock'];
@@ -135,6 +156,20 @@ class AdminCatalog extends Controller
                     $id = DB::table('variants')->insertGetId($fields + ['product_id' => $product]);
                     Inventory::record($id, 0, (int) $variant['stock'], 'initial', actorId: $actorId, note: $variant['stock_note'] ?? null);
                 }
+            }
+            if (array_key_exists('accessories', $data)) {
+                $retained = [];
+                foreach ($data['accessories'] as $accessory) {
+                    $fields = array_intersect_key($accessory, array_flip(['name', 'price', 'active', 'approved'])) + ['updated_at' => now()];
+                    if (! empty($accessory['id'])) {
+                        $accessoryId = (int) $accessory['id'];
+                        DB::table('product_accessories')->where('product_id', $product)->where('id', $accessoryId)->update($fields);
+                    } else {
+                        $accessoryId = DB::table('product_accessories')->insertGetId($fields + ['product_id' => $product, 'created_at' => now()]);
+                    }
+                    $retained[] = $accessoryId;
+                }
+                DB::table('product_accessories')->where('product_id', $product)->whereNotIn('id', $retained)->update(['active' => false, 'approved' => false, 'updated_at' => now()]);
             }
 
             return $product;

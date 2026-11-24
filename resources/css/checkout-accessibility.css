@@ -1,0 +1,91 @@
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+}
+
+.field > label { font-weight: 700; }
+.field :is(input, select, textarea)[aria-invalid="true"] { border: 2px solid #9c1838; }
+.field-error { color: #8b1534; font-size: 14px; font-weight: 600; }
+
+/* Interactive boundaries stay distinct from the pale decorative panel borders. */
+:is(.storefront-catalog, .storefront-product, .checkout-page, .cart-line)
+    :is(input:not([type="radio"], [type="checkbox"]), select, textarea):not(:disabled):not([aria-invalid="true"]),
+:is(.storefront-home, .storefront-catalog, .storefront-product, .checkout-page, .cart-line)
+    .button.secondary:not(:disabled),
+.storefront-product .sf-variant-option:not(.is-selected):not(.is-unavailable),
+.storefront-product .sf-accessory-options > label:not(:has(:checked)),
+.checkout-page .choices > label:not(:has(:checked)):not(:has(:disabled)) {
+    border-color: #94727e;
+}
+
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+    outline: 3px solid #771735;
+    outline-offset: 3px;
+}
+.error-list:focus, .checkout-feedback:focus, .checkout-schedule:focus,
+.checkout-choice-group:focus, .accessory-choices:focus, #checkout-items:focus {
+    outline: 3px solid #771735;
+    outline-offset: 4px;
+}
+.error-list a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.error-list a:focus-visible { outline-offset: 1px; }
+
+.checkout-page { overflow-wrap: anywhere; }
+.checkout-page :is(input, select, textarea, fieldset, .checkout-feedback, .error-list),
+.cart-line :is(input, select, textarea, fieldset, .error-list) {
+    scroll-margin-block: 95px 170px;
+}
+.checkout-fields { grid-row: span 3; }
+.checkout-choice-group, .checkout-schedule, .accessory-choices {
+    min-inline-size: 0;
+    padding: 0;
+    margin: 0;
+    border: 0;
+}
+.checkout-schedule { border-top: 1px solid var(--border); padding-top: 14px; }
+.checkout-schedule > legend, .accessory-choices > legend { font-weight: 700; padding: 0 0 8px; }
+.checkout-choice-group .choices label { min-height: 48px; }
+.checkout-choice-group .field-error { display: block; margin-top: 8px; }
+.schedule-refresh { min-height: 44px; justify-self: start; padding-block: 8px; }
+.schedule-status, .quote-status, .checkout-submit-help { color: #65525b; font-size: 14px; }
+.schedule-status:empty { display: none; }
+.checkout-submit-help { grid-column: 2; margin-top: 0; }
+.checkout-actions > .button { min-height: 48px; }
+.checkout-page .summary-lines > li { align-items: start; }
+.checkout-page .summary-lines > li > span, .summary-lines > li > div { min-width: 0; }
+.accessory-choices { display: grid; gap: 4px; }
+.accessory-choices .checkbox { min-height: 44px; align-items: flex-start; padding-block: 10px; }
+.accessory-choices input { margin-top: 3px; }
+.accessory-choices .checkbox:has(:disabled) { color: var(--muted); }
+.quote-skeleton { height: 9px; width: 72%; max-width: 230px; border-radius: 8px; background: #eadce1; }
+.quote-warning .text-action { min-height: 44px; }
+
+@media (max-width: 760px) {
+    .checkout-fields { grid-row: auto; }
+    .checkout-submit-help { grid-column: 1; }
+    .checkout-page .checkout-actions { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+    .checkout-page .checkout-actions > .button { min-width: 0; }
+    /* Keep the virtual keyboard and focused controls clear of the action bar. */
+    .checkout-grid:has(input:focus, textarea:focus, select:focus) .checkout-actions { position: static; }
+    .checkout-page .choices label { flex: 1 1 150px; }
+}
+@media (max-width: 540px) {
+    .checkout-page .two-fields, .cart-line .two-fields { grid-template-columns: minmax(0, 1fr); }
+    .checkout-page :is(input, select, textarea), .cart-line :is(input, select, textarea) { font-size: 16px; }
+    .checkout-page .coupon-row { align-items: start; }
+    .checkout-page .coupon-row > .button { margin-top: 29px; min-height: 44px; }
+}
+@media (max-width: 360px) {
+    .checkout-page .checkout-actions { flex-wrap: wrap; }
+    .checkout-page .checkout-actions > .button { width: 100%; }
+    .checkout-page .checkout-action-total { display: flex; align-items: baseline; justify-content: space-between; width: 100%; }
+    .checkout-page .coupon-row { grid-template-columns: 1fr; }
+    .checkout-page .coupon-row > .button { margin-top: 0; justify-self: start; }
+}

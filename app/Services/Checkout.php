@@ -19,8 +19,14 @@ class Checkout
 
         return collect($cart)->map(function ($line, $key) use ($variants, $choices, $requested) {
             $variant = $variants->get($line['variant_id']);
-            $available = $variant && $variant->active && $variant->product_active
+            $accessoryChoices = $variant ? ProductMetadata::accessories($variant->product_id) : collect();
+            $selectedIds = array_values(array_unique(array_map('intval', $line['accessories'] ?? [])));
+            $accessories = $accessoryChoices->whereIn('id', $selectedIds)->values();
+            $accessoriesAvailable = $accessories->count() === count($selectedIds);
+            $accessoryFee = (int) $accessories->sum('price');
+            $stockAvailable = $variant && $variant->active && $variant->product_active
                 && $variant->stock >= $requested[$line['variant_id']];
+            $available = $stockAvailable && $accessoriesAvailable;
             $customizable = (bool) ($variant?->customizable ?? false);
             $message = $customizable ? $line['message'] : null;
             $fee = $message !== null && $message !== '' ? (int) $variant->message_fee : 0;
@@ -30,7 +36,10 @@ class Checkout
                 'product_name' => $variant?->product_name ?? 'Bánh đã ngừng bán',
                 'variant_name' => $variant?->name ?? '',
                 'unit_price' => (int) ($variant?->price ?? 0), 'option_fee' => $fee,
-                'subtotal' => ((int) ($variant?->price ?? 0) + $fee) * $line['quantity'],
+                'accessory_fee' => $accessoryFee, 'accessories' => $accessories->all(),
+                'accessory_choices' => $accessoryChoices->values()->all(), 'accessories_available' => $accessoriesAvailable,
+                'stock_available' => (bool) $stockAvailable,
+                'subtotal' => ((int) ($variant?->price ?? 0) + $fee + $accessoryFee) * $line['quantity'],
                 'message' => $message, 'note' => $line['note'], 'available' => (bool) $available,
                 'customizable' => $customizable, 'message_fee' => (int) ($variant?->message_fee ?? 0),
                 'prep_minutes' => (int) ($variant?->prep_minutes ?? 0), 'slug' => $variant?->slug,
@@ -176,6 +185,7 @@ class Checkout
     {
         $prices = array_map(fn (array $line) => [
             $line['variant_id'], $line['quantity'], $line['unit_price'], $line['option_fee'],
+            $line['accessory_fee'] ?? 0, $line['accessories'] ?? [],
         ], $lines);
 
         return hash_hmac('sha256', json_encode([$key, $quote, $prices], JSON_THROW_ON_ERROR), config('app.key'));
@@ -233,6 +243,8 @@ class Checkout
                 DB::table('order_items')->insert([
                     ...array_intersect_key($line, array_flip(['variant_id', 'product_name', 'variant_name', 'unit_price', 'option_fee', 'quantity', 'message', 'note'])),
                     'order_id' => $id,
+                    'accessory_fee' => $line['accessory_fee'],
+                    'accessories_snapshot' => json_encode($line['accessories'], JSON_THROW_ON_ERROR),
                 ]);
             }
             if ($quote['coupon_id']) {

@@ -12,6 +12,8 @@
 :root { color-scheme: light; --bg: #fffcf9; --ink: #342129; --muted: #705e63; --berry: #a51e48; --border: #eddee0; --blush: #faeaf0; --radius: 20px; }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
+html { scroll-padding-block: 24px 112px; }
+input, select, textarea, button, summary, [tabindex] { scroll-margin-block: 24px 112px; }
 body { background: var(--bg); color: var(--ink); font-family: var(--font-sans); margin: 0; }
 body, button, input, textarea, select { font-size: 15px; }
 body, p { line-height: 1.55; }

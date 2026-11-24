@@ -68,7 +68,7 @@ Tất cả tài khoản mẫu dùng mật khẩu `BanhDemo2026!` và chỉ đư�
 
 Tài khoản nội bộ cần khóa TOTP. Sau khi chạy migration, dùng `php artisan bakery:mfa admin@tiembanh.test` để cấp khóa riêng cho quản trị viên mẫu và làm tương tự cho từng nhân viên cần kiểm thử. Nhập khóa vào ứng dụng xác thực theo chế độ dựa trên thời gian, 6 số, chu kỳ 30 giây. [Hướng dẫn cấp và thay khóa](docs/van-hanh.md#xác-thực-hai-bước-cho-tài-khoản-nội-bộ).
 
-1. Chọn bánh, phiên bản, số lượng và lời chúc nếu có. Mở giỏ để cập nhật món hoặc tiếp tục đặt bánh.
+1. Chọn bánh, cỡ / phiên bản, số lượng, lời chúc và phụ kiện được tiệm duyệt nếu có. Mở giỏ để cập nhật món hoặc tiếp tục đặt bánh.
 2. Chọn giao hàng hoặc nhận tại tiệm và chọn giờ. Dùng thử `NHAMINH10` cho đơn từ 200.000 ₫ hoặc `NGOT30000` cho đơn từ 300.000 ₫.
 3. Đặt thử COD hoặc chuyển khoản mẫu. Lưu liên kết tra cứu từ trang xác nhận hoặc lấy trong `storage/logs/laravel.log`. Yêu cầu quên mật khẩu cũng ghi email vào tệp này.
 4. Trong quản trị, tìm theo mã đơn, xác nhận, chuẩn bị rồi chuyển sang sẵn sàng nhận hoặc đang giao. Nhân viên ghi nhận COD sau khi giao/nhận. Người có quyền đối soát kiểm tra chuyển khoản và ghi nhận thanh toán. Sau khi đã thanh toán, đơn mới có thể chuyển sang hoàn tất.
@@ -81,13 +81,33 @@ Hệ thống đưa email nhận đơn, thay đổi trạng thái, đổi giờ, 
 
 **Đơn cần xử lý** gom đơn chưa xác nhận, chuyển khoản quá hạn, chờ hoàn, yêu cầu khách, chưa giao/nhận và bánh cần kiểm tra sau hủy. Nhân viên đổi giờ trước mốc chuẩn bị, quản lý xử lý ngoại lệ. Khách vẫn tra cứu và gửi yêu cầu đủ điều kiện khi tiệm tạm ngừng. Chỉnh chính sách đặt bánh và thông báo xử lý dữ liệu trong **Cấu hình**.
 
-Khách đã đăng nhập mở **Đơn của tôi**, chọn đơn cũ rồi bấm **Mua lại bánh**. Giỏ giữ các món đã có và thêm số bánh còn bán theo giá hiện tại. Nếu chỉ đủ một phần, hệ thống báo số bánh đã thêm và số bánh chưa thêm được. Khách nhập lời chúc và ghi chú mới trong giỏ. Đơn mới giữ tồn khi được đặt thành công.
+Khách đã đăng nhập mở **Đơn của tôi**, chọn đơn cũ rồi bấm **Mua lại bánh**. Giỏ giữ các món đã có và thêm số bánh còn bán theo giá hiện tại. Nếu chỉ đủ một phần, hệ thống báo số bánh đã thêm và số bánh chưa thêm được. Khách nhập lời chúc, ghi chú và chọn lại phụ kiện cho đơn mới trong giỏ. Đơn mới giữ tồn khi được đặt thành công.
 
 Quản trị viên mở **Nhật ký tồn kho** để xem tồn trước và sau, nguyên nhân, người thao tác và mã đơn liên quan. Có thể lọc theo loại thay đổi hoặc mở nhật ký riêng từ trang sản phẩm. Khi đổi số lượng tồn trong trang sản phẩm, có thể ghi lý do. Nhật ký bắt đầu ghi các thay đổi phát sinh sau migration, gồm tồn khi tạo phiên bản, điều chỉnh thủ công, giữ tồn và hoàn tồn.
 
 Nhân viên mở **Báo cáo** để chọn kỳ và xem doanh thu theo ngày cùng 10 bánh bán chạy theo số lượng. Báo cáo tính các đơn hoàn tất đã thanh toán theo ngày hoàn tất ở giờ Việt Nam. Doanh thu là tổng tiền sau giảm giá, gồm phí giao hàng. Mặc định xem từ đầu tháng đến hôm nay.
 
 Giờ nhận được tính trong 14 ngày tới từ lịch cửa hàng và thời gian chuẩn bị dài nhất trong giỏ, được chụp lại trên đơn mới. Hủy trước làm giải phóng phần giữ một lần; trả lượt mã theo cấu hình riêng. Hủy sau làm cần quản lý, không tự tăng tồn bán, sau đó phân loại phần chưa làm/còn bán được/tiêu hao. Đã xuất giao thì không được ghi là chưa làm. Đơn đã trả rồi hủy chờ người có quyền hoàn bên ngoài và nhập bằng chứng. Doanh thu tính từ đơn hoàn tất đã thanh toán.
+
+## Chọn bánh, bộ lọc và xác minh menu
+
+Trang chủ dẫn tới thực đơn, gợi ý dịp từ dữ liệu đã xác minh và hiển thị cơ sở đang phục vụ cùng vùng / phí giao đã cấu hình. Thực đơn hỗ trợ tìm tiếng Việt có hoặc không dấu, lọc danh mục, dịp, hương vị, số người, khoảng giá, còn / hết hàng, sắp xếp và phân trang. Bộ lọc nằm trong URL để giữ khi chia sẻ, phân trang, mở chi tiết hoặc quay lại. Khẩu phần, giá và tồn phải khớp cùng một phiên bản. Giá “Từ” ưu tiên lựa chọn còn tồn trong bộ lọc; từng cỡ hiển thị giá và tình trạng rõ ở trang bánh.
+
+Quản trị viên vào **Sản phẩm** để cập nhật dịp, hương vị, nhãn cỡ, khẩu phần, bảo quản và phụ kiện. Xác minh thông tin chi tiết, duyệt bộ ảnh và xác minh khẩu phần từng cỡ là các dấu riêng. Dữ liệu thiếu được ghi rõ chưa xác minh, không suy số người từ tên bánh hay đường kính. Hero chỉ dùng ảnh đã được tiệm duyệt; nếu chưa có sẽ hiển thị placeholder. Ảnh minh họa ở thẻ / chi tiết có chú thích và ảnh lỗi có trạng thái thay thế.
+
+Mỗi loại phụ kiện được chọn tính một đơn vị cho mỗi bánh. Máy chủ kiểm tra lại phụ kiện thuộc đúng sản phẩm, còn hoạt động, đã duyệt và lấy giá hiện hành; đơn giữ bản chụp tên / giá phụ kiện tại lúc mua. Phí lời chúc và phụ kiện thuộc tạm tính dùng để áp dụng mã giảm và xét miễn phí giao sau giảm giá. Bộ lọc giá chỉ tính giá bánh theo cỡ. Tiệm cần chốt quy tắc này và cách theo dõi cung cấp phụ kiện trước khi bán thật.
+
+Xem [hợp đồng dữ liệu, ma trận giao diện và cách nghiệm thu](docs/storefront-mobile.md). Repo hiện chưa có bộ ảnh thật hay bảng khẩu phần, gồm lựa chọn cho 8 người, đã được chủ tiệm xác nhận. Fixture local / test chỉ chứng minh hành vi kỹ thuật. Nghiệm thu bằng thiết bị, trình đọc màn hình và dữ liệu thật được ghi riêng trong hồ sơ, không suy từ kết quả lint / build.
+
+Hai migration ngày 24/11/2026 thêm metadata, phụ kiện, snapshot dòng đơn và nội dung tìm kiếm chuẩn hóa. Khi nâng cấp môi trường đã có dữ liệu, sao lưu, kiểm tra đúng schema môi trường riêng rồi chạy các lệnh dưới đây. Các dấu xác minh của dữ liệu cũ mặc định tắt, phí phụ kiện của đơn cũ bằng 0; tên, giá, tồn và lịch sử đơn được giữ.
+
+```powershell
+php artisan migrate
+npm run build
+php artisan queue:restart
+```
+
+Trình quản lý tiến trình cần khởi động lại worker sau lệnh restart. Chỉ nạp seed demo trên schema local / test trống theo phần cài đặt. Sau migration, chạy lại ca chọn / lọc / đặt bánh với dữ liệu được phép trên schema riêng, đối chiếu giá giỏ và snapshot đơn; giữ công tắc nhận đơn thật đóng đến khi người phụ trách duyệt.
 
 ## Đổi lịch, hủy và xử lý sau bán
 
@@ -110,17 +130,21 @@ php vendor/bin/pint --test
 php artisan test
 ```
 
-Lệnh test mặc định dùng SQLite trong bộ nhớ. Năm bài kiểm tra hai tiến trình được chạy khi chọn MySQL. Tạo schema mới có hậu tố `_test`, ví dụ `tiembanh_test`, và cấp quyền cho tài khoản kiểm thử. Bộ test tạo lại schema được chỉ định và chặn cấu hình trỏ đến cơ sở dữ liệu phát triển.
+Lệnh test mặc định dùng SQLite trong bộ nhớ. Các bài kiểm tra hai tiến trình được chạy khi chọn MySQL. Tạo schema mới có hậu tố `_test`, ví dụ `tiembanh_test`, và cấp quyền cho tài khoản kiểm thử. Bộ test tạo lại schema được chỉ định và chặn cấu hình trỏ đến cơ sở dữ liệu phát triển.
 
 ```powershell
+$env:APP_ENV = 'testing'
 $env:DB_CONNECTION = 'mysql'
 $env:DB_DATABASE = 'tiembanh_test'
 $env:DB_PORT = '33316' # Sửa theo cổng MySQL của máy
-php artisan test
-Remove-Item Env:DB_CONNECTION, Env:DB_DATABASE, Env:DB_PORT
+$env:DB_URL = ''
+php vendor/bin/phpunit --do-not-cache-result --fail-on-skipped
+Remove-Item Env:APP_ENV, Env:DB_CONNECTION, Env:DB_DATABASE, Env:DB_PORT, Env:DB_URL
 ```
 
 Dùng `DB_HOST`, `DB_USERNAME`, `DB_PASSWORD` trong môi trường hoặc trong `.env.testing` nếu thông tin riêng khác `.env`. Bài test HTTP bao phủ tính giá, tồn kho, hạn mức mã giảm, gửi đơn lặp, giờ nhận, hoàn kho, quyền xem đơn và đối soát, lọc CSV, email khôi phục và ảnh tải lên. Bộ test còn kiểm tra hạn đối soát, gửi lại email lỗi, quyền mua lại, nhật ký tồn, báo cáo, TOTP, điều kiện mở nhận đơn, quyền đổi giờ và đơn chờ hoàn tiền. MySQL kiểm tra hai tiến trình tranh tồn cuối, lượt mã cuối, khung giờ cuối, cùng khóa yêu cầu và thao tác đặt đơn tranh chỗ với thao tác đổi giờ.
+
+Các ca menu có cấu trúc kiểm tra quyền sửa metadata, các dấu xác minh độc lập, khoảng khẩu phần, tìm không dấu, bộ lọc giá / số người / tồn khớp cùng phiên bản và phụ kiện. Ca giá đối chiếu việc máy chủ tính lại, thay giá phụ kiện khi checkout còn mở, phụ kiện ngừng cung cấp và snapshot đơn sau khi menu đổi. Ca trình duyệt 320, 390, 768 và 1440 px cùng bàn phím / trạng thái biên được ghi ở [hồ sơ giao diện](docs/storefront-mobile.md); kết quả hiện tại cần đối chiếu đúng bản mã và môi trường ghi trong hồ sơ.
 
 Đã chạy lint PHP/JS và build Vite. MySQL đạt 25 bài với 767 assertions. SQLite đạt 21 bài với 738 assertions và bỏ qua bốn bài kiểm tra đồng thời dành cho MySQL. Chặng 4 dùng schema MySQL staging riêng. Trên trình duyệt đã kiểm tra đặt COD ở 390 px, tạm ngừng nhận đơn từ checkout cũ, hoàn tất COD, đối soát chuyển khoản mẫu và tra cứu. Email báo nhận đơn được kiểm tra bằng mailer log khi worker khởi động lại. Đã phục hồi 9 đơn và ảnh sản phẩm mẫu vào schema và thư mục ảnh riêng, đối chiếu mã băm ảnh và xem lại đơn trên trình duyệt. SMTP thật và tiền chuyển khoản thật cần cấu hình cửa hàng để xác minh.
 
