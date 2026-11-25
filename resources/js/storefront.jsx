@@ -1,7 +1,7 @@
 import { Link, useForm, usePage } from '@inertiajs/react';
 import { ArrowLeft, ArrowRight, CakeSlice, Check, Clock3, Gift, MapPin, Search, ShoppingBag, SlidersHorizontal, Truck, UsersRound } from 'lucide-react';
 import { useRef, useState } from 'react';
-import { Breadcrumb, ButtonLink, categoriesIcons, Empty, ErrorList, Field, Layout, money, Pagination } from './ui';
+import { Breadcrumb, ButtonLink, categoriesIcons, Empty, ErrorList, Field, Image, Layout, money, Pagination } from './ui';
 
 const verified = value => value === true || value === 1 || value === '1';
 const catalogFields = ['q', 'category', 'occasion', 'guests', 'flavor', 'min', 'max', 'availability', 'sort', 'page'];
@@ -11,14 +11,13 @@ function queryString(filters = {}) {
 }
 
 function catalogUrl(filters = {}) {
-    const query = queryString(filters);
-    return '/thuc-don' + (query ? '?' + query : '');
+    const { category, ...remaining } = filters;
+    const query = queryString(remaining);
+    return '/thuc-don' + (category ? '/' + encodeURIComponent(category) : '') + (query ? '?' + query : '');
 }
 
-function CakePhoto({ src, alt = '', className = '', loading = 'lazy', priority = false, placeholder = 'Ảnh đang được cập nhật', decorative = false }) {
-    const [failedSource, setFailedSource] = useState(null);
-    return src && src !== failedSource ? <img src={src} alt={alt} className={className} loading={loading} fetchPriority={priority ? 'high' : undefined} onError={() => setFailedSource(src)} /> :
-        <span className={'sf-photo-placeholder ' + className} role={decorative ? undefined : 'img'} aria-hidden={decorative || undefined} aria-label={decorative ? undefined : alt || placeholder}><CakeSlice size={40} strokeWidth={1.3} /><span>{placeholder}</span></span>;
+function CakePhoto({ src, asset, alt = '', className = '', loading = 'lazy', sizes, priority = false, placeholder = 'Ảnh đang được cập nhật', decorative = false }) {
+    return <Image src={src} asset={asset} alt={alt} className={className} loading={loading} sizes={sizes} priority={priority} placeholder={placeholder} placeholderClassName="sf-photo-placeholder" decorative={decorative} />;
 }
 
 function ProductCard({ product, filters = {} }) {
@@ -30,7 +29,7 @@ function ProductCard({ product, filters = {} }) {
     return <article className="product-card sf-product-card">
         <Link className="sf-card-link" href={href} aria-labelledby={'sf-card-name-' + product.id} aria-describedby={`sf-card-price-${product.id} sf-card-details-${product.id}${soldOut ? ' sf-card-stock-' + product.id : ''}${!verified(product.images_approved) ? ' sf-card-image-' + product.id : ''}`}>
             <div className="product-photo sf-card-photo">
-                <CakePhoto src={product.images?.[0]} alt="" decorative />
+                <CakePhoto src={product.images?.[0]} asset={product.image_assets?.[product.images?.[0]]} sizes="(max-width: 359px) calc(100vw - 32px), (max-width: 600px) calc((100vw - 43px) / 2), (max-width: 1000px) 30vw, 296px" alt="" decorative />
                 {soldOut && <span className="photo-badge" id={'sf-card-stock-' + product.id}>Hết hàng</span>}
                 {!verified(product.images_approved) && <span className="sf-image-note" id={'sf-card-image-' + product.id}>Ảnh minh họa / chờ xác minh</span>}
             </div>
@@ -73,7 +72,7 @@ export function Home({ categories = [], featured = [], occasions = [], currentLo
                 <p>Xem cỡ bánh, khẩu phần và giá trước khi chọn. Chọn giờ giao hoặc nhận tại tiệm ở bước đặt bánh.</p>
                 <div className="hero-actions"><ButtonLink href="/thuc-don">Chọn bánh <ArrowRight size={19} /></ButtonLink><a className="subtle-link" href="#co-so-dang-phuc-vu">Giờ mở cửa và vùng giao</a></div>
             </div>
-            <div className="hero-photo sf-hero-photo"><CakePhoto src={heroProduct?.images[0]} alt={heroProduct?.name ?? 'Tiệm đang bổ sung ảnh bánh đã xác nhận'} loading="eager" priority placeholder="Tiệm đang bổ sung ảnh bánh đã xác nhận" />
+            <div className="hero-photo sf-hero-photo"><CakePhoto src={heroProduct?.images[0]} asset={heroProduct?.image_assets?.[heroProduct?.images[0]]} sizes="(min-width: 1280px) 620px, (min-width: 881px) 50vw, (max-width: 760px) calc(100vw - 32px), calc(100vw - 64px)" alt={heroProduct?.name ?? 'Tiệm đang bổ sung ảnh bánh đã xác nhận'} loading="eager" priority placeholder="Tiệm đang bổ sung ảnh bánh đã xác nhận" />
                 {heroProduct && <div className="hero-caption"><div><small>GỢI Ý TỪ TIỆM</small><Link href={'/banh/' + heroProduct.slug}>{heroProduct.name} <ArrowRight size={14} /></Link></div></div>}
             </div>
         </section>
@@ -93,7 +92,7 @@ export function Home({ categories = [], featured = [], occasions = [], currentLo
     </div></Layout>;
 }
 
-function CatalogView({ products, categories, filters, filterOptions, currentLocation }) {
+function CatalogView({ products, categories, filters, filterOptions, currentLocation, currentCategory }) {
     const form = useForm({ q: filters.q ?? '', category: filters.category ?? '', occasion: filters.occasion ?? '', guests: filters.guests ?? '', flavor: filters.flavor ?? '', min: filters.min ?? '', max: filters.max ?? '', availability: filters.availability ?? 'all', sort: filters.sort ?? 'featured' });
     const filterDetails = useRef(null);
     const formElement = useRef(null);
@@ -106,15 +105,16 @@ function CatalogView({ products, categories, filters, filterOptions, currentLoca
     ].filter(([, label]) => label);
     function search(event) {
         event.preventDefault();
-        form.transform(data => Object.fromEntries(Object.entries(data).filter(([, value]) => value !== '')));
-        form.get('/thuc-don', { preserveState: true, preserveScroll: true, onError: () => {
+        const path = form.data.category ? '/thuc-don/' + encodeURIComponent(form.data.category) : '/thuc-don';
+        form.transform(data => Object.fromEntries(Object.entries(data).filter(([key, value]) => key !== 'category' && value !== '')));
+        form.get(path, { preserveState: true, preserveScroll: true, onError: () => {
             if (filterDetails.current) filterDetails.current.open = true;
             requestAnimationFrame(() => formElement.current?.querySelector('[aria-invalid="true"]')?.focus());
         } });
     }
     return <Layout title="Thực đơn"><div className="wrap page storefront-catalog">
-        <Breadcrumb><span>Thực đơn</span></Breadcrumb>
-        <div className="page-heading sf-catalog-heading"><span className="sf-eyebrow">Chọn bánh vừa dịp, vừa khẩu vị</span><h1>Hôm nay bạn chọn bánh gì?</h1><p>Lọc theo số người, dịp tặng hoặc khoảng giá. Khẩu phần chỉ dùng thông tin đã được tiệm xác nhận.</p></div>
+        <Breadcrumb>{currentCategory ? <><Link href="/thuc-don">Thực đơn</Link><span aria-hidden="true">/</span><span>{currentCategory.name}</span></> : <span>Thực đơn</span>}</Breadcrumb>
+        <div className="page-heading sf-catalog-heading"><span className="sf-eyebrow">Chọn bánh vừa dịp, vừa khẩu vị</span><h1>{currentCategory?.name ?? 'Hôm nay bạn chọn bánh gì?'}</h1><p>Lọc theo số người, dịp tặng hoặc khoảng giá. Khẩu phần chỉ dùng thông tin đã được tiệm xác nhận.</p></div>
         <CurrentLocation location={currentLocation} compact />
         <form ref={formElement} onSubmit={search} className="panel sf-catalog-form" aria-label="Tìm và lọc bánh" aria-busy={form.processing}>
             <div className="sf-search-row"><Field label="Tìm bánh" error={form.errors.q}><input type="search" name="q" maxLength={100} placeholder="Tên bánh hoặc điều bạn đang tìm…" value={form.data.q} aria-invalid={Boolean(form.errors.q)} onChange={e => form.setData('q', e.target.value)} /></Field><button className="button" disabled={form.processing}><Search size={18} />{form.processing ? 'Đang tìm…' : 'Tìm bánh'}</button></div>
@@ -141,8 +141,8 @@ function CatalogView({ products, categories, filters, filterOptions, currentLoca
     </div></Layout>;
 }
 
-export function Catalog({ products, categories = [], filters = {}, filterOptions = { occasions: [], flavors: [] }, currentLocation }) {
-    return <CatalogView key={JSON.stringify(filters)} products={products} categories={categories} filters={filters} filterOptions={filterOptions} currentLocation={currentLocation} />;
+export function Catalog({ products, categories = [], filters = {}, filterOptions = { occasions: [], flavors: [] }, currentLocation, currentCategory }) {
+    return <CatalogView key={JSON.stringify(filters)} products={products} categories={categories} filters={filters} filterOptions={filterOptions} currentLocation={currentLocation} currentCategory={currentCategory} />;
 }
 
 function servingLabel(variant) {
@@ -150,10 +150,10 @@ function servingLabel(variant) {
     return Number(variant.servings_min) === Number(variant.servings_max) ? `Khoảng ${variant.servings_min} người` : `Khoảng ${variant.servings_min}–${variant.servings_max} người`;
 }
 
-export function Product({ product, suggestedVariantId }) {
+export function Product({ product, suggestedVariantId, selectionFilters }) {
     const { shop } = usePage().props;
     const pageUrl = usePage().url;
-    const filters = Object.fromEntries(new URLSearchParams(pageUrl.split('?')[1] ?? ''));
+    const filters = selectionFilters ?? Object.fromEntries(new URLSearchParams(pageUrl.split('?')[1] ?? ''));
     const hasSelectionFilters = ['guests', 'min', 'max'].some(field => filters[field] != null && filters[field] !== '') || ['available', 'sold_out'].includes(filters.availability);
     const suggested = product.variants.find(choice => Number(choice.id) === Number(suggestedVariantId));
     const initial = suggested ?? (hasSelectionFilters && suggestedVariantId === null ? null : product.variants.find(choice => Number(choice.stock) > 0) ?? product.variants[0]);
@@ -176,9 +176,9 @@ export function Product({ product, suggestedVariantId }) {
     return <Layout title={product.name}><div className="wrap page storefront-product">
         <Breadcrumb><Link href={catalogUrl(filters)}>Thực đơn</Link><span aria-hidden="true">/</span><span>{product.name}</span></Breadcrumb>
         <div className="detail-grid sf-product-layout">
-            <div className="sf-product-gallery"><div className="detail-photo"><CakePhoto src={pictures[photo]} alt={`${product.name}${pictures.length > 1 ? ` — ảnh ${photo + 1}` : ''}`} loading="eager" priority /></div>
+            <div className="sf-product-gallery"><div className="detail-photo"><CakePhoto src={pictures[photo]} asset={product.image_assets?.[pictures[photo]]} sizes="(min-width: 1280px) 590px, (min-width: 881px) 46vw, (max-width: 760px) calc(100vw - 32px), calc(100vw - 64px)" alt={`${product.name}${pictures.length > 1 ? ` — ảnh ${photo + 1}` : ''}`} loading="eager" priority={photo === 0} /></div>
                 <p className="sf-photo-status">{verified(product.images_approved) ? 'Ảnh đã được tiệm xác nhận.' : 'Ảnh minh họa / chưa được tiệm xác minh. Hãy đối chiếu yêu cầu riêng với tiệm.'}</p>
-                {pictures.length > 1 && <div className="gallery sf-gallery" role="group" aria-label="Chọn ảnh bánh">{pictures.map((src, index) => <button type="button" className={photo === index ? 'selected' : ''} key={src + index} aria-label={`Xem ảnh ${index + 1} của ${product.name}`} aria-pressed={photo === index} onClick={() => setPhoto(index)}><CakePhoto src={src} alt="" decorative />{photo === index && <span className="sf-gallery-check" aria-hidden="true"><Check size={13} /></span>}</button>)}</div>}
+                {pictures.length > 1 && <div className="gallery sf-gallery" role="group" aria-label="Chọn ảnh bánh">{pictures.map((src, index) => <button type="button" className={photo === index ? 'selected' : ''} key={src + index} aria-label={`Xem ảnh ${index + 1} của ${product.name}`} aria-pressed={photo === index} onClick={() => setPhoto(index)}><CakePhoto src={src} asset={product.image_assets?.[src]} sizes="70px" alt="" decorative />{photo === index && <span className="sf-gallery-check" aria-hidden="true"><Check size={13} /></span>}</button>)}</div>}
             </div>
             <section className="sf-product-info"><span className="product-category">{product.category}</span><h1>{product.name}</h1>
                 <p className="intro">{product.description}</p>

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Services\Catalog;
 use App\Services\Inventory;
 use App\Services\ProductMetadata;
+use App\Services\ResponsiveImages;
 use App\Services\Store;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -75,6 +76,7 @@ class AdminCatalog extends Controller
         }
         $data = $request->validate([
             'name' => 'required|string|max:150', 'category_id' => 'required|exists:categories,id',
+            'slug' => ['sometimes', 'nullable', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/D', 'max:170'],
             'description' => 'required|string|max:3000', 'ingredients' => 'nullable|string|max:1200', 'allergens' => 'nullable|string|max:800',
             'prep_minutes' => 'required|integer|min:0|max:14400', 'message_fee' => 'required|integer|min:0|max:1000000',
             'active' => 'required|boolean', 'featured' => 'required|boolean', 'customizable' => 'required|boolean',
@@ -94,6 +96,15 @@ class AdminCatalog extends Controller
             Store::settings(lock: true);
             $existing = $product ? DB::table('products')->find($product) : null;
             abort_if($product && ! $existing, 404);
+            $slug = $data['slug'] ?? $existing?->slug;
+            if (! $slug) {
+                $base = Str::slug($data['name']) ?: 'banh';
+                $slug = substr($base, 0, 145).'-'.Str::lower(Str::random(8));
+            }
+            if (DB::table('products')->where('slug', $slug)->when($product, fn ($q) => $q->where('id', '<>', $product))->exists()
+                || DB::table('product_slug_history')->where('slug', $slug)->when($product, fn ($q) => $q->where('product_id', '<>', $product))->exists()) {
+                throw ValidationException::withMessages(['slug' => 'Đường dẫn đang dùng hoặc thuộc lịch sử của bánh khác.']);
+            }
             $previous = $existing ? DB::table('variants')->where('product_id', $product)->get()->keyBy('id') : collect();
             foreach ($data['variants'] as $index => $variant) {
                 $variantId = $variant['id'] ?? null;
@@ -131,13 +142,16 @@ class AdminCatalog extends Controller
 
             $fields = array_intersect_key($data, array_flip(['name', 'category_id', 'description', 'ingredients', 'allergens', 'prep_minutes', 'message_fee', 'active', 'featured', 'customizable']));
             $fields += $metadata + ['images' => json_encode($images, JSON_THROW_ON_ERROR), 'updated_at' => now()];
+            $fields['slug'] = $slug;
             $fields['search_text'] = Catalog::searchText($data['name'], $data['description'], ProductMetadata::stringList($metadata['occasions']), ProductMetadata::stringList($metadata['flavors']));
             if ($existing) {
+                if ($existing->slug !== $slug) {
+                    DB::table('product_slug_history')->insertOrIgnore(['product_id' => $product, 'slug' => $existing->slug, 'created_at' => now()]);
+                }
                 DB::table('products')->where('id', $product)->update($fields);
             } else {
-                $slug = Str::slug($data['name']) ?: 'banh';
                 $product = DB::table('products')->insertGetId($fields + [
-                    'slug' => substr($slug, 0, 145).'-'.Str::lower(Str::random(8)), 'created_at' => now(),
+                    'created_at' => now(),
                 ]);
             }
 
@@ -187,11 +201,23 @@ class AdminCatalog extends Controller
             'name' => 'required|string|max:100', 'slug' => ['required', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/', 'max:120', Rule::unique('categories')->ignore($category)],
             'icon' => 'required|in:cake,croissant,cupcake,cookie',
         ]);
-        if ($category) {
-            DB::table('categories')->where('id', $category)->update($data);
-        } else {
-            DB::table('categories')->insert($data);
-        }
+        DB::transaction(function () use ($data, $category) {
+            Store::settings(lock: true);
+            $previous = $category ? DB::table('categories')->find($category) : null;
+            abort_if($category && ! $previous, 404);
+            if (DB::table('categories')->where('slug', $data['slug'])->when($category, fn ($q) => $q->where('id', '<>', $category))->exists()
+                || DB::table('category_slug_history')->where('slug', $data['slug'])->when($category, fn ($q) => $q->where('category_id', '<>', $category))->exists()) {
+                throw ValidationException::withMessages(['slug' => 'Đường dẫn đang dùng hoặc thuộc lịch sử của danh mục khác.']);
+            }
+            if ($previous) {
+                if ($previous->slug !== $data['slug']) {
+                    DB::table('category_slug_history')->insertOrIgnore(['category_id' => $category, 'slug' => $previous->slug, 'created_at' => now()]);
+                }
+                DB::table('categories')->where('id', $category)->update($data);
+            } else {
+                DB::table('categories')->insert($data);
+            }
+        }, 5);
 
         return back()->with('notice', 'Đã lưu danh mục.');
     }
@@ -200,7 +226,9 @@ class AdminCatalog extends Controller
     {
         $path = $file->store('bakery', 'public');
         abort_unless($path, 500);
+        $url = '/anh/'.basename($path);
+        app(ResponsiveImages::class)->generate($url);
 
-        return '/anh/'.basename($path);
+        return $url;
     }
 }

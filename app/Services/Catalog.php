@@ -98,6 +98,7 @@ class Catalog
     public static function images(object $product): object
     {
         $product->images = is_string($product->images) ? json_decode($product->images, true, flags: JSON_THROW_ON_ERROR) : ($product->images ?? []);
+        $product->image_assets = app(ResponsiveImages::class)->assets($product->images);
         $product = ProductMetadata::hydrate($product);
         if (property_exists($product, 'price')) {
             $product->price = $product->price === null ? null : (int) $product->price;

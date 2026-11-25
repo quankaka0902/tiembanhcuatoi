@@ -4,6 +4,8 @@ namespace App\Providers;
 
 use App\Models\User;
 use App\Services\PrivateStaging;
+use App\Services\PublicRenderingGateway;
+use App\Services\PublicSeo;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Middleware\TrustProxies;
@@ -13,13 +15,22 @@ use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
+use Inertia\Ssr\Gateway;
 
 class AppServiceProvider extends ServiceProvider
 {
+    public function register(): void
+    {
+        $this->app->bind(Gateway::class, PublicRenderingGateway::class);
+    }
+
     public function boot(): void
     {
+        // Built assets use the validated deployment origin, never the request Host.
+        Vite::createAssetPathsUsing(fn (string $path) => (PublicSeo::origin() ?? '').'/'.ltrim($path, '/'));
         TrustProxies::at(config('bakery.trusted_proxies'));
         Event::listen(MessageSending::class, PrivateStaging::class.'@checkOutgoingMail');
         Gate::define('active-account', fn (User $user) => $user->active);

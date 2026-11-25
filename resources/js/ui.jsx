@@ -8,18 +8,20 @@ export const dateTime = value => value ? `${date(value)} · ${value.slice(11, 16
 export const categoriesIcons = { cake: CakeSlice, croissant: Croissant, cupcake: CupSoda, cookie: Cookie };
 
 export function Brand({ shop }) {
+    const [failedLogo, setFailedLogo] = useState(false);
+    const logo = shop.logo_asset;
     return <Link href="/" className="brand" aria-label={shop.name}>
-        {shop.logo ? <img src={shop.logo} alt="" /> : <span className="brand-mark"><CakeSlice size={23} strokeWidth={1.8} /></span>}
+        {shop.logo && !failedLogo ? <img src={logo?.src || shop.logo} srcSet={logo?.srcset || undefined} sizes={logo?.srcset ? '44px' : undefined} width="44" height="44" loading="eager" decoding="async" alt="" onError={() => setFailedLogo(true)} /> : <span className="brand-mark"><CakeSlice size={23} strokeWidth={1.8} /></span>}
         <span>{shop.name}</span>
     </Link>;
 }
 
 export function Layout({ title, children }) {
-    const { shop, auth, cartCount, notice } = usePage().props;
+    const { shop, auth, cartCount, notice, seo } = usePage().props;
     const path = usePage().url.split('?')[0];
     const internal = auth && auth.role !== 'customer';
     return <>
-        <Head title={title ? `${title} | ${shop.name}` : shop.name} />
+        {!seo && <Head title={title ? `${title} | ${shop.name}` : shop.name} />}
         <a className="skip" href="#main">Chuyển đến nội dung</a>
         <header className="site-header">
             <div className="wrap header-inner">
@@ -56,7 +58,7 @@ export function Layout({ title, children }) {
                 <div><Brand shop={shop} /><p>Bánh tươi cho những dịp đáng nhớ và cả những ngày bình thường.</p></div>
                 <div><h3>Ghé tiệm</h3>{shop.address && <p><MapPin size={17} />{shop.address}</p>}{shop.hours && <p><Clock3 size={17} />{shop.hours}</p>}</div>
                 <div><h3>Liên hệ</h3>{shop.phone && <p><Phone size={17} /><a href={`tel:${shop.phone.replace(/[^+\d]/g, '')}`}>{shop.phone}</a></p>}{shop.email && <p><a href={`mailto:${shop.email}`}>{shop.email}</a></p>}</div>
-                <div><h3>Đặt bánh</h3><p><Link href="/thuc-don">Thực đơn</Link></p><p><Link href="/tra-cuu">Tra cứu đơn</Link></p><p><Link href="/chinh-sach-dat-banh">Chính sách đặt bánh</Link></p>{auth && <Link className="text-action" as="button" method="post" href="/dang-xuat">Đăng xuất</Link>}</div>
+                <div><h3>Đặt bánh</h3><p><Link href="/thuc-don">Thực đơn</Link></p><p><Link href="/tra-cuu">Tra cứu đơn</Link></p><p><Link href="/chinh-sach-dat-banh">Chính sách đặt bánh</Link></p><p><Link href="/gioi-thieu">Về tiệm</Link></p><p><Link href="/lien-he">Liên hệ</Link></p><p><Link href="/cau-hoi-thuong-gap">Câu hỏi thường gặp</Link></p><p><Link href="/cua-hang">Cửa hàng</Link></p>{auth && <Link className="text-action" as="button" method="post" href="/dang-xuat">Đăng xuất</Link>}</div>
             </div>
         </footer>
     </>;
@@ -123,14 +125,22 @@ export function Pagination({ page }) {
     </nav>;
 }
 
-export function Image({ src, alt = '', className = '', loading = 'lazy' }) {
-    return <ImageContent key={src ?? ''} src={src} alt={alt} className={className} loading={loading} />;
+export function Image({ src, asset, alt = '', className = '', loading = 'lazy', sizes, priority = false, placeholder, placeholderClassName, decorative = false }) {
+    return <ImageContent key={(asset?.src || src || '') + (asset?.srcset || '')} src={src} asset={asset} alt={alt} className={className} loading={loading} sizes={sizes} priority={priority} placeholder={placeholder} placeholderClassName={placeholderClassName} decorative={decorative} />;
 }
 
-function ImageContent({ src, alt, className, loading }) {
-    const [failed, setFailed] = useState(false);
-    return src && !failed ? <img className={className} src={src} alt={alt} loading={loading} onError={() => setFailed(true)} /> :
-        <span className={`image-placeholder ${className}`} role={alt ? 'img' : undefined} aria-label={alt || undefined} aria-hidden={alt ? undefined : true}><CakeSlice size={32} strokeWidth={1.5} aria-hidden="true" /></span>;
+function ImageContent({ src, asset, alt, className, loading, sizes, priority, placeholder, placeholderClassName, decorative }) {
+    const [failures, setFailures] = useState([]);
+    const primary = asset?.src || src;
+    const fallback = asset?.fallback || src;
+    const useFallback = failures.includes('primary');
+    const selected = useFallback ? fallback : primary;
+    const failed = useFallback && (fallback === primary || failures.includes('fallback'));
+    const srcset = !useFallback && asset?.srcset;
+    const width = useFallback ? asset?.original_width : asset?.width;
+    const height = useFallback ? asset?.original_height : asset?.height;
+    return selected && !failed ? <img className={className} src={selected} srcSet={srcset || undefined} sizes={srcset ? sizes || '(max-width: 760px) 100vw, 50vw' : undefined} width={width || undefined} height={height || undefined} alt={alt} loading={loading} decoding="async" fetchPriority={priority ? 'high' : undefined} onError={() => setFailures(previous => [...previous, useFallback ? 'fallback' : 'primary'])} /> :
+        <span className={`${placeholderClassName || 'image-placeholder'} ${className}`} role={!decorative && alt ? 'img' : undefined} aria-label={!decorative && alt ? alt : undefined} aria-hidden={decorative || !alt ? true : undefined}><CakeSlice size={32} strokeWidth={1.5} aria-hidden="true" />{placeholder && <span>{placeholder}</span>}</span>;
 }
 
 export function Pill({ value, labels }) {

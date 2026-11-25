@@ -6,14 +6,16 @@ use App\Http\Controllers\AdminConfig;
 use App\Http\Controllers\AdminOrders;
 use App\Http\Controllers\AdminSchedule;
 use App\Http\Controllers\OrderChanges;
+use App\Http\Controllers\PublicPages;
 use App\Http\Controllers\Storefront;
 use App\Http\Middleware\VerifyStaffFactor;
+use App\Services\ResponsiveImages;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\Storage;
 
 Route::controller(Storefront::class)->group(function () {
     Route::get('/', 'home');
     Route::get('/thuc-don', 'catalog');
+    Route::get('/thuc-don/{categorySlug}', 'catalog')->where('categorySlug', '[a-z0-9]+(?:-[a-z0-9]+)*');
     Route::get('/banh/{slug}', 'product');
     Route::get('/gio-hang', 'cart');
     Route::post('/gio-hang', 'saveLine')->block();
@@ -42,11 +44,17 @@ Route::controller(Storefront::class)->group(function () {
     });
 });
 
-Route::get('/anh/{file}', function (string $file) {
-    $disk = Storage::disk('public');
-    abort_unless($disk->exists('bakery/'.$file), 404);
+Route::controller(PublicPages::class)->group(function () {
+    Route::get('/gioi-thieu', 'about');
+    Route::get('/lien-he', 'contact');
+    Route::get('/cau-hoi-thuong-gap', 'faq');
+    Route::get('/cua-hang', 'location');
+    Route::get('/robots.txt', 'robots');
+    Route::get('/sitemap.xml', 'sitemap');
+});
 
-    return $disk->response('bakery/'.$file, headers: ['Cache-Control' => 'public, max-age=86400', 'X-Content-Type-Options' => 'nosniff']);
+Route::get('/anh/{file}', function (string $file) {
+    return app(ResponsiveImages::class)->response($file);
 })->where('file', '[A-Za-z0-9]{40}\.(?:jpg|jpeg|png|webp)')->withoutMiddleware('web');
 
 Route::middleware('guest')->group(function () {

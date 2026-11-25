@@ -63,6 +63,7 @@ jobs:
           php vendor/bin/pint --test
           npm run lint
           npm run build
+          npm run test:ssr
 
       - name: Test on SQLite
         run: php vendor/bin/phpunit --do-not-cache-result

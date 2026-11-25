@@ -31,7 +31,7 @@ class Store
 
         return array_intersect_key($settings, array_flip([
             'name', 'logo', 'phone', 'email', 'address', 'hours', 'accepting_orders',
-        ])) + ['pause_message' => self::pauseMessage($settings)];
+        ])) + ['pause_message' => self::pauseMessage($settings), 'logo_asset' => app(ResponsiveImages::class)->asset($settings['logo'])];
     }
 
     public static function pauseMessage(array $settings): string

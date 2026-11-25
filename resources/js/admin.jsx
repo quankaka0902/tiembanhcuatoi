@@ -537,7 +537,7 @@ function Flag({ form, field, label }) {
 
 export function AdminProduct({ product, categories }) {
     const form = useForm({
-        name: product?.name ?? '', category_id: product?.category_id ?? '', description: product?.description ?? '',
+        name: product?.name ?? '', slug: product?.slug ?? '', category_id: product?.category_id ?? '', description: product?.description ?? '',
         ingredients: product?.ingredients ?? '', allergens: product?.allergens ?? '', prep_minutes: product?.prep_minutes ?? 60,
         occasions: (product?.occasions ?? []).join('\n'), flavors: (product?.flavors ?? []).join('\n'),
         storage_instructions: product?.storage_instructions ?? '', details_verified: Boolean(product?.details_verified), images_approved: Boolean(product?.images_approved),
@@ -566,6 +566,8 @@ export function AdminProduct({ product, categories }) {
         }}>
             <div className="admin-columns">
                 <section className="panel form-stack"><h2>Thông tin bánh</h2><Text form={form} field="name" label="Tên bánh" required maxLength={150} />
+                    <Text form={form} field="slug" label="Đường dẫn bánh" maxLength={170} pattern="[a-z0-9]+(-[a-z0-9]+)*" placeholder="Để trống khi tạo mới để tự tạo" />
+                    <p className="muted">Đổi tên không tự đổi đường dẫn. Khi đổi đường dẫn đã lưu, liên kết cũ của bánh còn bán sẽ chuyển tới địa chỉ mới.</p>
                     <Field label="Danh mục" error={form.errors.category_id}><select required value={form.data.category_id} onChange={e => form.setData('category_id', e.target.value)}><option value="">Chọn danh mục</option>{categories.map(category => <option key={category.id} value={category.id}>{category.name}</option>)}</select></Field>
                     <TextArea form={form} field="description" label="Mô tả" required maxLength={3000} />
                     <TextArea form={form} field="occasions" label="Dịp dùng bánh" placeholder="Mỗi dòng một dịp do tiệm cung cấp" />
@@ -624,10 +626,54 @@ export function AdminProduct({ product, categories }) {
     </Admin>;
 }
 
+function PublicContentSettings({ form, businessChange }) {
+    const contentChange = (key, value) => form.setData(data => ({ ...data, [key]: value, public_content_approved: false }));
+    function faqChange(index, key, value) {
+        contentChange('faq_items', form.data.faq_items.map((row, i) => i === index ? { ...row, [key]: value } : row));
+    }
+    function hoursChange(index, key, value) {
+        businessChange('business_opening_hours', form.data.business_opening_hours.map((row, i) => i === index ? { ...row, [key]: value } : row));
+    }
+    return <>
+        <section className="panel form-stack"><h2>Nội dung giới thiệu và FAQ</h2>
+            <TextArea form={form} field="about_text" label="Giới thiệu do tiệm cung cấp" maxLength={6000} onChange={e => contentChange('about_text', e.target.value)} />
+            <TextArea form={form} field="contact_text" label="Hướng dẫn liên hệ" maxLength={3000} onChange={e => contentChange('contact_text', e.target.value)} />
+            {form.data.faq_items.map((row, index) => <fieldset className="form-stack" key={index}><legend>Câu hỏi {index + 1}</legend>
+                <Field label="Câu hỏi" error={form.errors['faq_items.' + index + '.question']}><input required maxLength={250} value={row.question} onChange={e => faqChange(index, 'question', e.target.value)} /></Field>
+                <Field label="Câu trả lời được tiệm xác nhận" error={form.errors['faq_items.' + index + '.answer']}><textarea required maxLength={2000} value={row.answer} onChange={e => faqChange(index, 'answer', e.target.value)} /></Field>
+                <button type="button" className="text-action danger" onClick={() => contentChange('faq_items', form.data.faq_items.filter((_, i) => i !== index))}>Bỏ câu hỏi</button>
+            </fieldset>)}
+            <button type="button" className="button secondary compact" disabled={form.data.faq_items.length >= 30} onClick={() => contentChange('faq_items', [...form.data.faq_items, { question: '', answer: '' }])}>Thêm câu hỏi</button>
+            <Flag form={form} field="public_content_approved" label="Tiệm đã duyệt nội dung giới thiệu, hướng dẫn liên hệ và FAQ hiện tại" />
+        </section>
+        <section className="panel form-stack"><h2>Thông tin cơ sở công khai</h2>
+            <p className="muted">Nhập dữ liệu thật từ người phụ trách. Phần chưa xác minh không được dùng làm dữ liệu doanh nghiệp cho công cụ tìm kiếm. Duyệt nội dung không tự mở bán hoặc bật lập chỉ mục.</p>
+            <Text form={form} field="business_street_address" label="Số nhà, đường" maxLength={250} onChange={e => businessChange('business_street_address', e.target.value)} />
+            <div className="two-fields"><Text form={form} field="business_locality" label="Thành phố hoặc địa phương" maxLength={120} onChange={e => businessChange('business_locality', e.target.value)} />
+                <Text form={form} field="business_region" label="Tỉnh hoặc vùng (nếu áp dụng)" maxLength={120} onChange={e => businessChange('business_region', e.target.value)} /></div>
+            <div className="two-fields"><Text form={form} field="business_postal_code" label="Mã bưu chính đã xác minh (nếu có)" maxLength={20} onChange={e => businessChange('business_postal_code', e.target.value)} />
+                <Text form={form} field="business_country_code" label="Mã quốc gia hai chữ cái" maxLength={2} placeholder="Điền VN nếu đã xác nhận" onChange={e => businessChange('business_country_code', e.target.value)} /></div>
+            <Text form={form} field="maps_url" label="Liên kết bản đồ của đúng cơ sở" type="url" maxLength={1000} onChange={e => businessChange('maps_url', e.target.value)} />
+            <h3>Giờ mở cửa công khai</h3><p className="muted">Đây là giờ mở cửa của cơ sở. Lịch nhận bánh tiếp tục được cấu hình riêng phía trên. Để trống danh sách khi chưa có giờ được duyệt.</p>
+            {form.data.business_opening_hours.map((row, index) => <fieldset className="form-stack" key={index}><legend>Khoảng mở cửa {index + 1}</legend>
+                <div className="weekdays">{[[1, 'T2'], [2, 'T3'], [3, 'T4'], [4, 'T5'], [5, 'T6'], [6, 'T7'], [7, 'CN']].map(([day, label]) => <label className="checkbox" key={day}>
+                    <input type="checkbox" checked={row.days.includes(day)} onChange={e => hoursChange(index, 'days', e.target.checked ? [...row.days, day] : row.days.filter(value => value !== day))} />{label}
+                </label>)}</div>
+                <div className="two-fields"><Field label="Mở cửa" error={form.errors['business_opening_hours.' + index + '.opens']}><input required type="time" value={row.opens} onChange={e => hoursChange(index, 'opens', e.target.value)} /></Field>
+                    <Field label="Đóng cửa" error={form.errors['business_opening_hours.' + index + '.closes']}><input required type="time" value={row.closes} onChange={e => hoursChange(index, 'closes', e.target.value)} /></Field></div>
+                <button type="button" className="text-action danger" onClick={() => businessChange('business_opening_hours', form.data.business_opening_hours.filter((_, i) => i !== index))}>Bỏ khoảng giờ</button>
+            </fieldset>)}
+            <button type="button" className="button secondary compact" disabled={form.data.business_opening_hours.length >= 28} onClick={() => businessChange('business_opening_hours', [...form.data.business_opening_hours, { days: [], opens: '', closes: '' }])}>Thêm khoảng mở cửa</button>
+            <Flag form={form} field="business_verified" label="Đã đối chiếu tên, địa chỉ, liên hệ, bản đồ và giờ mở cửa hiện tại với tiệm" />
+        </section>
+    </>;
+}
+
 export function AdminSettings({ settings }) {
     const { logo, weekdays, slots, slot_limits, closed_dates, regions, ...fields } = settings;
     const form = useForm({
         ...fields, logo: null, remove_logo: false, weekdays, closedText: closed_dates.join('\n'), regions,
+        faq_items: settings.faq_items ?? [], business_opening_hours: settings.business_opening_hours ?? [],
         slotRows: slots.map(time => ({ time, limit: slot_limits[time] ?? '' })),
     });
     const lines = value => value.split(/[\n,]+/).map(line => line.trim()).filter(Boolean);
@@ -637,6 +683,9 @@ export function AdminSettings({ settings }) {
     function regionChange(index, key, value) {
         form.setData('regions', form.data.regions.map((region, i) => index === i ? { ...region, [key]: value } : region));
     }
+    function businessChange(key, value) {
+        form.setData(data => ({ ...data, [key]: value, business_verified: false }));
+    }
     return <Admin title="Cấu hình cửa hàng">
         <form className="form-stack" onSubmit={e => {
             e.preventDefault();
@@ -645,16 +694,18 @@ export function AdminSettings({ settings }) {
                 slots: slotRows.map(slot => slot.time),
                 slot_limits: Object.fromEntries(slotRows.map(slot => [slot.time, slot.limit])),
                 closed_dates: lines(closedText),
+                faq_items: JSON.stringify(data.faq_items), business_opening_hours: JSON.stringify(data.business_opening_hours),
             }));
             form.post(root + '/cai-dat', { forceFormData: true, preserveState: 'errors' });
         }}>
             <div className="admin-columns"><section className="panel form-stack"><h2>Thông tin tiệm</h2>
-                <Text form={form} field="name" label="Tên cửa hàng" required maxLength={100} /><Text form={form} field="address" label="Địa chỉ" maxLength={250} />
-                <div className="two-fields"><Text form={form} field="phone" label="Số điện thoại" /><Text form={form} field="email" label="Email liên hệ" type="email" /></div>
+                <Text form={form} field="name" label="Tên cửa hàng" required maxLength={100} onChange={e => businessChange('name', e.target.value)} /><Text form={form} field="address" label="Địa chỉ" maxLength={250} onChange={e => businessChange('address', e.target.value)} />
+                <div className="two-fields"><Text form={form} field="phone" label="Số điện thoại" onChange={e => businessChange('phone', e.target.value)} /><Text form={form} field="email" label="Email liên hệ" type="email" onChange={e => businessChange('email', e.target.value)} /></div>
                 <TextArea form={form} field="order_policy" label="Chính sách đổi giờ, hủy đơn và hoàn tiền" maxLength={4000} />
                 <TextArea form={form} field="privacy_notice" label="Thông báo xử lý dữ liệu khách hàng" maxLength={4000} />
-                <Text form={form} field="hours" label="Giờ mở cửa hiển thị" required /><Field label="Logo" hint="JPEG, PNG hoặc WebP, tối đa 4 MB"><input type="file" accept="image/jpeg,image/png,image/webp" onChange={e => form.setData('logo', e.target.files?.[0] ?? null)} /></Field>
+                <Text form={form} field="hours" label="Giờ mở cửa hiển thị" required onChange={e => businessChange('hours', e.target.value)} /><Field label="Logo" hint="JPEG, PNG hoặc WebP, tối đa 4 MB"><input type="file" accept="image/jpeg,image/png,image/webp" onChange={e => form.setData(data => ({ ...data, logo: e.target.files?.[0] ?? null, logo_approved: false }))} /></Field>
                 {logo && <><img className="logo-preview" src={logo} alt="Logo hiện tại" /><Flag form={form} field="remove_logo" label="Bỏ logo hiện tại" /></>}
+                <Flag form={form} field="logo_approved" label="Logo hiện tại đã được tiệm xác nhận quyền sử dụng" />
             </section><section className="panel form-stack"><h2>Lịch nhận bánh</h2>
                 <div className="weekdays">{[[1, 'T2'], [2, 'T3'], [3, 'T4'], [4, 'T5'], [5, 'T6'], [6, 'T7'], [7, 'CN']].map(([day, name]) => <label className="checkbox" key={day}><input type="checkbox" checked={form.data.weekdays.includes(day)} onChange={e => form.setData('weekdays', e.target.checked ? [...form.data.weekdays, day] : form.data.weekdays.filter(value => value !== day))} />{name}</label>)}</div>
                 <div className="form-stack">
@@ -693,6 +744,7 @@ export function AdminSettings({ settings }) {
                 <Flag form={form} field="coupon_return_on_early_cancel" label="Trả lượt mã giảm khi hủy trước khi bắt đầu làm" />
                 <p className="muted">Lượt mã giảm được xử lý riêng với tồn. Hủy sau khi bắt đầu làm không tự nhập bánh vào tồn bán, quản lý phải kiểm tra và ghi rõ phần chưa làm, còn bán được hoặc hỏng.</p>
             </section>
+            <PublicContentSettings form={form} businessChange={businessChange} />
             <ErrorList errors={form.errors} /><button className="button" disabled={form.processing}>{form.processing ? 'Đang lưu…' : 'Lưu cấu hình'}</button>
         </form>
     </Admin>;

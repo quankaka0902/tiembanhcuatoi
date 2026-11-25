@@ -2,6 +2,8 @@
 
 Ứng dụng đặt bánh và quản trị cửa hàng bằng tiếng Việt. Giá dùng số nguyên VND. Lịch, bộ lọc ngày và thời điểm tạo đơn dùng múi giờ Asia/Ho_Chi_Minh.
 
+Trang công khai có sẵn HTML từ PHP, gồm nội dung chính, liên kết và metadata. React/Inertia tiếp tục xử lý tương tác; Node SSR là tùy chọn và có PHP fallback khi tắt hoặc lỗi. Giỏ, checkout, tài khoản, đơn riêng và quản trị giữ luồng bảo vệ hiện có.
+
 ## Cài đặt
 
 - PHP 8.3 trở lên với các extension Laravel và PHPUnit, gồm PDO MySQL, Mbstring, OpenSSL, Fileinfo, XML, Zip và GD. Bật PDO SQLite nếu muốn chạy bộ test mặc định bằng SQLite.
@@ -109,6 +111,37 @@ php artisan queue:restart
 
 Trình quản lý tiến trình cần khởi động lại worker sau lệnh restart. Chỉ nạp seed demo trên schema local / test trống theo phần cài đặt. Sau migration, chạy lại ca chọn / lọc / đặt bánh với dữ liệu được phép trên schema riêng, đối chiếu giá giỏ và snapshot đơn; giữ công tắc nhận đơn thật đóng đến khi người phụ trách duyệt.
 
+## HTML công khai, SEO và ảnh
+
+Xem [hướng dẫn SEO, render HTML, ảnh và nội dung chờ duyệt](docs/seo-toc-do.md). Trang danh mục có URL `/thuc-don/{slug}`; trang giới thiệu, liên hệ, FAQ và một cơ sở lần lượt là `/gioi-thieu`, `/lien-he`, `/cau-hoi-thuong-gap`, `/cua-hang`. Cấu hình cửa hàng quản lý nội dung và các dấu duyệt, thông tin cơ sở, bản đồ và giờ mở cửa có cấu trúc. Repo chưa có dữ liệu thật được chủ tiệm duyệt cho những mục này.
+
+Title, description, canonical, Open Graph và JSON-LD xuất hiện ngay trong HTML. Canonical dùng `APP_URL`, phân trang sạch có URL riêng; trang tìm kiếm/lọc không được lập chỉ mục. Lịch sử slug sản phẩm và danh mục giữ chuyển hướng 301 khi đổi đường dẫn, không tự đổi slug khi chỉ đổi tên. Sitemap chỉ chứa URL công khai đủ điều kiện, không chứa giỏ, tài khoản, tra cứu hay liên kết đơn.
+
+`BAKERY_SEO_INDEXING_ENABLED=false` là mặc định. Local, test, staging, rehearsal và demo không được lập chỉ mục. Bật cờ này chưa đủ để lập chỉ mục nếu chưa đúng môi trường production, HTTPS và các dấu duyệt dữ liệu. Cờ SEO không bật nhận đơn. `/robots.txt` hiện do Laravel tạo theo cấu hình; không thêm lại tệp robots tĩnh hoặc để web server/CDN trả bản cũ làm mất quy tắc đóng của staging.
+
+Hai migration ngày 25/11/2026 thêm lịch sử slug và metadata ảnh nhiều cỡ, giữ URL/bản gốc ảnh cũ. Sau khi sao lưu và chọn đúng schema riêng, chạy migration và tạo các dẫn xuất cần thiết. Lệnh ảnh không duyệt nội dung hoặc quyền dùng ảnh thay chủ tiệm.
+
+```powershell
+php artisan migrate
+php artisan bakery:images --missing
+npm run build
+php artisan queue:restart
+```
+
+Ảnh mới tải lên được tạo WebP nhiều cỡ bằng GD; `--missing` dùng cho ảnh đã có hoặc sau phục hồi. Không resize khi đọc trang. Ảnh gốc tiếp tục được sao lưu cùng DB và các dẫn xuất. Xem hướng dẫn để kiểm tra ảnh hỏng/thiếu và cache của staging. HTML/Inertia có dữ liệu phiên nên luôn `private, no-store`; không đặt cache chia sẻ cho trang theo URL hoặc User-Agent.
+
+Node SSR tùy chọn, mặc định tắt. Build client và SSR từ cùng bản mã; kiểm tra smoke trước khi khởi động renderer riêng trên loopback.
+
+```powershell
+npm run test:ssr
+# Sau khi đặt BAKERY_SSR_ENABLED=true và BAKERY_SSR_URL=http://127.0.0.1:13714
+# trong cấu hình PHP của môi trường riêng, nạp lại tiến trình PHP.
+$env:BAKERY_SSR_PORT = '13714'
+node bootstrap/ssr/ssr.js
+```
+
+`test:ssr` chạy `build:ssr` và smoke test rồi kết thúc. Không dùng lệnh khởi động SSR vendor cho renderer này và không expose cổng Node ra public. Khi Node tắt/lỗi, PHP vẫn trả nội dung công khai. [Tài liệu SEO](docs/seo-toc-do.md#node-ssr-tùy-chọn) có cấu hình, giới hạn dữ liệu gửi sang Node và cách đối chiếu HTML; không coi kết quả SSR local là phê duyệt mở bán hoặc xác nhận tốc độ trên thiết bị thật.
+
 ## Đổi lịch, hủy và xử lý sau bán
 
 Xem [bảng trạng thái, ma trận quyền và hướng dẫn ca bán](docs/vong-doi-don.md). Khách đăng nhập gửi yêu cầu cho đơn của mình. Khách vãng lai xác minh bằng liên kết thao tác riêng qua email, hạn 15 phút và dùng một lần. Yêu cầu chỉ đổi đơn sau khi nhân viên chấp thuận. Máy chủ kiểm tra lại giờ cũ, lịch, công suất và thời gian chuẩn bị trong transaction.
@@ -156,7 +189,7 @@ Chặng 7 thêm chế độ staging kín có tên miền HTTPS riêng và chỉ 
 
 Chặng 8 yêu cầu khách xác nhận lại khi báo giá đổi và bổ sung thử lại khi mất kết nối lúc tính tiền. Checkout cho chọn ngày và giờ riêng. Hai màn hình **Đơn cần xử lý** và **Đối soát** dùng thẻ trên điện thoại. Xem [biên bản chặng 8](docs/nghiem-thu-chang-8.md) trước khi nghiệm thu bằng menu và dịch vụ thật của tiệm.
 
-GitHub chạy [Bakery CI](https://github.com/quankaka0902/tiembanhcuatoi/actions/workflows/ci.yml) khi push lên `main` hoặc mở pull request. Workflow chạy lint, build và PHPUnit trên SQLite cùng MySQL độc lập. Các bước chốt phiên bản, chạy ca thử và bàn giao nằm trong [hồ sơ vận hành chặng 9–11](docs/ban-giao-van-hanh.md).
+GitHub chạy [Bakery CI](https://github.com/quankaka0902/tiembanhcuatoi/actions/workflows/ci.yml) khi push lên `main` hoặc mở pull request. Workflow được cấu hình chạy lint, build client, build/smoke SSR qua `npm run test:ssr` và PHPUnit trên SQLite cùng MySQL độc lập. Kết quả cần đối chiếu đúng commit của lần chạy. Các bước chốt phiên bản, chạy ca thử và bàn giao nằm trong [hồ sơ vận hành chặng 9–11](docs/ban-giao-van-hanh.md).
 
 Ca nghiệm thu một cơ sở ngày 23/11/2026 được ghi tại [biên bản mở bán](docs/nghiem-thu-mo-ban-mot-co-so.md), kèm ảnh và kết quả đã loại bí mật. Bản sửa local `5de11c0` bổ sung kiểm tra cookie, SMTP host và khả năng phát hiện sự cố sao lưu, thư lỗi. Trạng thái vẫn **chờ mở bán** vì chưa có dữ liệu, nhân sự và dịch vụ thật được tiệm xác nhận. Sandbox được tạm ngừng nhận đơn sau ca thử.
 

@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Services\LaunchReadiness;
+use App\Services\ProductMetadata;
+use App\Services\PublicSeo;
 use App\Services\Store;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -51,6 +53,14 @@ class AdminConfig extends Controller
 
     public function saveSettings(Request $request, AdminCatalog $catalog)
     {
+        foreach (['faq_items', 'business_opening_hours'] as $field) {
+            if ($request->exists($field)) {
+                $request->merge([$field => ProductMetadata::listInput($request->input($field))]);
+            }
+        }
+        if (is_string($request->input('business_country_code'))) {
+            $request->merge(['business_country_code' => Str::upper($request->input('business_country_code'))]);
+        }
         $fields = $request->validate([
             'name' => 'required|string|max:100', 'phone' => 'nullable|string|max:30', 'email' => 'nullable|email|max:254',
             'address' => 'nullable|string|max:250', 'hours' => 'required|string|max:100',
@@ -71,6 +81,7 @@ class AdminConfig extends Controller
             'bank_prepay_required' => 'sometimes|required|boolean',
             'allow_payment_override' => 'sometimes|required|boolean',
             'coupon_return_on_early_cancel' => 'sometimes|required|boolean',
+            ...PublicSeo::settingsRules(),
         ]);
         $slotTimes = array_flip($fields['slots']);
         if (array_diff_key($fields['slot_limits'] ?? [], $slotTimes)) {
@@ -78,6 +89,7 @@ class AdminConfig extends Controller
         }
         DB::transaction(function () use ($fields, $catalog, $slotTimes) {
             $current = Store::settings(lock: true);
+            $fields = PublicSeo::settingsFields($fields, $current);
             $logo = isset($fields['logo']) ? $catalog->uploadedImage($fields['logo']) : ($fields['remove_logo'] ? null : $current['logo']);
             $limits = array_filter(array_intersect_key($fields['slot_limits'] ?? $current['slot_limits'], $slotTimes));
             unset($fields['remove_logo']);

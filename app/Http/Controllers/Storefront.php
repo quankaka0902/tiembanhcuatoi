@@ -8,6 +8,7 @@ use App\Services\Checkout;
 use App\Services\OrderRequests;
 use App\Services\Orders;
 use App\Services\ProductMetadata;
+use App\Services\PublicSeo;
 use App\Services\Store;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Bus;
@@ -26,14 +27,36 @@ class Storefront extends Controller
             'categories' => DB::table('categories')->orderBy('id')->get(),
             'featured' => Catalog::listings()->where('products.featured', true)->orderBy('products.id')->limit(4)->get()->map(Catalog::images(...)),
             'occasions' => Catalog::filterOptions()['occasions'], 'currentLocation' => Catalog::currentLocation(),
+            'seo' => PublicSeo::home(),
         ]);
     }
 
-    public function catalog(Request $request)
+    public function catalog(Request $request, ?string $categorySlug = null)
     {
         $rules = Catalog::filterRules();
         $rules['max'] = 'nullable|integer|min:0|max:100000000'.($request->filled('min') ? '|gte:min' : '');
         $filters = $request->validate($rules);
+        $currentCategory = $categorySlug ? DB::table('categories')->where('slug', $categorySlug)->first(['id', 'name', 'slug']) : null;
+        if ($categorySlug && ! $currentCategory) {
+            $oldCategory = DB::table('category_slug_history')->join('categories', 'categories.id', '=', 'category_slug_history.category_id')
+                ->where('category_slug_history.slug', $categorySlug)->first(['categories.slug']);
+            $destination = $oldCategory ? PublicSeo::url('/thuc-don/'.$oldCategory->slug) : null;
+            abort_unless($destination, 404);
+
+            return redirect()->away($destination, 301);
+        }
+        if ($currentCategory) {
+            $filters['category'] = $currentCategory->slug;
+        } elseif (! empty($filters['category'])) {
+            $currentCategory = DB::table('categories')->where('slug', $filters['category'])->first(['id', 'name', 'slug']);
+            if ($currentCategory && ! array_diff(array_keys($request->query()), ['category', 'page'])) {
+                $page = (int) ($filters['page'] ?? 1);
+                $destination = PublicSeo::url('/thuc-don/'.$currentCategory->slug.($page > 1 ? '?page='.$page : ''));
+                abort_unless($destination, 404);
+
+                return redirect()->away($destination, 301);
+            }
+        }
         $query = Catalog::listings($filters);
         match ($filters['sort'] ?? 'featured') {
             'price_asc' => $query->orderByRaw('availability.price IS NULL')->orderBy('availability.price'),
@@ -41,11 +64,21 @@ class Storefront extends Controller
             'new' => $query->orderByDesc('products.created_at'),
             default => $query->orderByDesc('products.featured'),
         };
+        $paginationFilters = $filters;
+        if ($currentCategory) {
+            unset($paginationFilters['category']);
+        }
+        $products = $query->orderBy('products.id')->paginate(8)
+            ->withPath($currentCategory ? '/thuc-don/'.$currentCategory->slug : '/thuc-don')
+            ->appends($paginationFilters)->through(Catalog::images(...));
+        abort_if($products->currentPage() > $products->lastPage(), 404);
+        $filtered = count(array_diff(array_keys($request->query()), ['page'])) > 0;
 
         return Inertia::render('Catalog', [
-            'products' => $query->orderBy('products.id')->paginate(8)->withQueryString()->through(Catalog::images(...)),
+            'products' => $products, 'currentCategory' => $currentCategory,
             'categories' => DB::table('categories')->orderBy('id')->get(), 'filters' => $filters,
             'filterOptions' => Catalog::filterOptions(), 'currentLocation' => Catalog::currentLocation(),
+            'seo' => PublicSeo::catalog($currentCategory, $products->currentPage(), $filtered || $products->total() === 0),
         ]);
     }
 
@@ -53,8 +86,21 @@ class Storefront extends Controller
     {
         $product = DB::table('products')->join('categories', 'categories.id', '=', 'products.category_id')
             ->where('products.slug', $slug)->where('products.active', true)
-            ->first(['products.*', 'categories.name as category']);
-        abort_unless($product, 404);
+            ->first(['products.*', 'categories.name as category', 'categories.slug as category_slug']);
+        if (! $product) {
+            $old = DB::table('product_slug_history')->join('products', 'products.id', '=', 'product_slug_history.product_id')
+                ->where('product_slug_history.slug', $slug)->where('products.active', true)->first(['products.slug']);
+            $destination = $old ? PublicSeo::url('/banh/'.$old->slug) : null;
+            abort_unless($destination, 404);
+
+            return redirect()->away($destination, 301);
+        }
+        if ($product->slug !== $slug) {
+            $destination = PublicSeo::url('/banh/'.$product->slug);
+            abort_unless($destination, 404);
+
+            return redirect()->away($destination, 301);
+        }
         $product = Catalog::images($product);
         $product->variants = DB::table('variants')->where('product_id', $product->id)->where('active', true)
             ->orderBy('id')->get(['id', 'name', 'price', 'stock', 'size_label', 'servings_min', 'servings_max', 'servings_verified']);
@@ -69,7 +115,7 @@ class Storefront extends Controller
         }
         $product->accessories = ProductMetadata::accessories($product->id);
 
-        return Inertia::render('Product', ['product' => $product, 'suggestedVariantId' => $suggestion->orderByRaw('stock > 0 DESC')->orderBy('price')->orderBy('id')->value('id'), 'selectionFilters' => $filters]);
+        return Inertia::render('Product', ['product' => $product, 'suggestedVariantId' => $suggestion->orderByRaw('stock > 0 DESC')->orderBy('price')->orderBy('id')->value('id'), 'selectionFilters' => $filters, 'seo' => PublicSeo::product($product)]);
     }
 
     public function cart(Request $request, Checkout $checkout)
@@ -201,7 +247,7 @@ class Storefront extends Controller
     {
         $settings = Store::settings();
 
-        return Inertia::render('OrderPolicy', ['policy' => $settings['order_policy'], 'privacy' => $settings['privacy_notice']]);
+        return Inertia::render('OrderPolicy', ['policy' => $settings['order_policy'], 'privacy' => $settings['privacy_notice'], 'seo' => PublicSeo::policy()]);
     }
 
     public function tracking()
