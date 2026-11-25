@@ -1,0 +1,21 @@
+{
+    "phase": "renderer-stopped",
+    "http": "HTTP/1.1 200 OK",
+    "duration_ms": 1130.01,
+    "rendering": "php",
+    "h1": "[THỬ] Bánh kiểm tra SEO",
+    "title_count": 1,
+    "canonical": "http://127.0.0.1:18929/banh/banh-thu-seo",
+    "canonical_count": 1,
+    "schema_types": [
+        "BreadcrumbList",
+        "Product"
+    ],
+    "headers": [
+        "Cache-Control: no-store, private",
+        "Content-Type: text/html; charset=utf-8",
+        "Vary: X-Inertia",
+        "Vary: Cookie",
+        "X-Robots-Tag: noindex, follow"
+    ]
+}

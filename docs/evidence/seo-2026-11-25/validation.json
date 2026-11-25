@@ -1,0 +1,275 @@
+{
+  "date": "2026-11-25",
+  "timezone": "Asia/Ho_Chi_Minh",
+  "tester": "Codex",
+  "source_commit": "4a4e1f3705e8f087302b02c1e2e3e6d3ba8e7485",
+  "baseline_commit": "2c24e969e94f5f2838cbbf42ca0e7be1a2a8ed10",
+  "provenance": "Tests and browser/HTTP observations ran against the working tree subsequently committed as source_commit. Implementation was unchanged when committed; illustrative disabled SSR entries in .env.example were added before the final source commit. These are local results, not a GitHub CI run.",
+  "environment": {
+    "os": "Windows",
+    "php": "8.3.33",
+    "mysql": "8.4.13",
+    "runtime_schema": "tiembanh_seo_20261125_test",
+    "phpunit_schema": "tiembanh_stage7_phpunit_test",
+    "mysql_port": 33317,
+    "browser": "Codex in-app browser",
+    "final_local_url": "http://127.0.0.1:18926",
+    "viewport_mobile": [
+      390,
+      844
+    ],
+    "viewport_desktop": [
+      1440,
+      900
+    ]
+  },
+  "checks": {
+    "mysql_phpunit": {
+      "passed": 112,
+      "failed": 0,
+      "skipped": 0,
+      "assertions": 2083,
+      "seconds": 87.84,
+      "exit_code": 0,
+      "concurrency": "MySQL-only contention tests executed on a separate test schema"
+    },
+    "sqlite_phpunit": {
+      "passed": 105,
+      "failed": 0,
+      "skipped": 7,
+      "assertions": 2026,
+      "seconds": 28.004,
+      "exit_code": 0,
+      "skip_reason": "MySQL-only concurrency coverage; verified by the MySQL run"
+    },
+    "lint": {
+      "result": "passed",
+      "command": "npm run lint"
+    },
+    "client_build": {
+      "result": "passed",
+      "command": "npm run build"
+    },
+    "pint": {
+      "result": "passed",
+      "command": "vendor/bin/pint --test"
+    },
+    "ssr": {
+      "result": "passed",
+      "command": "npm run test:ssr",
+      "public_pages": 5,
+      "private_pages_refused": true
+    },
+    "node_helpers": {
+      "result": "passed",
+      "checks": [
+        "node --check ops/performance-proxy.cjs",
+        "node --check ops/performance-probe.js",
+        "node ops/performance-proxy.cjs --help"
+      ]
+    },
+    "http_no_javascript": {
+      "result": "passed after fixes",
+      "initial_cases": 24,
+      "public_anchors": 28,
+      "broken_anchors": 0,
+      "initial_findings_preserved": true,
+      "final_post_fix_rechecks": 4,
+      "final_post_fix_rechecks_passed": 4,
+      "recheck_history_entries": 7,
+      "recheck_history": "Earlier failed attempt is retained; last four rechecks supersede it and pass."
+    },
+    "renderer_failure": {
+      "result": "passed",
+      "method": "Actual loopback Node process stopped after a successful React SSR response; the same SSR-enabled web process returned PHP core HTML with status 200"
+    },
+    "spa_metadata": {
+      "result": "passed",
+      "checks": [
+        "clean category URL",
+        "single current product canonical and schema",
+        "pending business info has no unsupported Bakery schema",
+        "private route clears canonical/OG/schema"
+      ]
+    },
+    "missing_image": {
+      "result": "passed",
+      "method": "Temporarily absent fixture photo rendered the visible replacement without horizontal overflow; original restored and SHA256 rechecked"
+    },
+    "private_staging": {
+      "result": "local coverage passed",
+      "scope": "Existing private staging middleware and resource/privacy tests; real edge network, trusted HTTPS and external static asset protection are pending actual infrastructure"
+    },
+    "git_diff_check": "passed before source commit"
+  },
+  "performance": {
+    "details": "performance-summary.json",
+    "raw_samples": "performance-runs.json",
+    "fixture_original_sha256": "e8cea015cbe4f5e63f7928a05a5b71bf45afe3f43882c218e47079f55c15d210",
+    "original_bytes": 125160,
+    "original_dimensions": [
+      900,
+      758
+    ],
+    "method": "Same fake fixture, database, image and prices. 390x844. Three samples per home/product phase; one policy byte sample. Identical opt-in loopback proxies add 150ms per response and share 200000 B/s response body bandwidth, gzip text, no-store, no CPU throttle. Test runners/crawler stopped for final samples.",
+    "image_home_bytes": {
+      "before": 125160,
+      "after": 69296,
+      "change_percent": -44.63406839245765
+    },
+    "image_product_bytes": {
+      "before": 125160,
+      "after": 51502,
+      "change_percent": -58.85107062959412
+    },
+    "production_js_home_product_bytes": {
+      "before": 151472,
+      "after": 152995,
+      "change_percent": 1.0054663568184186
+    },
+    "production_js_policy_bytes_single_sample": {
+      "before": 154079,
+      "after": 145192,
+      "change_percent": -5.767820403818824
+    },
+    "ttfb_ms_medians": {
+      "home_before": 683,
+      "home_after": 776.3,
+      "product_before": 797.9,
+      "product_after": 755.8
+    },
+    "limitations": [
+      "TTFB did not consistently improve; no overall speed claim.",
+      "Embedded browser paint entries were missing or delayed; FCP/LCP comparison rejected and raw observations retained.",
+      "window.load is reported raw and is not LCP; baseline CSR can finish load before inserting images.",
+      "No Lighthouse, physical-device, field Core Web Vitals or external-network acceptance.",
+      "Optional React SSR function and recovery verified; performance comparison is PHP HTML fallback versus original CSR, not an SSR benchmark."
+    ]
+  },
+  "handoff_state": {
+    "intake_paused": true,
+    "indexing_enabled": false,
+    "business_verified": false,
+    "public_content_approved": false,
+    "seed_orders_unchanged": 7,
+    "queued_jobs": 0,
+    "failed_jobs": 0,
+    "public_deployment": false,
+    "push_performed": false
+  },
+  "pending_real_inputs": [
+    "Approved business name, structured address, telephone, opening hours and correct map link",
+    "Approved product details, menu, prices, stock and photo/logo usage rights",
+    "Approved introduction, FAQ and contact text; consistency with business profile if present",
+    "Real domain/APP_URL, trusted HTTPS, private staging edge coverage and infrastructure approval",
+    "Search Console ownership, live metadata/Rich Results checks and physical-device/field performance acceptance"
+  ],
+  "privacy": "Only synthetic public fixture screenshots and sanitized summaries retained. Environment secrets, credentials, TOTP, raw cookies/HTML, tracking/action/reset tokens remain outside Git.",
+  "artifacts": [
+    {
+      "path": "docs/evidence/seo-2026-11-25/after-home-390.jpg",
+      "bytes": 48942,
+      "sha256": "dcfac361c41e295ac2fbc20c998b79006cb6194fd9eb9d5c7632beb60635b07c"
+    },
+    {
+      "path": "docs/evidence/seo-2026-11-25/after-product-1440.jpg",
+      "bytes": 138045,
+      "sha256": "8323b9001df09bfb7e1cef36bd81221270740c99c470146a06ece692b5dab2f5"
+    },
+    {
+      "path": "docs/evidence/seo-2026-11-25/after-product-390.jpg",
+      "bytes": 48953,
+      "sha256": "ef5051eda94f13725cb21f142939e21634e1105333c6d83b5bfc037b67432a41"
+    },
+    {
+      "path": "docs/evidence/seo-2026-11-25/baseline-metrics.json",
+      "bytes": 6660,
+      "sha256": "675401c2d02f5c6882a5b8f0023887a53d221aa581c19181555724f3babc742c"
+    },
+    {
+      "path": "docs/evidence/seo-2026-11-25/before-home-390.jpg",
+      "bytes": 49907,
+      "sha256": "36707184cfb3641e36ca81348e262a2709fd6461376c804a7eae6463575318e8"
+    },
+    {
+      "path": "docs/evidence/seo-2026-11-25/before-product-390.jpg",
+      "bytes": 50532,
+      "sha256": "15e1b22b143a3850616d242b07aa34ddde9070c5fb9905d8d5597c324d666c8e"
+    },
+    {
+      "path": "docs/evidence/seo-2026-11-25/broken-image-390.jpg",
+      "bytes": 34060,
+      "sha256": "3ba401381b41ec355a2cf4470aef75d635a8ee52ef280ae37271c9b2e1cd7986"
+    },
+    {
+      "path": "docs/evidence/seo-2026-11-25/broken-image.json",
+      "bytes": 213,
+      "sha256": "01e4c6e9c7d3e3edda8f69feb180114dadfea3f3df24fddc54ce1605250bf869"
+    },
+    {
+      "path": "docs/evidence/seo-2026-11-25/check-build.txt",
+      "bytes": 865,
+      "sha256": "9d8298f7f6ada8645c8a97c9e561aef18051f8a0d90b019d645db9d3fb1efe1a"
+    },
+    {
+      "path": "docs/evidence/seo-2026-11-25/check-lint.txt",
+      "bytes": 45,
+      "sha256": "209befbc94fb31ffa51e9ecc53c60521d2f13783999f35a25365156e23d59c4b"
+    },
+    {
+      "path": "docs/evidence/seo-2026-11-25/check-mysql.txt",
+      "bytes": 359,
+      "sha256": "b1696bd9c2c004bb465ea55abd63986d834757f47d8ddaa637c889c3ba34053c"
+    },
+    {
+      "path": "docs/evidence/seo-2026-11-25/check-pint.txt",
+      "bytes": 34,
+      "sha256": "9fa3c401d4d7dcf9d616a4e847f09d73bafe2397e5f1b5b77531e2516436ed5a"
+    },
+    {
+      "path": "docs/evidence/seo-2026-11-25/check-sqlite.txt",
+      "bytes": 402,
+      "sha256": "31b8c5a87aa89d576315fd48974523296f474b9ac5609e390a0117883c644f21"
+    },
+    {
+      "path": "docs/evidence/seo-2026-11-25/check-ssr.txt",
+      "bytes": 696,
+      "sha256": "6f677f408468b6c033266d9443a824e4f9ede7e717f8437815cad246cf08989c"
+    },
+    {
+      "path": "docs/evidence/seo-2026-11-25/final-runtime.json",
+      "bytes": 885,
+      "sha256": "76c19e6d1c71f50c30f2b57714c99d5918cfa3518aafacdff46b5ba62b40782c"
+    },
+    {
+      "path": "docs/evidence/seo-2026-11-25/http-audit.json",
+      "bytes": 39414,
+      "sha256": "4545c0b07c685e0845e7c93f713aab962b47c5e76d92705f3f81cdc63b813f1b"
+    },
+    {
+      "path": "docs/evidence/seo-2026-11-25/performance-runs.json",
+      "bytes": 14886,
+      "sha256": "4fd1ef1c23c2be8b9a716d519aac7fdb5c78b9afdecb6f6d749a0390330b1d94"
+    },
+    {
+      "path": "docs/evidence/seo-2026-11-25/performance-summary.json",
+      "bytes": 5688,
+      "sha256": "5770f1289cca5beb36fd158a0c6731b1a1dcd4d0673c93c1c95e211634675a8b"
+    },
+    {
+      "path": "docs/evidence/seo-2026-11-25/render-running.json",
+      "bytes": 557,
+      "sha256": "037b0042387516b3b166225815662e91dbe70a8b041b47d8883263a00a74b3a2"
+    },
+    {
+      "path": "docs/evidence/seo-2026-11-25/render-stopped-fallback.json",
+      "bytes": 552,
+      "sha256": "1862e963e6cede6f24787cb40270860fb944984999fd12ff1db703afb72c8d69"
+    },
+    {
+      "path": "docs/evidence/seo-2026-11-25/ui-metadata.json",
+      "bytes": 1072,
+      "sha256": "0172dcc1fd8bbd22991bc6086801e0f23eda8fc7778cf2cb36629945d3d7b2c3"
+    }
+  ]
+}

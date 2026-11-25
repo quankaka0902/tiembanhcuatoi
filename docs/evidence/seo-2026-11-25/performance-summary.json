@@ -1,0 +1,197 @@
+{
+  "date": "2026-11-25",
+  "tester": "Codex",
+  "environment": "Windows local loopback PHP 8.3.33 / MySQL 8.4.13 / Codex in-app browser",
+  "baseline_commit": "2c24e969e94f5f2838cbbf42ca0e7be1a2a8ed10",
+  "candidate": "tested working tree, source commit recorded in validation.json",
+  "method": {
+    "viewport": [
+      390,
+      844
+    ],
+    "samples_home_product": 3,
+    "samples_policy": 1,
+    "added_response_latency_ms": 150,
+    "shared_body_bandwidth_bytes_per_second": 200000,
+    "gzip_text": true,
+    "cache": "private,no-store enforced by both lab proxies",
+    "cpu": "not throttled; test runners and crawler stopped before these sequential final runs",
+    "js_bytes": "compressed production script bodies; lab probe excluded",
+    "probe_bytes": "resource_encoded_bytes.other; identical for both phases",
+    "paint": "Not accepted for comparison: embedded browser reports missing or delayed paint entries despite advertised support; raw observations are retained. Real-device FCP/LCP and field Core Web Vitals remain unverified.",
+    "window_load": "reported as raw load-event timing; CSR baseline can fire before dynamically inserted images, so it is not LCP or a comparable user-ready deadline"
+  },
+  "fixture": {
+    "slug": "banh-thu-seo",
+    "image_original_sha256": "e8cea015cbe4f5e63f7928a05a5b71bf45afe3f43882c218e47079f55c15d210",
+    "original_bytes": 125160,
+    "original_dimensions": [
+      900,
+      758
+    ],
+    "scope": "explicit fake fixture; no real shop approval; same database, image and prices in A/B"
+  },
+  "pages": {
+    "home": {
+      "baseline": {
+        "samples": 3,
+        "ttfb_ms": 683,
+        "window_load_ms": 2114.5999999996275,
+        "cls": 0.0012234715281818328,
+        "js_encoded_bytes": 151472,
+        "image_encoded_bytes": 125160,
+        "html_encoded_bytes": 1290,
+        "fcp_ms": null,
+        "lcp_ms": null,
+        "raw_paint_observations": [
+          {
+            "fcp_ms": null,
+            "lcp_ms": null
+          },
+          {
+            "fcp_ms": null,
+            "lcp_ms": null
+          },
+          {
+            "fcp_ms": null,
+            "lcp_ms": null
+          }
+        ],
+        "paint_accepted": false
+      },
+      "after-php": {
+        "samples": 3,
+        "ttfb_ms": 776.2999999988824,
+        "window_load_ms": 4191.4000000003725,
+        "cls": 0.0013036484687109396,
+        "js_encoded_bytes": 152995,
+        "image_encoded_bytes": 69296,
+        "html_encoded_bytes": 4436,
+        "fcp_ms": null,
+        "lcp_ms": null,
+        "raw_paint_observations": [
+          {
+            "fcp_ms": 760,
+            "lcp_ms": 2480
+          },
+          {
+            "fcp_ms": null,
+            "lcp_ms": null
+          },
+          {
+            "fcp_ms": null,
+            "lcp_ms": null
+          }
+        ],
+        "paint_accepted": false
+      },
+      "change": {
+        "image_bytes_percent": -44.63406839245765,
+        "js_bytes_percent": 1.0054663568184186,
+        "ttfb_percent": 13.66032210818191
+      }
+    },
+    "product": {
+      "baseline": {
+        "samples": 3,
+        "ttfb_ms": 797.9000000003725,
+        "window_load_ms": 2241.5999999996275,
+        "cls": 0.001167651400366919,
+        "js_encoded_bytes": 151472,
+        "image_encoded_bytes": 125160,
+        "html_encoded_bytes": 1487,
+        "fcp_ms": null,
+        "lcp_ms": null,
+        "raw_paint_observations": [
+          {
+            "fcp_ms": null,
+            "lcp_ms": null
+          },
+          {
+            "fcp_ms": null,
+            "lcp_ms": null
+          },
+          {
+            "fcp_ms": 4704,
+            "lcp_ms": 5400
+          }
+        ],
+        "paint_accepted": false
+      },
+      "after-php": {
+        "samples": 3,
+        "ttfb_ms": 755.8000000007451,
+        "window_load_ms": 3987.9000000003725,
+        "cls": 0.0011746261401090565,
+        "js_encoded_bytes": 152995,
+        "image_encoded_bytes": 51502,
+        "html_encoded_bytes": 4745,
+        "fcp_ms": null,
+        "lcp_ms": null,
+        "raw_paint_observations": [
+          {
+            "fcp_ms": 64728,
+            "lcp_ms": 64728
+          },
+          {
+            "fcp_ms": null,
+            "lcp_ms": null
+          },
+          {
+            "fcp_ms": null,
+            "lcp_ms": null
+          }
+        ],
+        "paint_accepted": false
+      },
+      "change": {
+        "image_bytes_percent": -58.85107062959412,
+        "js_bytes_percent": 1.0054663568184186,
+        "ttfb_percent": -5.276350419802956
+      }
+    },
+    "policy": {
+      "baseline": {
+        "samples": 1,
+        "ttfb_ms": 685.5999999996275,
+        "window_load_ms": 2091.5999999996275,
+        "cls": 0.0005640632491343894,
+        "js_encoded_bytes": 154079,
+        "image_encoded_bytes": 0,
+        "html_encoded_bytes": 783,
+        "fcp_ms": null,
+        "lcp_ms": null,
+        "raw_paint_observations": [
+          {
+            "fcp_ms": null,
+            "lcp_ms": null
+          }
+        ],
+        "paint_accepted": false
+      },
+      "after-php": {
+        "samples": 1,
+        "ttfb_ms": 779.9000000003725,
+        "window_load_ms": 3188.60000000149,
+        "cls": 0.0005640632491343894,
+        "js_encoded_bytes": 145192,
+        "image_encoded_bytes": 0,
+        "html_encoded_bytes": 2353,
+        "fcp_ms": null,
+        "lcp_ms": null,
+        "raw_paint_observations": [
+          {
+            "fcp_ms": null,
+            "lcp_ms": null
+          }
+        ],
+        "paint_accepted": false
+      },
+      "change": {
+        "image_bytes_percent": null,
+        "js_bytes_percent": -5.767820403818824,
+        "ttfb_percent": 13.754375729404366
+      }
+    }
+  }
+}

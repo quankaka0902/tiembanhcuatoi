@@ -1,0 +1,42 @@
+[
+  {
+    "canonical": "http://127.0.0.1:18928/thuc-don/banh-kem",
+    "canonicalCount": 1,
+    "robots": "noindex, follow",
+    "schemaTypes": [
+      "BreadcrumbList"
+    ],
+    "step": "category-spa",
+    "title": "Bánh kem | Tiệm Bánh Nhà Mình"
+  },
+  {
+    "canonical": "http://127.0.0.1:18928/cua-hang",
+    "canonicalCount": 1,
+    "robots": "noindex, follow",
+    "schemaTypes": [
+      "BreadcrumbList"
+    ],
+    "step": "location-pending-spa",
+    "title": "Cửa hàng | Tiệm Bánh Nhà Mình"
+  },
+  {
+    "canonicals": 0,
+    "openGraph": 0,
+    "robots": "noindex, nofollow",
+    "schemas": 0,
+    "step": "private-login-spa",
+    "title": "Đăng nhập | Tiệm Bánh Nhà Mình"
+  },
+  {
+    "canonical": "http://127.0.0.1:18929/banh/banh-thu-seo",
+    "canonicalCount": 1,
+    "initialComponent": "Catalog",
+    "ogUrl": "http://127.0.0.1:18929/banh/banh-thu-seo",
+    "schemaTypes": [
+      "BreadcrumbList",
+      "Product"
+    ],
+    "step": "product-spa-from-ssr",
+    "title": "[THỬ] Bánh kiểm tra SEO | Tiệm Bánh Nhà Mình"
+  }
+]

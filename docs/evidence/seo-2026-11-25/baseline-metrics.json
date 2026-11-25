@@ -1,0 +1,279 @@
+[
+  {
+    "phase": "baseline",
+    "page": "home",
+    "run": 1,
+    "viewport": 390,
+    "viewport_height": 844,
+    "client_width": 375,
+    "ttfb_ms": 736.5,
+    "window_load_ms": 2255.0999999996275,
+    "fcp_ms": null,
+    "lcp": null,
+    "cls": 0.0012234715281818328,
+    "paint_entry_types": [
+      "largest-contentful-paint",
+      "layout-shift",
+      "paint"
+    ],
+    "html_encoded_bytes": 1290,
+    "resource_encoded_bytes": {
+      "js": 151472,
+      "css": 11885,
+      "image": 125160,
+      "font": 131800,
+      "other": 1197
+    },
+    "resource_transfer_bytes": 425714,
+    "request_count": 14,
+    "quiet": true,
+    "images": [
+      {
+        "src": "/anh/759c32bf07022e91dda701225bf00c1a5eb25b84.jpg",
+        "natural_width": 900,
+        "display_width": 343,
+        "width_attribute": null,
+        "height_attribute": null,
+        "loading": "eager",
+        "priority": "high"
+      },
+      {
+        "src": "/anh/759c32bf07022e91dda701225bf00c1a5eb25b84.jpg",
+        "natural_width": 900,
+        "display_width": 165,
+        "width_attribute": null,
+        "height_attribute": null,
+        "loading": "lazy",
+        "priority": "auto"
+      }
+    ],
+    "document_width": 375
+  },
+  {
+    "phase": "baseline",
+    "page": "home",
+    "run": 2,
+    "viewport": 390,
+    "viewport_height": 844,
+    "client_width": 375,
+    "ttfb_ms": 683,
+    "window_load_ms": 2114.5999999996275,
+    "fcp_ms": null,
+    "lcp": null,
+    "cls": 0.0012234715281818328,
+    "paint_entry_types": [
+      "largest-contentful-paint",
+      "layout-shift",
+      "paint"
+    ],
+    "html_encoded_bytes": 1290,
+    "resource_encoded_bytes": {
+      "js": 151472,
+      "css": 11885,
+      "image": 125160,
+      "font": 131800,
+      "other": 1197
+    },
+    "resource_transfer_bytes": 425714,
+    "request_count": 14,
+    "quiet": true,
+    "images": [
+      {
+        "src": "/anh/759c32bf07022e91dda701225bf00c1a5eb25b84.jpg",
+        "natural_width": 900,
+        "display_width": 343,
+        "width_attribute": null,
+        "height_attribute": null,
+        "loading": "eager",
+        "priority": "high"
+      },
+      {
+        "src": "/anh/759c32bf07022e91dda701225bf00c1a5eb25b84.jpg",
+        "natural_width": 900,
+        "display_width": 165,
+        "width_attribute": null,
+        "height_attribute": null,
+        "loading": "lazy",
+        "priority": "auto"
+      }
+    ],
+    "document_width": 375
+  },
+  {
+    "phase": "baseline",
+    "page": "home",
+    "run": 3,
+    "viewport": 390,
+    "viewport_height": 844,
+    "client_width": 375,
+    "ttfb_ms": 648,
+    "window_load_ms": 2016,
+    "fcp_ms": null,
+    "lcp": null,
+    "cls": 0.0012234715281818328,
+    "paint_entry_types": [
+      "largest-contentful-paint",
+      "layout-shift",
+      "paint"
+    ],
+    "html_encoded_bytes": 1290,
+    "resource_encoded_bytes": {
+      "js": 151472,
+      "css": 11885,
+      "image": 125160,
+      "font": 131800,
+      "other": 1197
+    },
+    "resource_transfer_bytes": 425714,
+    "request_count": 14,
+    "quiet": true,
+    "images": [
+      {
+        "src": "/anh/759c32bf07022e91dda701225bf00c1a5eb25b84.jpg",
+        "natural_width": 900,
+        "display_width": 343,
+        "width_attribute": null,
+        "height_attribute": null,
+        "loading": "eager",
+        "priority": "high"
+      },
+      {
+        "src": "/anh/759c32bf07022e91dda701225bf00c1a5eb25b84.jpg",
+        "natural_width": 900,
+        "display_width": 165,
+        "width_attribute": null,
+        "height_attribute": null,
+        "loading": "lazy",
+        "priority": "auto"
+      }
+    ],
+    "document_width": 375
+  },
+  {
+    "phase": "baseline",
+    "page": "product",
+    "run": 1,
+    "viewport": 390,
+    "viewport_height": 844,
+    "client_width": 375,
+    "ttfb_ms": 652.5999999996275,
+    "window_load_ms": 2048.300000000745,
+    "fcp_ms": null,
+    "lcp": null,
+    "cls": 0.001167651400366919,
+    "paint_entry_types": [
+      "largest-contentful-paint",
+      "layout-shift",
+      "paint"
+    ],
+    "html_encoded_bytes": 1487,
+    "resource_encoded_bytes": {
+      "js": 151472,
+      "css": 11885,
+      "image": 125160,
+      "font": 123816,
+      "other": 1197
+    },
+    "resource_transfer_bytes": 417430,
+    "request_count": 13,
+    "quiet": true,
+    "images": [
+      {
+        "src": "/anh/759c32bf07022e91dda701225bf00c1a5eb25b84.jpg",
+        "natural_width": 900,
+        "display_width": 343,
+        "width_attribute": null,
+        "height_attribute": null,
+        "loading": "eager",
+        "priority": "high"
+      }
+    ],
+    "document_width": 375
+  },
+  {
+    "phase": "baseline",
+    "page": "product",
+    "run": 2,
+    "viewport": 390,
+    "viewport_height": 844,
+    "client_width": 375,
+    "ttfb_ms": 797.9000000003725,
+    "window_load_ms": 2241.5999999996275,
+    "fcp_ms": null,
+    "lcp": null,
+    "cls": 0.001167651400366919,
+    "paint_entry_types": [
+      "largest-contentful-paint",
+      "layout-shift",
+      "paint"
+    ],
+    "html_encoded_bytes": 1487,
+    "resource_encoded_bytes": {
+      "js": 151472,
+      "css": 11885,
+      "image": 125160,
+      "font": 123816,
+      "other": 1197
+    },
+    "resource_transfer_bytes": 417430,
+    "request_count": 13,
+    "quiet": true,
+    "images": [
+      {
+        "src": "/anh/759c32bf07022e91dda701225bf00c1a5eb25b84.jpg",
+        "natural_width": 900,
+        "display_width": 343,
+        "width_attribute": null,
+        "height_attribute": null,
+        "loading": "eager",
+        "priority": "high"
+      }
+    ],
+    "document_width": 375
+  },
+  {
+    "phase": "baseline",
+    "page": "product",
+    "run": 3,
+    "viewport": 390,
+    "viewport_height": 844,
+    "client_width": 375,
+    "ttfb_ms": 905.9000000003725,
+    "window_load_ms": 2344.60000000149,
+    "fcp_ms": 4704,
+    "lcp": {
+      "ms": 5400,
+      "size": 98155,
+      "url": "/anh/759c32bf07022e91dda701225bf00c1a5eb25b84.jpg"
+    },
+    "cls": 0.0010858639743042608,
+    "paint_entry_types": [
+      "largest-contentful-paint",
+      "layout-shift",
+      "paint"
+    ],
+    "html_encoded_bytes": 1487,
+    "resource_encoded_bytes": {
+      "js": 151472,
+      "css": 11885,
+      "image": 125160,
+      "font": 123816,
+      "other": 1197
+    },
+    "resource_transfer_bytes": 417430,
+    "request_count": 13,
+    "quiet": true,
+    "images": [
+      {
+        "src": "/anh/759c32bf07022e91dda701225bf00c1a5eb25b84.jpg",
+        "natural_width": 900,
+        "display_width": 343,
+        "width_attribute": null,
+        "height_attribute": null,
+        "loading": "eager",
+        "priority": "high"
+      }
+    ],
+    "document_width": 375
+  }
+]

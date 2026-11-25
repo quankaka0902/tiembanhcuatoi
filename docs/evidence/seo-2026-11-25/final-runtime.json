@@ -1,0 +1,28 @@
+{
+    "date": "2026-11-25",
+    "scope": "local fake SEO/performance sandbox; no public launch",
+    "url": "http://127.0.0.1:18926",
+    "database": "tiembanh_seo_20261125_test",
+    "mysql_version": "8.4.13",
+    "intake_paused": true,
+    "indexing_enabled": false,
+    "business_verified": false,
+    "public_content_approved": false,
+    "orders": 7,
+    "queued": 0,
+    "failed": 0,
+    "responsive_image_sources": 7,
+    "fixture_original_sha256": "e8cea015cbe4f5e63f7928a05a5b71bf45afe3f43882c218e47079f55c15d210",
+    "outside_fixture_approved_images": 0,
+    "title_count": 1,
+    "canonical": "http://127.0.0.1:18926/",
+    "h1_count": 1,
+    "headers": [
+        "Cache-Control: no-store, private",
+        "Vary: X-Inertia",
+        "Vary: Cookie",
+        "X-Robots-Tag: noindex, follow"
+    ],
+    "robots": "User-agent: *\nDisallow: /",
+    "sitemap_entry_count": 0
+}

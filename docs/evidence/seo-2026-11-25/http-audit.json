@@ -1,0 +1,1477 @@
+{
+  "tested_at_utc": "2026-11-25T02:29:20.584Z",
+  "timezone": "Asia/Ho_Chi_Minh",
+  "tester": "Codex read-only native HTTP audit, no JavaScript execution",
+  "base_commit_at_audit": "2c24e969e94f5f2838cbbf42ca0e7be1a2a8ed10",
+  "working_tree_under_test": true,
+  "client_manifest_sha256": "990661cf47459f31c1acc69cda99b26c2aa178fc6c8bc739f7cfbe788b0fd0ee",
+  "environment": {
+    "php_ssr_off": "http://127.0.0.1:18926",
+    "php_canonical_origin": "http://127.0.0.1:18928",
+    "optional_ssr": "http://127.0.0.1:18929",
+    "node_loopback_port": 13725,
+    "database": "tiembanh_seo_20261125_test",
+    "read_only": true
+  },
+  "cases": [
+    {
+      "id": "php-home",
+      "scope": "public SSR off",
+      "path": "/",
+      "status": 200,
+      "title_count": 1,
+      "title": "Tiệm Bánh Nhà Mình | Thực đơn và đặt bánh",
+      "canonical_count": 1,
+      "canonical": [
+        "http://127.0.0.1:18928/"
+      ],
+      "description_count": 1,
+      "robots": [
+        "noindex, follow"
+      ],
+      "og_keys": [
+        "og:description",
+        "og:title",
+        "og:type",
+        "og:url"
+      ],
+      "jsonld_count": 0,
+      "jsonld_parse_errors": 0,
+      "jsonld_types": [],
+      "h1_count": 1,
+      "h1": [
+        "Chọn chiếc bánh cho dịp của bạn."
+      ],
+      "rendering": "php",
+      "react_hydration": false,
+      "cache_control": "no-store, private",
+      "x_robots_tag": "noindex, follow",
+      "vary": "X-Inertia, Cookie",
+      "sentinel_in_head": false,
+      "sentinel_in_pagination": false,
+      "poison_host_in_head": false,
+      "poison_host_in_pagination": false
+    },
+    {
+      "id": "php-catalog",
+      "scope": "public SSR off",
+      "path": "/thuc-don",
+      "status": 200,
+      "title_count": 1,
+      "title": "Thực đơn | Tiệm Bánh Nhà Mình",
+      "canonical_count": 1,
+      "canonical": [
+        "http://127.0.0.1:18928/thuc-don"
+      ],
+      "description_count": 1,
+      "robots": [
+        "noindex, follow"
+      ],
+      "og_keys": [
+        "og:description",
+        "og:title",
+        "og:type",
+        "og:url"
+      ],
+      "jsonld_count": 1,
+      "jsonld_parse_errors": 0,
+      "jsonld_types": [
+        "BreadcrumbList",
+        "ListItem"
+      ],
+      "h1_count": 1,
+      "h1": [
+        "Hôm nay bạn chọn bánh gì?"
+      ],
+      "rendering": "php",
+      "react_hydration": false,
+      "cache_control": "no-store, private",
+      "x_robots_tag": "noindex, follow",
+      "vary": "X-Inertia, Cookie",
+      "sentinel_in_head": false,
+      "sentinel_in_pagination": false,
+      "poison_host_in_head": false,
+      "poison_host_in_pagination": false
+    },
+    {
+      "id": "php-category",
+      "scope": "public SSR off",
+      "path": "/thuc-don/banh-kem",
+      "status": 200,
+      "title_count": 1,
+      "title": "Bánh kem | Tiệm Bánh Nhà Mình",
+      "canonical_count": 1,
+      "canonical": [
+        "http://127.0.0.1:18928/thuc-don/banh-kem"
+      ],
+      "description_count": 1,
+      "robots": [
+        "noindex, follow"
+      ],
+      "og_keys": [
+        "og:description",
+        "og:title",
+        "og:type",
+        "og:url"
+      ],
+      "jsonld_count": 1,
+      "jsonld_parse_errors": 0,
+      "jsonld_types": [
+        "BreadcrumbList",
+        "ListItem"
+      ],
+      "h1_count": 1,
+      "h1": [
+        "Bánh kem"
+      ],
+      "rendering": "php",
+      "react_hydration": false,
+      "cache_control": "no-store, private",
+      "x_robots_tag": "noindex, follow",
+      "vary": "X-Inertia, Cookie",
+      "sentinel_in_head": false,
+      "sentinel_in_pagination": false,
+      "poison_host_in_head": false,
+      "poison_host_in_pagination": false
+    },
+    {
+      "id": "php-catalog-page-two",
+      "scope": "public SSR off",
+      "path": "/thuc-don?page=2",
+      "status": 200,
+      "title_count": 1,
+      "title": "Thực đơn · Trang 2 | Tiệm Bánh Nhà Mình",
+      "canonical_count": 1,
+      "canonical": [
+        "http://127.0.0.1:18928/thuc-don?page=2"
+      ],
+      "description_count": 1,
+      "robots": [
+        "noindex, follow"
+      ],
+      "og_keys": [
+        "og:description",
+        "og:title",
+        "og:type",
+        "og:url"
+      ],
+      "jsonld_count": 1,
+      "jsonld_parse_errors": 0,
+      "jsonld_types": [
+        "BreadcrumbList",
+        "ListItem"
+      ],
+      "h1_count": 1,
+      "h1": [
+        "Hôm nay bạn chọn bánh gì?"
+      ],
+      "rendering": "php",
+      "react_hydration": false,
+      "cache_control": "no-store, private",
+      "x_robots_tag": "noindex, follow",
+      "vary": "X-Inertia, Cookie",
+      "sentinel_in_head": false,
+      "sentinel_in_pagination": false,
+      "poison_host_in_head": false,
+      "poison_host_in_pagination": false
+    },
+    {
+      "id": "php-product-fixture",
+      "scope": "public SSR off",
+      "path": "/banh/banh-thu-seo",
+      "status": 200,
+      "title_count": 1,
+      "title": "[THỬ] Bánh kiểm tra SEO | Tiệm Bánh Nhà Mình",
+      "canonical_count": 1,
+      "canonical": [
+        "http://127.0.0.1:18928/banh/banh-thu-seo"
+      ],
+      "description_count": 1,
+      "robots": [
+        "noindex, follow"
+      ],
+      "og_keys": [
+        "og:description",
+        "og:image",
+        "og:image:height",
+        "og:image:width",
+        "og:title",
+        "og:type",
+        "og:url"
+      ],
+      "jsonld_count": 1,
+      "jsonld_parse_errors": 0,
+      "jsonld_types": [
+        "BreadcrumbList",
+        "ListItem",
+        "Product"
+      ],
+      "h1_count": 1,
+      "h1": [
+        "[THỬ] Bánh kiểm tra SEO"
+      ],
+      "rendering": "php",
+      "react_hydration": false,
+      "cache_control": "no-store, private",
+      "x_robots_tag": "noindex, follow",
+      "vary": "X-Inertia, Cookie",
+      "sentinel_in_head": false,
+      "sentinel_in_pagination": false,
+      "poison_host_in_head": false,
+      "poison_host_in_pagination": false
+    },
+    {
+      "id": "php-product-legacy-sold-out",
+      "scope": "public SSR off",
+      "path": "/banh/banh-kem-dau-mini",
+      "status": 200,
+      "title_count": 1,
+      "title": "Bánh Kem Dâu Mini | Tiệm Bánh Nhà Mình",
+      "canonical_count": 1,
+      "canonical": [
+        "http://127.0.0.1:18928/banh/banh-kem-dau-mini"
+      ],
+      "description_count": 1,
+      "robots": [
+        "noindex, follow"
+      ],
+      "og_keys": [
+        "og:description",
+        "og:title",
+        "og:type",
+        "og:url"
+      ],
+      "jsonld_count": 1,
+      "jsonld_parse_errors": 0,
+      "jsonld_types": [
+        "BreadcrumbList",
+        "ListItem"
+      ],
+      "h1_count": 1,
+      "h1": [
+        "Bánh Kem Dâu Mini"
+      ],
+      "rendering": "php",
+      "react_hydration": false,
+      "cache_control": "no-store, private",
+      "x_robots_tag": "noindex, follow",
+      "vary": "X-Inertia, Cookie",
+      "sentinel_in_head": false,
+      "sentinel_in_pagination": false,
+      "poison_host_in_head": false,
+      "poison_host_in_pagination": false
+    },
+    {
+      "id": "php-policy",
+      "scope": "public SSR off",
+      "path": "/chinh-sach-dat-banh",
+      "status": 200,
+      "title_count": 1,
+      "title": "Chính sách đặt bánh | Tiệm Bánh Nhà Mình",
+      "canonical_count": 1,
+      "canonical": [
+        "http://127.0.0.1:18928/chinh-sach-dat-banh"
+      ],
+      "description_count": 1,
+      "robots": [
+        "noindex, follow"
+      ],
+      "og_keys": [
+        "og:description",
+        "og:title",
+        "og:type",
+        "og:url"
+      ],
+      "jsonld_count": 0,
+      "jsonld_parse_errors": 0,
+      "jsonld_types": [],
+      "h1_count": 1,
+      "h1": [
+        "Chính sách đặt bánh"
+      ],
+      "rendering": "php",
+      "react_hydration": false,
+      "cache_control": "no-store, private",
+      "x_robots_tag": "noindex, follow",
+      "vary": "X-Inertia, Cookie",
+      "sentinel_in_head": false,
+      "sentinel_in_pagination": false,
+      "poison_host_in_head": false,
+      "poison_host_in_pagination": false
+    },
+    {
+      "id": "php-about",
+      "scope": "public SSR off",
+      "path": "/gioi-thieu",
+      "status": 200,
+      "title_count": 1,
+      "title": "Giới thiệu | Tiệm Bánh Nhà Mình",
+      "canonical_count": 1,
+      "canonical": [
+        "http://127.0.0.1:18928/gioi-thieu"
+      ],
+      "description_count": 1,
+      "robots": [
+        "noindex, follow"
+      ],
+      "og_keys": [
+        "og:description",
+        "og:title",
+        "og:type",
+        "og:url"
+      ],
+      "jsonld_count": 1,
+      "jsonld_parse_errors": 0,
+      "jsonld_types": [
+        "BreadcrumbList",
+        "ListItem"
+      ],
+      "h1_count": 1,
+      "h1": [
+        "Giới thiệu"
+      ],
+      "rendering": "php",
+      "react_hydration": false,
+      "cache_control": "no-store, private",
+      "x_robots_tag": "noindex, follow",
+      "vary": "X-Inertia, Cookie",
+      "sentinel_in_head": false,
+      "sentinel_in_pagination": false,
+      "poison_host_in_head": false,
+      "poison_host_in_pagination": false
+    },
+    {
+      "id": "php-contact",
+      "scope": "public SSR off",
+      "path": "/lien-he",
+      "status": 200,
+      "title_count": 1,
+      "title": "Liên hệ | Tiệm Bánh Nhà Mình",
+      "canonical_count": 1,
+      "canonical": [
+        "http://127.0.0.1:18928/lien-he"
+      ],
+      "description_count": 1,
+      "robots": [
+        "noindex, follow"
+      ],
+      "og_keys": [
+        "og:description",
+        "og:title",
+        "og:type",
+        "og:url"
+      ],
+      "jsonld_count": 1,
+      "jsonld_parse_errors": 0,
+      "jsonld_types": [
+        "BreadcrumbList",
+        "ListItem"
+      ],
+      "h1_count": 1,
+      "h1": [
+        "Liên hệ"
+      ],
+      "rendering": "php",
+      "react_hydration": false,
+      "cache_control": "no-store, private",
+      "x_robots_tag": "noindex, follow",
+      "vary": "X-Inertia, Cookie",
+      "sentinel_in_head": false,
+      "sentinel_in_pagination": false,
+      "poison_host_in_head": false,
+      "poison_host_in_pagination": false
+    },
+    {
+      "id": "php-faq",
+      "scope": "public SSR off",
+      "path": "/cau-hoi-thuong-gap",
+      "status": 200,
+      "title_count": 1,
+      "title": "Câu hỏi thường gặp | Tiệm Bánh Nhà Mình",
+      "canonical_count": 1,
+      "canonical": [
+        "http://127.0.0.1:18928/cau-hoi-thuong-gap"
+      ],
+      "description_count": 1,
+      "robots": [
+        "noindex, follow"
+      ],
+      "og_keys": [
+        "og:description",
+        "og:title",
+        "og:type",
+        "og:url"
+      ],
+      "jsonld_count": 1,
+      "jsonld_parse_errors": 0,
+      "jsonld_types": [
+        "BreadcrumbList",
+        "ListItem"
+      ],
+      "h1_count": 1,
+      "h1": [
+        "Câu hỏi thường gặp"
+      ],
+      "rendering": "php",
+      "react_hydration": false,
+      "cache_control": "no-store, private",
+      "x_robots_tag": "noindex, follow",
+      "vary": "X-Inertia, Cookie",
+      "sentinel_in_head": false,
+      "sentinel_in_pagination": false,
+      "poison_host_in_head": false,
+      "poison_host_in_pagination": false
+    },
+    {
+      "id": "php-location",
+      "scope": "public SSR off",
+      "path": "/cua-hang",
+      "status": 200,
+      "title_count": 1,
+      "title": "Cửa hàng | Tiệm Bánh Nhà Mình",
+      "canonical_count": 1,
+      "canonical": [
+        "http://127.0.0.1:18928/cua-hang"
+      ],
+      "description_count": 1,
+      "robots": [
+        "noindex, follow"
+      ],
+      "og_keys": [
+        "og:description",
+        "og:title",
+        "og:type",
+        "og:url"
+      ],
+      "jsonld_count": 1,
+      "jsonld_parse_errors": 0,
+      "jsonld_types": [
+        "BreadcrumbList",
+        "ListItem"
+      ],
+      "h1_count": 1,
+      "h1": [
+        "Cửa hàng"
+      ],
+      "rendering": "php",
+      "react_hydration": false,
+      "cache_control": "no-store, private",
+      "x_robots_tag": "noindex, follow",
+      "vary": "X-Inertia, Cookie",
+      "sentinel_in_head": false,
+      "sentinel_in_pagination": false,
+      "poison_host_in_head": false,
+      "poison_host_in_pagination": false
+    },
+    {
+      "id": "private-login",
+      "scope": "private",
+      "path": "/dang-nhap",
+      "status": 200,
+      "title_count": 1,
+      "title": "Tiệm Bánh Nhà Mình",
+      "canonical_count": 0,
+      "canonical": [],
+      "description_count": 0,
+      "robots": [
+        "noindex, nofollow"
+      ],
+      "og_keys": [],
+      "jsonld_count": 0,
+      "jsonld_parse_errors": 0,
+      "jsonld_types": [],
+      "h1_count": 0,
+      "h1": [],
+      "rendering": "client",
+      "react_hydration": false,
+      "cache_control": "no-store, private",
+      "x_robots_tag": "noindex, nofollow",
+      "vary": "X-Inertia, Cookie",
+      "sentinel_in_head": false,
+      "sentinel_in_pagination": false,
+      "poison_host_in_head": false,
+      "poison_host_in_pagination": false
+    },
+    {
+      "id": "private-cart",
+      "scope": "private",
+      "path": "/gio-hang",
+      "status": 200,
+      "title_count": 1,
+      "title": "Tiệm Bánh Nhà Mình",
+      "canonical_count": 0,
+      "canonical": [],
+      "description_count": 0,
+      "robots": [
+        "noindex, nofollow"
+      ],
+      "og_keys": [],
+      "jsonld_count": 0,
+      "jsonld_parse_errors": 0,
+      "jsonld_types": [],
+      "h1_count": 0,
+      "h1": [],
+      "rendering": "client",
+      "react_hydration": false,
+      "cache_control": "no-store, private",
+      "x_robots_tag": "noindex, nofollow",
+      "vary": "X-Inertia, Cookie",
+      "sentinel_in_head": false,
+      "sentinel_in_pagination": false,
+      "poison_host_in_head": false,
+      "poison_host_in_pagination": false
+    },
+    {
+      "id": "private-tracking-form",
+      "scope": "private",
+      "path": "/tra-cuu",
+      "status": 200,
+      "title_count": 1,
+      "title": "Tiệm Bánh Nhà Mình",
+      "canonical_count": 0,
+      "canonical": [],
+      "description_count": 0,
+      "robots": [
+        "noindex, nofollow"
+      ],
+      "og_keys": [],
+      "jsonld_count": 0,
+      "jsonld_parse_errors": 0,
+      "jsonld_types": [],
+      "h1_count": 0,
+      "h1": [],
+      "rendering": "client",
+      "react_hydration": false,
+      "cache_control": "no-store, private",
+      "x_robots_tag": "noindex, nofollow",
+      "vary": "X-Inertia, Cookie",
+      "sentinel_in_head": false,
+      "sentinel_in_pagination": false,
+      "poison_host_in_head": false,
+      "poison_host_in_pagination": false
+    },
+    {
+      "id": "unknown-home-query",
+      "scope": "untrusted query/Host test",
+      "path": "/",
+      "host_override": false,
+      "status": 200,
+      "title_count": 1,
+      "title": "Tiệm Bánh Nhà Mình | Thực đơn và đặt bánh",
+      "canonical_count": 1,
+      "canonical": [
+        "http://127.0.0.1:18928/"
+      ],
+      "description_count": 1,
+      "robots": [
+        "noindex, follow"
+      ],
+      "og_keys": [
+        "og:description",
+        "og:title",
+        "og:type",
+        "og:url"
+      ],
+      "jsonld_count": 0,
+      "jsonld_parse_errors": 0,
+      "jsonld_types": [],
+      "h1_count": 1,
+      "h1": [
+        "Chọn chiếc bánh cho dịp của bạn."
+      ],
+      "rendering": "php",
+      "react_hydration": false,
+      "cache_control": "no-store, private",
+      "x_robots_tag": "noindex, follow",
+      "vary": "X-Inertia, Cookie",
+      "sentinel_in_head": false,
+      "sentinel_in_pagination": false,
+      "poison_host_in_head": false,
+      "poison_host_in_pagination": false
+    },
+    {
+      "id": "unknown-pagination-query",
+      "scope": "untrusted query/Host test",
+      "path": "/thuc-don",
+      "host_override": false,
+      "status": 200,
+      "title_count": 1,
+      "title": "Thực đơn · Trang 2 | Tiệm Bánh Nhà Mình",
+      "canonical_count": 1,
+      "canonical": [
+        "http://127.0.0.1:18928/thuc-don"
+      ],
+      "description_count": 1,
+      "robots": [
+        "noindex, follow"
+      ],
+      "og_keys": [
+        "og:description",
+        "og:title",
+        "og:type",
+        "og:url"
+      ],
+      "jsonld_count": 1,
+      "jsonld_parse_errors": 0,
+      "jsonld_types": [
+        "BreadcrumbList",
+        "ListItem"
+      ],
+      "h1_count": 1,
+      "h1": [
+        "Hôm nay bạn chọn bánh gì?"
+      ],
+      "rendering": "php",
+      "react_hydration": false,
+      "cache_control": "no-store, private",
+      "x_robots_tag": "noindex, follow",
+      "vary": "X-Inertia, Cookie",
+      "sentinel_in_head": false,
+      "sentinel_in_pagination": false,
+      "poison_host_in_head": false,
+      "poison_host_in_pagination": false
+    },
+    {
+      "id": "poison-host-pagination",
+      "scope": "untrusted query/Host test",
+      "path": "/thuc-don",
+      "host_override": true,
+      "status": 200,
+      "title_count": 1,
+      "title": "Thực đơn · Trang 2 | Tiệm Bánh Nhà Mình",
+      "canonical_count": 1,
+      "canonical": [
+        "http://127.0.0.1:18928/thuc-don"
+      ],
+      "description_count": 1,
+      "robots": [
+        "noindex, follow"
+      ],
+      "og_keys": [
+        "og:description",
+        "og:title",
+        "og:type",
+        "og:url"
+      ],
+      "jsonld_count": 1,
+      "jsonld_parse_errors": 0,
+      "jsonld_types": [
+        "BreadcrumbList",
+        "ListItem"
+      ],
+      "h1_count": 1,
+      "h1": [
+        "Hôm nay bạn chọn bánh gì?"
+      ],
+      "rendering": "php",
+      "react_hydration": false,
+      "cache_control": "no-store, private",
+      "x_robots_tag": "noindex, follow",
+      "vary": "X-Inertia, Cookie",
+      "sentinel_in_head": false,
+      "sentinel_in_pagination": false,
+      "poison_host_in_head": false,
+      "poison_host_in_pagination": false,
+      "rechecked_after_asset_origin_fix": true
+    },
+    {
+      "id": "optional-ssr-home-first",
+      "scope": "optional Node SSR first sample",
+      "path": "/",
+      "status": 200,
+      "title_count": 1,
+      "title": "Tiệm Bánh Nhà Mình | Thực đơn và đặt bánh",
+      "canonical_count": 1,
+      "canonical": [
+        "http://127.0.0.1:18929/"
+      ],
+      "description_count": 1,
+      "robots": [
+        "noindex, follow"
+      ],
+      "og_keys": [
+        "og:description",
+        "og:title",
+        "og:type",
+        "og:url"
+      ],
+      "jsonld_count": 0,
+      "jsonld_parse_errors": 0,
+      "jsonld_types": [],
+      "h1_count": 1,
+      "h1": [
+        "Chọn chiếc bánh cho dịp của bạn."
+      ],
+      "rendering": "react-ssr",
+      "react_hydration": true,
+      "cache_control": "no-store, private",
+      "x_robots_tag": "noindex, follow",
+      "vary": "X-Inertia, Cookie",
+      "sentinel_in_head": false,
+      "sentinel_in_pagination": false,
+      "poison_host_in_head": false,
+      "poison_host_in_pagination": false
+    },
+    {
+      "id": "optional-ssr-product-first",
+      "scope": "optional Node SSR first sample",
+      "path": "/banh/banh-thu-seo",
+      "status": 200,
+      "title_count": 1,
+      "title": "[THỬ] Bánh kiểm tra SEO | Tiệm Bánh Nhà Mình",
+      "canonical_count": 1,
+      "canonical": [
+        "http://127.0.0.1:18929/banh/banh-thu-seo"
+      ],
+      "description_count": 1,
+      "robots": [
+        "noindex, follow"
+      ],
+      "og_keys": [
+        "og:description",
+        "og:image",
+        "og:image:height",
+        "og:image:width",
+        "og:title",
+        "og:type",
+        "og:url"
+      ],
+      "jsonld_count": 1,
+      "jsonld_parse_errors": 0,
+      "jsonld_types": [
+        "BreadcrumbList",
+        "ListItem",
+        "Product"
+      ],
+      "h1_count": 1,
+      "h1": [
+        "[THỬ] Bánh kiểm tra SEO"
+      ],
+      "rendering": "react-ssr",
+      "react_hydration": true,
+      "cache_control": "no-store, private",
+      "x_robots_tag": "noindex, follow",
+      "vary": "X-Inertia, Cookie",
+      "sentinel_in_head": false,
+      "sentinel_in_pagination": false,
+      "poison_host_in_head": false,
+      "poison_host_in_pagination": false
+    },
+    {
+      "id": "optional-ssr-category-first",
+      "scope": "optional Node SSR first sample",
+      "path": "/thuc-don/banh-kem",
+      "status": 200,
+      "title_count": 1,
+      "title": "Bánh kem | Tiệm Bánh Nhà Mình",
+      "canonical_count": 1,
+      "canonical": [
+        "http://127.0.0.1:18929/thuc-don/banh-kem"
+      ],
+      "description_count": 1,
+      "robots": [
+        "noindex, follow"
+      ],
+      "og_keys": [
+        "og:description",
+        "og:title",
+        "og:type",
+        "og:url"
+      ],
+      "jsonld_count": 1,
+      "jsonld_parse_errors": 0,
+      "jsonld_types": [
+        "BreadcrumbList",
+        "ListItem"
+      ],
+      "h1_count": 1,
+      "h1": [
+        "Bánh kem"
+      ],
+      "rendering": "react-ssr",
+      "react_hydration": true,
+      "cache_control": "no-store, private",
+      "x_robots_tag": "noindex, follow",
+      "vary": "X-Inertia, Cookie",
+      "sentinel_in_head": false,
+      "sentinel_in_pagination": false,
+      "poison_host_in_head": false,
+      "poison_host_in_pagination": false
+    },
+    {
+      "id": "optional-ssr-info-first",
+      "scope": "optional Node SSR first sample",
+      "path": "/cua-hang",
+      "status": 200,
+      "title_count": 1,
+      "title": "Cửa hàng | Tiệm Bánh Nhà Mình",
+      "canonical_count": 1,
+      "canonical": [
+        "http://127.0.0.1:18929/cua-hang"
+      ],
+      "description_count": 1,
+      "robots": [
+        "noindex, follow"
+      ],
+      "og_keys": [
+        "og:description",
+        "og:title",
+        "og:type",
+        "og:url"
+      ],
+      "jsonld_count": 1,
+      "jsonld_parse_errors": 0,
+      "jsonld_types": [
+        "BreadcrumbList",
+        "ListItem"
+      ],
+      "h1_count": 1,
+      "h1": [
+        "Cửa hàng"
+      ],
+      "rendering": "react-ssr",
+      "react_hydration": true,
+      "cache_control": "no-store, private",
+      "x_robots_tag": "noindex, follow",
+      "vary": "X-Inertia, Cookie",
+      "sentinel_in_head": false,
+      "sentinel_in_pagination": false,
+      "poison_host_in_head": false,
+      "poison_host_in_pagination": false
+    },
+    {
+      "id": "ssr-private-login",
+      "scope": "private with optional SSR enabled",
+      "path": "/dang-nhap",
+      "status": 200,
+      "title_count": 1,
+      "title": "Tiệm Bánh Nhà Mình",
+      "canonical_count": 0,
+      "canonical": [],
+      "description_count": 0,
+      "robots": [
+        "noindex, nofollow"
+      ],
+      "og_keys": [],
+      "jsonld_count": 0,
+      "jsonld_parse_errors": 0,
+      "jsonld_types": [],
+      "h1_count": 0,
+      "h1": [],
+      "rendering": "client",
+      "react_hydration": false,
+      "cache_control": "no-store, private",
+      "x_robots_tag": "noindex, nofollow",
+      "vary": "X-Inertia, Cookie",
+      "sentinel_in_head": false,
+      "sentinel_in_pagination": false,
+      "poison_host_in_head": false,
+      "poison_host_in_pagination": false
+    },
+    {
+      "id": "ssr-private-cart",
+      "scope": "private with optional SSR enabled",
+      "path": "/gio-hang",
+      "status": 200,
+      "title_count": 1,
+      "title": "Tiệm Bánh Nhà Mình",
+      "canonical_count": 0,
+      "canonical": [],
+      "description_count": 0,
+      "robots": [
+        "noindex, nofollow"
+      ],
+      "og_keys": [],
+      "jsonld_count": 0,
+      "jsonld_parse_errors": 0,
+      "jsonld_types": [],
+      "h1_count": 0,
+      "h1": [],
+      "rendering": "client",
+      "react_hydration": false,
+      "cache_control": "no-store, private",
+      "x_robots_tag": "noindex, nofollow",
+      "vary": "X-Inertia, Cookie",
+      "sentinel_in_head": false,
+      "sentinel_in_pagination": false,
+      "poison_host_in_head": false,
+      "poison_host_in_pagination": false
+    },
+    {
+      "id": "ssr-private-tracking-form",
+      "scope": "private with optional SSR enabled",
+      "path": "/tra-cuu",
+      "status": 200,
+      "title_count": 1,
+      "title": "Tiệm Bánh Nhà Mình",
+      "canonical_count": 0,
+      "canonical": [],
+      "description_count": 0,
+      "robots": [
+        "noindex, nofollow"
+      ],
+      "og_keys": [],
+      "jsonld_count": 0,
+      "jsonld_parse_errors": 0,
+      "jsonld_types": [],
+      "h1_count": 0,
+      "h1": [],
+      "rendering": "client",
+      "react_hydration": false,
+      "cache_control": "no-store, private",
+      "x_robots_tag": "noindex, nofollow",
+      "vary": "X-Inertia, Cookie",
+      "sentinel_in_head": false,
+      "sentinel_in_pagination": false,
+      "poison_host_in_head": false,
+      "poison_host_in_pagination": false
+    }
+  ],
+  "crawl": {
+    "origin": "http://127.0.0.1:18926",
+    "unique_public_anchors": 28,
+    "excluded_private_or_external_anchors": 101,
+    "results": [
+      {
+        "path": "/",
+        "status": 200,
+        "redirects": 0,
+        "blocked_redirect": false
+      },
+      {
+        "path": "/banh/banh-kem-chocolate",
+        "status": 200,
+        "redirects": 0,
+        "blocked_redirect": false
+      },
+      {
+        "path": "/banh/banh-kem-chocolate?category=banh-kem",
+        "status": 200,
+        "redirects": 0,
+        "blocked_redirect": false
+      },
+      {
+        "path": "/banh/banh-kem-dau",
+        "status": 200,
+        "redirects": 0,
+        "blocked_redirect": false
+      },
+      {
+        "path": "/banh/banh-kem-dau-mini?category=banh-kem",
+        "status": 200,
+        "redirects": 0,
+        "blocked_redirect": false
+      },
+      {
+        "path": "/banh/banh-kem-dau-mini?page=2",
+        "status": 200,
+        "redirects": 0,
+        "blocked_redirect": false
+      },
+      {
+        "path": "/banh/banh-kem-dau?category=banh-kem",
+        "status": 200,
+        "redirects": 0,
+        "blocked_redirect": false
+      },
+      {
+        "path": "/banh/banh-thu-seo",
+        "status": 200,
+        "redirects": 0,
+        "blocked_redirect": false
+      },
+      {
+        "path": "/banh/banh-thu-seo?category=banh-kem",
+        "status": 200,
+        "redirects": 0,
+        "blocked_redirect": false
+      },
+      {
+        "path": "/banh/cheesecake-viet-quat",
+        "status": 200,
+        "redirects": 0,
+        "blocked_redirect": false
+      },
+      {
+        "path": "/banh/cookie-chocolate-chip",
+        "status": 200,
+        "redirects": 0,
+        "blocked_redirect": false
+      },
+      {
+        "path": "/banh/croissant-bo-phap",
+        "status": 200,
+        "redirects": 0,
+        "blocked_redirect": false
+      },
+      {
+        "path": "/banh/hop-croissant-bo?page=2",
+        "status": 200,
+        "redirects": 0,
+        "blocked_redirect": false
+      },
+      {
+        "path": "/banh/tiramisu-ca-phe",
+        "status": 200,
+        "redirects": 0,
+        "blocked_redirect": false
+      },
+      {
+        "path": "/banh/tiramisu-chocolate",
+        "status": 200,
+        "redirects": 0,
+        "blocked_redirect": false
+      },
+      {
+        "path": "/cau-hoi-thuong-gap",
+        "status": 200,
+        "redirects": 0,
+        "blocked_redirect": false
+      },
+      {
+        "path": "/chinh-sach-dat-banh",
+        "status": 200,
+        "redirects": 0,
+        "blocked_redirect": false
+      },
+      {
+        "path": "/cua-hang",
+        "status": 200,
+        "redirects": 0,
+        "blocked_redirect": false
+      },
+      {
+        "path": "/gioi-thieu",
+        "status": 200,
+        "redirects": 0,
+        "blocked_redirect": false
+      },
+      {
+        "path": "/lien-he",
+        "status": 200,
+        "redirects": 0,
+        "blocked_redirect": false
+      },
+      {
+        "path": "/thuc-don",
+        "status": 200,
+        "redirects": 0,
+        "blocked_redirect": false
+      },
+      {
+        "path": "/thuc-don/banh-kem",
+        "status": 200,
+        "redirects": 0,
+        "blocked_redirect": false
+      },
+      {
+        "path": "/thuc-don/banh-lanh",
+        "status": 200,
+        "redirects": 0,
+        "blocked_redirect": false
+      },
+      {
+        "path": "/thuc-don/banh-nuong",
+        "status": 200,
+        "redirects": 0,
+        "blocked_redirect": false
+      },
+      {
+        "path": "/thuc-don/banh-quy",
+        "status": 200,
+        "redirects": 0,
+        "blocked_redirect": false
+      },
+      {
+        "path": "/thuc-don?occasion=Sinh%20nh%E1%BA%ADt",
+        "status": 200,
+        "redirects": 0,
+        "blocked_redirect": false
+      },
+      {
+        "path": "/thuc-don?page=1",
+        "status": 200,
+        "redirects": 0,
+        "blocked_redirect": false
+      },
+      {
+        "path": "/thuc-don?page=2",
+        "status": 200,
+        "redirects": 0,
+        "blocked_redirect": false
+      }
+    ],
+    "dead_links": 0
+  },
+  "issues": [],
+  "limitations": [
+    "Native HTTP GET checks only; no JavaScript or browser interaction in this audit.",
+    "No cookies, CSRF tokens, raw page payloads, full HTML or private bearer URLs are persisted.",
+    "Only public route anchors are crawled on the approved PHP origin. External/private/action URLs and form submissions are excluded.",
+    "Local demo data and metadata are not approval of the real shop or a public launch."
+  ],
+  "completed_at_utc": "2026-11-25T02:37:06.005Z",
+  "passed": true,
+  "initial_findings": [
+    {
+      "case": "poison-host-pagination",
+      "diagnosis": "Three Vite link hrefs and one script src used an untrusted Host while canonical, Open Graph, schema and pagination were safe.",
+      "before": {
+        "id": "poison-host-pagination",
+        "scope": "untrusted query/Host test",
+        "path": "/thuc-don",
+        "host_override": true,
+        "status": 200,
+        "title_count": 1,
+        "title": "Thực đơn · Trang 2 | Tiệm Bánh Nhà Mình",
+        "canonical_count": 1,
+        "canonical": [
+          "http://127.0.0.1:18928/thuc-don"
+        ],
+        "description_count": 1,
+        "robots": [
+          "noindex, follow"
+        ],
+        "og_keys": [
+          "og:description",
+          "og:title",
+          "og:type",
+          "og:url"
+        ],
+        "jsonld_count": 1,
+        "jsonld_parse_errors": 0,
+        "jsonld_types": [
+          "BreadcrumbList",
+          "ListItem"
+        ],
+        "h1_count": 1,
+        "h1": [
+          "Hôm nay bạn chọn bánh gì?"
+        ],
+        "rendering": "php",
+        "react_hydration": false,
+        "cache_control": "no-store, private",
+        "x_robots_tag": "noindex, follow",
+        "vary": "X-Inertia, Cookie",
+        "sentinel_in_head": false,
+        "sentinel_in_pagination": false,
+        "poison_host_in_head": false,
+        "poison_host_in_pagination": false,
+        "rechecked_after_asset_origin_fix": true
+      }
+    }
+  ],
+  "rechecks": [
+    {
+      "id": "host-asset-origin-after-fix",
+      "passed": true,
+      "at_utc": "2026-11-25T02:35:05.585Z",
+      "status": 200,
+      "title_count": 1,
+      "title": "Thực đơn · Trang 2 | Tiệm Bánh Nhà Mình",
+      "canonical_count": 1,
+      "canonical": [
+        "http://127.0.0.1:18928/thuc-don"
+      ],
+      "description_count": 1,
+      "robots": [
+        "noindex, follow"
+      ],
+      "og_keys": [
+        "og:description",
+        "og:title",
+        "og:type",
+        "og:url"
+      ],
+      "jsonld_count": 1,
+      "jsonld_parse_errors": 0,
+      "jsonld_types": [
+        "BreadcrumbList",
+        "ListItem"
+      ],
+      "h1_count": 1,
+      "h1": [
+        "Hôm nay bạn chọn bánh gì?"
+      ],
+      "rendering": "php",
+      "react_hydration": false,
+      "cache_control": "no-store, private",
+      "x_robots_tag": "noindex, follow",
+      "vary": "X-Inertia, Cookie",
+      "sentinel_in_head": false,
+      "sentinel_in_pagination": false,
+      "poison_host_in_head": false,
+      "poison_host_in_pagination": false
+    },
+    {
+      "id": "ssr-clean-category-url",
+      "passed": true,
+      "path": "/thuc-don/banh-kem",
+      "at_utc": "2026-11-25T02:35:06.561Z",
+      "inertia_page_url_is_clean": true,
+      "status": 200,
+      "title_count": 1,
+      "title": "Bánh kem | Tiệm Bánh Nhà Mình",
+      "canonical_count": 1,
+      "canonical": [
+        "http://127.0.0.1:18929/thuc-don/banh-kem"
+      ],
+      "description_count": 1,
+      "robots": [
+        "noindex, follow"
+      ],
+      "og_keys": [
+        "og:description",
+        "og:title",
+        "og:type",
+        "og:url"
+      ],
+      "jsonld_count": 1,
+      "jsonld_parse_errors": 0,
+      "jsonld_types": [
+        "BreadcrumbList",
+        "ListItem"
+      ],
+      "h1_count": 1,
+      "h1": [
+        "Bánh kem"
+      ],
+      "rendering": "react-ssr",
+      "react_hydration": true,
+      "cache_control": "no-store, private",
+      "x_robots_tag": "noindex, follow",
+      "vary": "X-Inertia, Cookie",
+      "sentinel_in_head": false,
+      "sentinel_in_pagination": false,
+      "poison_host_in_head": false,
+      "poison_host_in_pagination": false
+    },
+    {
+      "id": "ssr-explicit-valid-filters-without-unknown-query",
+      "passed": false,
+      "path": "/thuc-don/banh-kem",
+      "at_utc": "2026-11-25T02:35:07.250Z",
+      "query_keys": [
+        "address",
+        "guests",
+        "page",
+        "sort"
+      ],
+      "valid_filter_values_preserved": true,
+      "unknown_query_stripped": false,
+      "status": 404,
+      "title_count": 1,
+      "title": "Tiệm Bánh Nhà Mình",
+      "canonical_count": 0,
+      "canonical": [],
+      "description_count": 0,
+      "robots": [
+        "noindex, nofollow"
+      ],
+      "og_keys": [],
+      "jsonld_count": 0,
+      "jsonld_parse_errors": 0,
+      "jsonld_types": [],
+      "h1_count": 0,
+      "h1": [],
+      "rendering": "client",
+      "react_hydration": false,
+      "cache_control": "no-store, private",
+      "x_robots_tag": "noindex, follow",
+      "vary": "X-Inertia, Cookie",
+      "sentinel_in_head": false,
+      "sentinel_in_pagination": false,
+      "poison_host_in_head": false,
+      "poison_host_in_pagination": false,
+      "expectation_correction": "Initial combined guests=8&page=2 fixture has only one result page. HTTP 404 is intentional. Preserve this initial observation; test valid guest filter and page two independently below.",
+      "superseded_by_valid_url_recheck": true
+    },
+    {
+      "id": "host-asset-origin-after-fix",
+      "passed": true,
+      "at_utc": "2026-11-25T02:37:04.057Z",
+      "status": 200,
+      "title_count": 1,
+      "title": "Thực đơn · Trang 2 | Tiệm Bánh Nhà Mình",
+      "canonical_count": 1,
+      "canonical": [
+        "http://127.0.0.1:18928/thuc-don"
+      ],
+      "description_count": 1,
+      "robots": [
+        "noindex, follow"
+      ],
+      "og_keys": [
+        "og:description",
+        "og:title",
+        "og:type",
+        "og:url"
+      ],
+      "jsonld_count": 1,
+      "jsonld_parse_errors": 0,
+      "jsonld_types": [
+        "BreadcrumbList",
+        "ListItem"
+      ],
+      "h1_count": 1,
+      "h1": [
+        "Hôm nay bạn chọn bánh gì?"
+      ],
+      "rendering": "php",
+      "react_hydration": false,
+      "cache_control": "no-store, private",
+      "x_robots_tag": "noindex, follow",
+      "vary": "X-Inertia, Cookie",
+      "sentinel_in_head": false,
+      "sentinel_in_pagination": false,
+      "poison_host_in_head": false,
+      "poison_host_in_pagination": false
+    },
+    {
+      "id": "ssr-clean-category-url",
+      "passed": true,
+      "path": "/thuc-don/banh-kem",
+      "at_utc": "2026-11-25T02:37:04.674Z",
+      "inertia_page_url_is_clean": true,
+      "status": 200,
+      "title_count": 1,
+      "title": "Bánh kem | Tiệm Bánh Nhà Mình",
+      "canonical_count": 1,
+      "canonical": [
+        "http://127.0.0.1:18929/thuc-don/banh-kem"
+      ],
+      "description_count": 1,
+      "robots": [
+        "noindex, follow"
+      ],
+      "og_keys": [
+        "og:description",
+        "og:title",
+        "og:type",
+        "og:url"
+      ],
+      "jsonld_count": 1,
+      "jsonld_parse_errors": 0,
+      "jsonld_types": [
+        "BreadcrumbList",
+        "ListItem"
+      ],
+      "h1_count": 1,
+      "h1": [
+        "Bánh kem"
+      ],
+      "rendering": "react-ssr",
+      "react_hydration": true,
+      "cache_control": "no-store, private",
+      "x_robots_tag": "noindex, follow",
+      "vary": "X-Inertia, Cookie",
+      "sentinel_in_head": false,
+      "sentinel_in_pagination": false,
+      "poison_host_in_head": false,
+      "poison_host_in_pagination": false
+    },
+    {
+      "id": "ssr-explicit-valid-filters-without-unknown-query",
+      "passed": true,
+      "path": "/thuc-don/banh-kem",
+      "at_utc": "2026-11-25T02:37:05.351Z",
+      "query_keys": [
+        "guests",
+        "sort"
+      ],
+      "valid_filter_values_preserved": true,
+      "unknown_query_stripped": true,
+      "status": 200,
+      "title_count": 1,
+      "title": "Bánh kem | Tiệm Bánh Nhà Mình",
+      "canonical_count": 1,
+      "canonical": [
+        "http://127.0.0.1:18929/thuc-don/banh-kem"
+      ],
+      "description_count": 1,
+      "robots": [
+        "noindex, follow"
+      ],
+      "og_keys": [
+        "og:description",
+        "og:title",
+        "og:type",
+        "og:url"
+      ],
+      "jsonld_count": 1,
+      "jsonld_parse_errors": 0,
+      "jsonld_types": [
+        "BreadcrumbList",
+        "ListItem"
+      ],
+      "h1_count": 1,
+      "h1": [
+        "Bánh kem"
+      ],
+      "rendering": "react-ssr",
+      "react_hydration": true,
+      "cache_control": "no-store, private",
+      "x_robots_tag": "noindex, follow",
+      "vary": "X-Inertia, Cookie",
+      "sentinel_in_head": false,
+      "sentinel_in_pagination": false,
+      "poison_host_in_head": false,
+      "poison_host_in_pagination": false
+    },
+    {
+      "id": "ssr-explicit-valid-page-two-without-unknown-query",
+      "passed": true,
+      "path": "/thuc-don",
+      "at_utc": "2026-11-25T02:37:06.005Z",
+      "query_keys": [
+        "page",
+        "sort"
+      ],
+      "valid_filter_values_preserved": true,
+      "unknown_query_stripped": true,
+      "status": 200,
+      "title_count": 1,
+      "title": "Thực đơn · Trang 2 | Tiệm Bánh Nhà Mình",
+      "canonical_count": 1,
+      "canonical": [
+        "http://127.0.0.1:18929/thuc-don"
+      ],
+      "description_count": 1,
+      "robots": [
+        "noindex, follow"
+      ],
+      "og_keys": [
+        "og:description",
+        "og:title",
+        "og:type",
+        "og:url"
+      ],
+      "jsonld_count": 1,
+      "jsonld_parse_errors": 0,
+      "jsonld_types": [
+        "BreadcrumbList",
+        "ListItem"
+      ],
+      "h1_count": 1,
+      "h1": [
+        "Hôm nay bạn chọn bánh gì?"
+      ],
+      "rendering": "react-ssr",
+      "react_hydration": true,
+      "cache_control": "no-store, private",
+      "x_robots_tag": "noindex, follow",
+      "vary": "X-Inertia, Cookie",
+      "sentinel_in_head": false,
+      "sentinel_in_pagination": false,
+      "poison_host_in_head": false,
+      "poison_host_in_pagination": false
+    }
+  ],
+  "source_fix_validation": {
+    "scope": "Only Host-independent Vite asset paths and SSR preservation of explicit validated query keys",
+    "focused_phpunit_tests": 17,
+    "focused_phpunit_assertions": 227,
+    "pint": "passed",
+    "client_or_ssr_js_rebuilt": false
+  }
+}

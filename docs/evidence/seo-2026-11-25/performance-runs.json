@@ -1,0 +1,622 @@
+[
+  {
+    "phase": "baseline",
+    "page": "home",
+    "run": 1,
+    "viewport": 390,
+    "viewport_height": 844,
+    "client_width": 375,
+    "ttfb_ms": 736.5,
+    "window_load_ms": 2255.0999999996275,
+    "fcp_ms": null,
+    "lcp": null,
+    "cls": 0.0012234715281818328,
+    "paint_entry_types": [
+      "largest-contentful-paint",
+      "layout-shift",
+      "paint"
+    ],
+    "html_encoded_bytes": 1290,
+    "resource_encoded_bytes": {
+      "js": 151472,
+      "css": 11885,
+      "image": 125160,
+      "font": 131800,
+      "other": 1197
+    },
+    "resource_transfer_bytes": 425714,
+    "request_count": 14,
+    "quiet": true,
+    "images": [
+      {
+        "src": "/anh/759c32bf07022e91dda701225bf00c1a5eb25b84.jpg",
+        "natural_width": 900,
+        "display_width": 343,
+        "width_attribute": null,
+        "height_attribute": null,
+        "loading": "eager",
+        "priority": "high"
+      },
+      {
+        "src": "/anh/759c32bf07022e91dda701225bf00c1a5eb25b84.jpg",
+        "natural_width": 900,
+        "display_width": 165,
+        "width_attribute": null,
+        "height_attribute": null,
+        "loading": "lazy",
+        "priority": "auto"
+      }
+    ],
+    "document_width": 375
+  },
+  {
+    "phase": "baseline",
+    "page": "home",
+    "run": 2,
+    "viewport": 390,
+    "viewport_height": 844,
+    "client_width": 375,
+    "ttfb_ms": 683,
+    "window_load_ms": 2114.5999999996275,
+    "fcp_ms": null,
+    "lcp": null,
+    "cls": 0.0012234715281818328,
+    "paint_entry_types": [
+      "largest-contentful-paint",
+      "layout-shift",
+      "paint"
+    ],
+    "html_encoded_bytes": 1290,
+    "resource_encoded_bytes": {
+      "js": 151472,
+      "css": 11885,
+      "image": 125160,
+      "font": 131800,
+      "other": 1197
+    },
+    "resource_transfer_bytes": 425714,
+    "request_count": 14,
+    "quiet": true,
+    "images": [
+      {
+        "src": "/anh/759c32bf07022e91dda701225bf00c1a5eb25b84.jpg",
+        "natural_width": 900,
+        "display_width": 343,
+        "width_attribute": null,
+        "height_attribute": null,
+        "loading": "eager",
+        "priority": "high"
+      },
+      {
+        "src": "/anh/759c32bf07022e91dda701225bf00c1a5eb25b84.jpg",
+        "natural_width": 900,
+        "display_width": 165,
+        "width_attribute": null,
+        "height_attribute": null,
+        "loading": "lazy",
+        "priority": "auto"
+      }
+    ],
+    "document_width": 375
+  },
+  {
+    "phase": "baseline",
+    "page": "home",
+    "run": 3,
+    "viewport": 390,
+    "viewport_height": 844,
+    "client_width": 375,
+    "ttfb_ms": 648,
+    "window_load_ms": 2016,
+    "fcp_ms": null,
+    "lcp": null,
+    "cls": 0.0012234715281818328,
+    "paint_entry_types": [
+      "largest-contentful-paint",
+      "layout-shift",
+      "paint"
+    ],
+    "html_encoded_bytes": 1290,
+    "resource_encoded_bytes": {
+      "js": 151472,
+      "css": 11885,
+      "image": 125160,
+      "font": 131800,
+      "other": 1197
+    },
+    "resource_transfer_bytes": 425714,
+    "request_count": 14,
+    "quiet": true,
+    "images": [
+      {
+        "src": "/anh/759c32bf07022e91dda701225bf00c1a5eb25b84.jpg",
+        "natural_width": 900,
+        "display_width": 343,
+        "width_attribute": null,
+        "height_attribute": null,
+        "loading": "eager",
+        "priority": "high"
+      },
+      {
+        "src": "/anh/759c32bf07022e91dda701225bf00c1a5eb25b84.jpg",
+        "natural_width": 900,
+        "display_width": 165,
+        "width_attribute": null,
+        "height_attribute": null,
+        "loading": "lazy",
+        "priority": "auto"
+      }
+    ],
+    "document_width": 375
+  },
+  {
+    "phase": "baseline",
+    "page": "product",
+    "run": 1,
+    "viewport": 390,
+    "viewport_height": 844,
+    "client_width": 375,
+    "ttfb_ms": 652.5999999996275,
+    "window_load_ms": 2048.300000000745,
+    "fcp_ms": null,
+    "lcp": null,
+    "cls": 0.001167651400366919,
+    "paint_entry_types": [
+      "largest-contentful-paint",
+      "layout-shift",
+      "paint"
+    ],
+    "html_encoded_bytes": 1487,
+    "resource_encoded_bytes": {
+      "js": 151472,
+      "css": 11885,
+      "image": 125160,
+      "font": 123816,
+      "other": 1197
+    },
+    "resource_transfer_bytes": 417430,
+    "request_count": 13,
+    "quiet": true,
+    "images": [
+      {
+        "src": "/anh/759c32bf07022e91dda701225bf00c1a5eb25b84.jpg",
+        "natural_width": 900,
+        "display_width": 343,
+        "width_attribute": null,
+        "height_attribute": null,
+        "loading": "eager",
+        "priority": "high"
+      }
+    ],
+    "document_width": 375
+  },
+  {
+    "phase": "baseline",
+    "page": "product",
+    "run": 2,
+    "viewport": 390,
+    "viewport_height": 844,
+    "client_width": 375,
+    "ttfb_ms": 797.9000000003725,
+    "window_load_ms": 2241.5999999996275,
+    "fcp_ms": null,
+    "lcp": null,
+    "cls": 0.001167651400366919,
+    "paint_entry_types": [
+      "largest-contentful-paint",
+      "layout-shift",
+      "paint"
+    ],
+    "html_encoded_bytes": 1487,
+    "resource_encoded_bytes": {
+      "js": 151472,
+      "css": 11885,
+      "image": 125160,
+      "font": 123816,
+      "other": 1197
+    },
+    "resource_transfer_bytes": 417430,
+    "request_count": 13,
+    "quiet": true,
+    "images": [
+      {
+        "src": "/anh/759c32bf07022e91dda701225bf00c1a5eb25b84.jpg",
+        "natural_width": 900,
+        "display_width": 343,
+        "width_attribute": null,
+        "height_attribute": null,
+        "loading": "eager",
+        "priority": "high"
+      }
+    ],
+    "document_width": 375
+  },
+  {
+    "phase": "baseline",
+    "page": "product",
+    "run": 3,
+    "viewport": 390,
+    "viewport_height": 844,
+    "client_width": 375,
+    "ttfb_ms": 905.9000000003725,
+    "window_load_ms": 2344.60000000149,
+    "fcp_ms": 4704,
+    "lcp": {
+      "ms": 5400,
+      "size": 98155,
+      "url": "/anh/759c32bf07022e91dda701225bf00c1a5eb25b84.jpg"
+    },
+    "cls": 0.0010858639743042608,
+    "paint_entry_types": [
+      "largest-contentful-paint",
+      "layout-shift",
+      "paint"
+    ],
+    "html_encoded_bytes": 1487,
+    "resource_encoded_bytes": {
+      "js": 151472,
+      "css": 11885,
+      "image": 125160,
+      "font": 123816,
+      "other": 1197
+    },
+    "resource_transfer_bytes": 417430,
+    "request_count": 13,
+    "quiet": true,
+    "images": [
+      {
+        "src": "/anh/759c32bf07022e91dda701225bf00c1a5eb25b84.jpg",
+        "natural_width": 900,
+        "display_width": 343,
+        "width_attribute": null,
+        "height_attribute": null,
+        "loading": "eager",
+        "priority": "high"
+      }
+    ],
+    "document_width": 375
+  },
+  {
+    "phase": "after-php",
+    "page": "home",
+    "run": 1,
+    "viewport": 390,
+    "viewport_height": 844,
+    "client_width": 375,
+    "ttfb_ms": 372.69999999925494,
+    "window_load_ms": 3342.4000000003725,
+    "fcp_ms": 760,
+    "lcp": {
+      "ms": 2480,
+      "size": 73856,
+      "url": "/anh/9ce726e5893f26d2c38c0ecefac15e099905373d.webp"
+    },
+    "cls": 0.0017188368115877758,
+    "paint_entry_types": [
+      "largest-contentful-paint",
+      "layout-shift",
+      "paint"
+    ],
+    "html_encoded_bytes": 4436,
+    "resource_encoded_bytes": {
+      "js": 152995,
+      "css": 11947,
+      "image": 69296,
+      "font": 131800,
+      "other": 1197
+    },
+    "resource_transfer_bytes": 372035,
+    "request_count": 16,
+    "quiet": true,
+    "images": [
+      {
+        "src": "/anh/9ce726e5893f26d2c38c0ecefac15e099905373d.webp",
+        "natural_width": 358,
+        "display_width": 343,
+        "width_attribute": "900",
+        "height_attribute": "758",
+        "loading": "eager",
+        "priority": "high"
+      },
+      {
+        "src": "/anh/9ce726e5893f26d2c38c0ecefac15e099905373d.webp",
+        "natural_width": 173,
+        "display_width": 165,
+        "width_attribute": "900",
+        "height_attribute": "758",
+        "loading": "lazy",
+        "priority": "auto"
+      }
+    ],
+    "document_width": 375
+  },
+  {
+    "phase": "after-php",
+    "page": "home",
+    "run": 2,
+    "viewport": 390,
+    "viewport_height": 844,
+    "client_width": 375,
+    "ttfb_ms": 1126.2000000011176,
+    "window_load_ms": 4191.4000000003725,
+    "fcp_ms": null,
+    "lcp": null,
+    "cls": 0.00040440894929486096,
+    "paint_entry_types": [
+      "largest-contentful-paint",
+      "layout-shift",
+      "paint"
+    ],
+    "html_encoded_bytes": 4436,
+    "resource_encoded_bytes": {
+      "js": 152995,
+      "css": 11947,
+      "image": 69296,
+      "font": 131800,
+      "other": 1197
+    },
+    "resource_transfer_bytes": 372035,
+    "request_count": 16,
+    "quiet": true,
+    "images": [
+      {
+        "src": "/anh/9ce726e5893f26d2c38c0ecefac15e099905373d.webp",
+        "natural_width": 358,
+        "display_width": 343,
+        "width_attribute": "900",
+        "height_attribute": "758",
+        "loading": "eager",
+        "priority": "high"
+      },
+      {
+        "src": "/anh/9ce726e5893f26d2c38c0ecefac15e099905373d.webp",
+        "natural_width": 173,
+        "display_width": 165,
+        "width_attribute": "900",
+        "height_attribute": "758",
+        "loading": "lazy",
+        "priority": "auto"
+      }
+    ],
+    "document_width": 375
+  },
+  {
+    "phase": "after-php",
+    "page": "home",
+    "run": 3,
+    "viewport": 390,
+    "viewport_height": 844,
+    "client_width": 375,
+    "ttfb_ms": 776.2999999988824,
+    "window_load_ms": 4335.299999998882,
+    "fcp_ms": null,
+    "lcp": null,
+    "cls": 0.0013036484687109396,
+    "paint_entry_types": [
+      "largest-contentful-paint",
+      "layout-shift",
+      "paint"
+    ],
+    "html_encoded_bytes": 4436,
+    "resource_encoded_bytes": {
+      "js": 152995,
+      "css": 11947,
+      "image": 69296,
+      "font": 131800,
+      "other": 1197
+    },
+    "resource_transfer_bytes": 372035,
+    "request_count": 16,
+    "quiet": true,
+    "images": [
+      {
+        "src": "/anh/9ce726e5893f26d2c38c0ecefac15e099905373d.webp",
+        "natural_width": 358,
+        "display_width": 343,
+        "width_attribute": "900",
+        "height_attribute": "758",
+        "loading": "eager",
+        "priority": "high"
+      },
+      {
+        "src": "/anh/9ce726e5893f26d2c38c0ecefac15e099905373d.webp",
+        "natural_width": 173,
+        "display_width": 165,
+        "width_attribute": "900",
+        "height_attribute": "758",
+        "loading": "lazy",
+        "priority": "auto"
+      }
+    ],
+    "document_width": 375
+  },
+  {
+    "phase": "after-php",
+    "page": "product",
+    "run": 1,
+    "viewport": 390,
+    "viewport_height": 844,
+    "client_width": 375,
+    "ttfb_ms": 916.7999999988824,
+    "window_load_ms": 4303.199999999255,
+    "fcp_ms": 64728,
+    "lcp": {
+      "ms": 64728,
+      "size": 98155,
+      "url": "/anh/9ce726e5893f26d2c38c0ecefac15e099905373d.webp"
+    },
+    "cls": 0.0011746261401090565,
+    "paint_entry_types": [
+      "largest-contentful-paint",
+      "layout-shift",
+      "paint"
+    ],
+    "html_encoded_bytes": 4745,
+    "resource_encoded_bytes": {
+      "js": 152995,
+      "css": 11947,
+      "image": 51502,
+      "font": 123816,
+      "other": 1197
+    },
+    "resource_transfer_bytes": 345657,
+    "request_count": 14,
+    "quiet": true,
+    "images": [
+      {
+        "src": "/anh/9ce726e5893f26d2c38c0ecefac15e099905373d.webp",
+        "natural_width": 358,
+        "display_width": 343,
+        "width_attribute": "900",
+        "height_attribute": "758",
+        "loading": "eager",
+        "priority": "high"
+      }
+    ],
+    "document_width": 375
+  },
+  {
+    "phase": "after-php",
+    "page": "product",
+    "run": 2,
+    "viewport": 390,
+    "viewport_height": 844,
+    "client_width": 375,
+    "ttfb_ms": 755.8000000007451,
+    "window_load_ms": 3987.9000000003725,
+    "fcp_ms": null,
+    "lcp": null,
+    "cls": 0.0011746261401090565,
+    "paint_entry_types": [
+      "largest-contentful-paint",
+      "layout-shift",
+      "paint"
+    ],
+    "html_encoded_bytes": 4745,
+    "resource_encoded_bytes": {
+      "js": 152995,
+      "css": 11947,
+      "image": 51502,
+      "font": 123816,
+      "other": 1197
+    },
+    "resource_transfer_bytes": 345657,
+    "request_count": 14,
+    "quiet": true,
+    "images": [
+      {
+        "src": "/anh/9ce726e5893f26d2c38c0ecefac15e099905373d.webp",
+        "natural_width": 358,
+        "display_width": 343,
+        "width_attribute": "900",
+        "height_attribute": "758",
+        "loading": "eager",
+        "priority": "high"
+      }
+    ],
+    "document_width": 375
+  },
+  {
+    "phase": "after-php",
+    "page": "product",
+    "run": 3,
+    "viewport": 390,
+    "viewport_height": 844,
+    "client_width": 375,
+    "ttfb_ms": 694.5,
+    "window_load_ms": 3509.699999999255,
+    "fcp_ms": null,
+    "lcp": null,
+    "cls": 0.00045717626654611954,
+    "paint_entry_types": [
+      "largest-contentful-paint",
+      "layout-shift",
+      "paint"
+    ],
+    "html_encoded_bytes": 4745,
+    "resource_encoded_bytes": {
+      "js": 152995,
+      "css": 11947,
+      "image": 51502,
+      "font": 123816,
+      "other": 1197
+    },
+    "resource_transfer_bytes": 345657,
+    "request_count": 14,
+    "quiet": true,
+    "images": [
+      {
+        "src": "/anh/9ce726e5893f26d2c38c0ecefac15e099905373d.webp",
+        "natural_width": 358,
+        "display_width": 343,
+        "width_attribute": "900",
+        "height_attribute": "758",
+        "loading": "eager",
+        "priority": "high"
+      }
+    ],
+    "document_width": 375
+  },
+  {
+    "phase": "baseline",
+    "page": "policy",
+    "run": 1,
+    "viewport": 390,
+    "viewport_height": 844,
+    "client_width": 375,
+    "ttfb_ms": 685.5999999996275,
+    "window_load_ms": 2091.5999999996275,
+    "fcp_ms": null,
+    "lcp": null,
+    "cls": 0.0005640632491343894,
+    "paint_entry_types": [
+      "largest-contentful-paint",
+      "layout-shift",
+      "paint"
+    ],
+    "html_encoded_bytes": 783,
+    "resource_encoded_bytes": {
+      "js": 154079,
+      "css": 11885,
+      "image": 0,
+      "font": 123816,
+      "other": 1197
+    },
+    "resource_transfer_bytes": 294577,
+    "request_count": 12,
+    "quiet": true,
+    "images": [],
+    "document_width": 375
+  },
+  {
+    "phase": "after-php",
+    "page": "policy",
+    "run": 1,
+    "viewport": 390,
+    "viewport_height": 844,
+    "client_width": 375,
+    "ttfb_ms": 779.9000000003725,
+    "window_load_ms": 3188.60000000149,
+    "fcp_ms": null,
+    "lcp": null,
+    "cls": 0.0005640632491343894,
+    "paint_entry_types": [
+      "largest-contentful-paint",
+      "layout-shift",
+      "paint"
+    ],
+    "html_encoded_bytes": 2353,
+    "resource_encoded_bytes": {
+      "js": 145192,
+      "css": 11947,
+      "image": 0,
+      "font": 123816,
+      "other": 1197
+    },
+    "resource_transfer_bytes": 285752,
+    "request_count": 12,
+    "quiet": true,
+    "images": [],
+    "document_width": 375
+  }
+]
