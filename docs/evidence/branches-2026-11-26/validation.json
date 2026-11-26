@@ -1,0 +1,276 @@
+{
+  "date": "2026-11-26",
+  "timezone": "Asia/Ho_Chi_Minh",
+  "tester": "Codex",
+  "tested_source_commit": "a874c44c2933b82fef7026b8acb3f23337f73d62",
+  "base_commit": "37ee0a14180425796023241a5e987fded2ba3562",
+  "provenance": "Migration drill, automated tests and browser observations were recorded against the working tree subsequently committed as tested_source_commit. Migration logic was unchanged after its real legacy upgrade/rollback drill. Final full suites ran after the pricing, permissions, stock and pickup-location fixes; the pickup fix was rechecked in a fresh browser build. Formatting/line-ending normalization did not change implementation. This is local evidence, not a GitHub Actions result.",
+  "environments": {
+    "mysql_phpunit": {
+      "schema": "tiembanh_branches_phpunit_test",
+      "host": "127.0.0.1",
+      "port": 33317,
+      "version": "8.4.13",
+      "php": "8.3.33",
+      "storage_cache": "isolated from browser and existing dev databases"
+    },
+    "sqlite": {
+      "database": ":memory:",
+      "storage_cache": "separate full-sqlite-storage/cache"
+    },
+    "upgrade_and_browser": {
+      "schema": "tiembanh_branches_upgrade_test",
+      "host": "127.0.0.1",
+      "port": 33317,
+      "url": "http://127.0.0.1:18936",
+      "data": "explicit synthetic fixtures only",
+      "mailer": "log"
+    },
+    "legacy_code": {
+      "commit": "37ee0a14180425796023241a5e987fded2ba3562",
+      "method": "Git archive plus physically copied locked vendor, separate PHP process"
+    }
+  },
+  "checks": {
+    "mysql": {
+      "passed": 163,
+      "failed": 0,
+      "skipped": 0,
+      "assertions": 2687,
+      "command": "php vendor/bin/phpunit --do-not-cache-result --colors=never --fail-on-skipped"
+    },
+    "sqlite": {
+      "passed": 145,
+      "failed": 0,
+      "skipped": 18,
+      "assertions": 2544,
+      "command": "php vendor/bin/phpunit --do-not-cache-result --colors=never",
+      "skip_reason": "Dedicated MySQL contention/snapshot cases, all executed in the MySQL suite"
+    },
+    "lint": {
+      "result": "passed",
+      "command": "npm run lint"
+    },
+    "build": {
+      "result": "passed",
+      "command": "npm run build"
+    },
+    "pint": {
+      "result": "passed",
+      "command": "php vendor/bin/pint --test --format json"
+    },
+    "ssr": {
+      "result": "passed",
+      "public_pages": 5,
+      "private_refused": true,
+      "command": "npm run test:ssr"
+    },
+    "order_ui": {
+      "passed": 3,
+      "failed": 0,
+      "command": "npm run test:orders"
+    },
+    "legacy_upgrade": {
+      "result": "passed",
+      "before_orders": 10,
+      "after_orders": 10,
+      "total_vnd": 2176000,
+      "available_stock": 204,
+      "coupon_used": 2,
+      "stock_movements": 4,
+      "order_items": 10,
+      "checksums_unchanged": true,
+      "backfill_batch": 2,
+      "backfill_runs": 2,
+      "historical_pickup": "Unknown fields explicitly marked; no current address invented as history"
+    },
+    "rollback": {
+      "compatible_default_only": "passed; old exact source read all orders on expanded schema",
+      "after_branch_B_data": "correctly refused; branch data retained"
+    },
+    "browser": {
+      "result": "passed after location fix",
+      "details": "browser-acceptance.json",
+      "mobile": [
+        390,
+        844
+      ],
+      "desktop": [
+        1440,
+        900
+      ],
+      "physical_device": false
+    },
+    "concurrency_coverage": [
+      "Independent branches with different effective prices, stock and slots",
+      "A held SKU lock does not block a B booking",
+      "Same-branch last SKU and last capacity slot",
+      "Chain-wide last coupon use across branches",
+      "Repeated checkout key creates one reservation, notification and order",
+      "Current price from branch SKU, shared variant and accessory despite an older MySQL REPEATABLE READ view",
+      "Branch B intake update preserves concurrent brand changes",
+      "Legacy catalog stale expected_stock is rejected after a real reservation"
+    ],
+    "authorization_coverage": [
+      "A staff cannot read/mutate/export/schedule/reconcile B",
+      "Manager scope, accountant redaction, kitchen production-only",
+      "Open-session membership changes invalidate TOTP proof; mutations check fresh locked permissions",
+      "Customer owner/guest token actions and email jobs use the branch persisted on the order",
+      "Chain aggregates and branch switching are explicit and authorized"
+    ]
+  },
+  "handoff": {
+    "mode": "branch in isolated sandbox only",
+    "all_branches_intake_paused": true,
+    "indexing_enabled": false,
+    "business_verified": false,
+    "orders": 11,
+    "A_orders": 10,
+    "B_orders": 1,
+    "A_available_stock": 204,
+    "B_available_stock": 71,
+    "legacy_variant_stock_mirror": 204,
+    "coupon_used": 2,
+    "queued": 0,
+    "failed": 0,
+    "browser_order": {
+      "code": "NB-261126-7F6515FD9B",
+      "branch_id": 2,
+      "total": 475000,
+      "status": "completed",
+      "payment": "paid",
+      "notifications_sent": 6,
+      "transaction": "synthetic COD, no real money"
+    },
+    "public_deployment": false,
+    "push_performed": false,
+    "real_shop_configuration_changed": false
+  },
+  "ci": {
+    "workflow": ".github/workflows/ci.yml",
+    "includes": [
+      "Pint",
+      "ESLint",
+      "client build",
+      "SSR build/smoke",
+      "order-location JavaScript tests",
+      "SQLite",
+      "MySQL including concurrency with --fail-on-skipped"
+    ],
+    "github_run_for_new_source": "not run; no push requested in this task"
+  },
+  "limitations": [
+    "HTTP loopback and simulated viewports only, no physical-phone or external trusted-HTTPS staging acceptance",
+    "Synthetic menu, addresses, photos and test staff; real branch menu/stock/fees/calendar/memberships require owner approval",
+    "Only Asia/Ho_Chi_Minh is currently accepted for operational branches; a future multi-timezone rollout needs a separate timestamp migration and acceptance",
+    "Single-branch orders; no mixed-branch cart or stock transfer module",
+    "Cutover requires a documented maintenance window freezing writes; batch size bounds memory while the backfill remains one transaction",
+    "Once another branch has incompatible data, rollback-read refuses; use an approved forward-fix/restore plan without deleting evidence",
+    "Branch URL/SEO rollout is pending; branch mode remains noindex",
+    "Mailer log does not verify real SMTP, trusted domain, bank settlement or external infrastructure"
+  ],
+  "privacy": "Public evidence contains only synthetic content and sanitized aggregates. No environment secrets, real credentials/TOTP, tracking/action/reset URLs, cookie/session payloads or raw email bodies are included. Private browser debug image and helper profiles remain in ignored work/.",
+  "client_manifest_sha256": "7c575ba6a2e3bbdd214b54be55eec58ea3e1e5508b7884bafeac670de91133ee",
+  "artifacts": [
+    {
+      "path": "docs/evidence/branches-2026-11-26/browser-acceptance.json",
+      "bytes": 2383,
+      "sha256": "e8dcc82980b4b23c92b171d1282d33edbff7cf5896f0dcec992cc2360f7b3a79"
+    },
+    {
+      "path": "docs/evidence/branches-2026-11-26/check-branches-mysql-focused.txt",
+      "bytes": 276,
+      "sha256": "e196ff96e178f99889b2417da671d222271b319f992cb7a2347d57be424d617f"
+    },
+    {
+      "path": "docs/evidence/branches-2026-11-26/check-build.txt",
+      "bytes": 865,
+      "sha256": "f022f2107f504cf4c70950fc24fd8f476f8bfab60ce32437a91758ac31fe8af4"
+    },
+    {
+      "path": "docs/evidence/branches-2026-11-26/check-lint.txt",
+      "bytes": 45,
+      "sha256": "209befbc94fb31ffa51e9ecc53c60521d2f13783999f35a25365156e23d59c4b"
+    },
+    {
+      "path": "docs/evidence/branches-2026-11-26/check-mysql.txt",
+      "bytes": 440,
+      "sha256": "f2d3287af47366ce78ab59613ea4a367c1558eb659c6cd67e7722e7bb2b80a9a"
+    },
+    {
+      "path": "docs/evidence/branches-2026-11-26/check-order-ui.txt",
+      "bytes": 500,
+      "sha256": "6a9a8ff8cbee0f31681830f1835b40e2e054d3d0b850f6d78f74662a04267e66"
+    },
+    {
+      "path": "docs/evidence/branches-2026-11-26/check-pint.txt",
+      "bytes": 34,
+      "sha256": "9fa3c401d4d7dcf9d616a4e847f09d73bafe2397e5f1b5b77531e2516436ed5a"
+    },
+    {
+      "path": "docs/evidence/branches-2026-11-26/check-sqlite.txt",
+      "bytes": 484,
+      "sha256": "3ac0d20c67d865b46366cae6a8a374b6880119beee66aab47ecd94d641a07f97"
+    },
+    {
+      "path": "docs/evidence/branches-2026-11-26/check-ssr.txt",
+      "bytes": 696,
+      "sha256": "01efc7d712b2025cb421999d999a98a36019d9c9d54950ead0e3d49ba3947980"
+    },
+    {
+      "path": "docs/evidence/branches-2026-11-26/desktop-chain-dashboard.jpg",
+      "bytes": 98831,
+      "sha256": "bc6b6aa7999b309124f3bfc16d85fed53fae3947771ebbf7882fe44ef3bef7ec"
+    },
+    {
+      "path": "docs/evidence/branches-2026-11-26/final-runtime.json",
+      "bytes": 2589,
+      "sha256": "533972d280b2fdfa2337a5c93711c83f14c7297b572fe53d5e68250a497bbe4b"
+    },
+    {
+      "path": "docs/evidence/branches-2026-11-26/migration-after.json",
+      "bytes": 1365,
+      "sha256": "166f3421fde6930ecd3bb7a5ae2e6a2e05d833e25e9a80723b6b93ff6f9105f2"
+    },
+    {
+      "path": "docs/evidence/branches-2026-11-26/migration-before.json",
+      "bytes": 1342,
+      "sha256": "4f28f2424839198dbad4f89c3276d58a6e9050faad2dd9b0f595e7f9ad229e12"
+    },
+    {
+      "path": "docs/evidence/branches-2026-11-26/migration-expand.txt",
+      "bytes": 150,
+      "sha256": "1debf9b2eeccb645455a09fa7b7a074c60f521ea2cb709c94135d2af9b4b2d10"
+    },
+    {
+      "path": "docs/evidence/branches-2026-11-26/migration-old-code-read.json",
+      "bytes": 1342,
+      "sha256": "461976e8eed5c1a14fff88c310c05ce642c3224d156f868467c3934903151a42"
+    },
+    {
+      "path": "docs/evidence/branches-2026-11-26/migration-rollback-refused.txt",
+      "bytes": 156,
+      "sha256": "2ec6c13961025c525cf98d6166ae47f577cb094b5f40c2ac03728b108791c9a2"
+    },
+    {
+      "path": "docs/evidence/branches-2026-11-26/migration-upgrade.json",
+      "bytes": 7043,
+      "sha256": "396cb08ad578f2584c9c2e63149e304c162e4bce0ed2623b46f174574148d309"
+    },
+    {
+      "path": "docs/evidence/branches-2026-11-26/mobile-admin-B.jpg",
+      "bytes": 49104,
+      "sha256": "5fdac95fd5f2f5af8427f5bdd9901423234a134dd5358d1be9ab0487ec174315"
+    },
+    {
+      "path": "docs/evidence/branches-2026-11-26/mobile-order-B.jpg",
+      "bytes": 43882,
+      "sha256": "7a7e1deb0ad87a44a883a4b6f8c3ad61398ef724694ff17ff4c64197d60fb483"
+    },
+    {
+      "path": "docs/evidence/branches-2026-11-26/mobile-switch-confirm.jpg",
+      "bytes": 39965,
+      "sha256": "683cce5fa70592cb16e5afba35382a4e7f477072c98cd32c7858563fed934f47"
+    }
+  ]
+}

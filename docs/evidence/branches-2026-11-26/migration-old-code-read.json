@@ -1,0 +1,39 @@
+{
+    "app": "legacy",
+    "app_commit": "37ee0a1",
+    "schema": "tiembanh_branches_upgrade_test",
+    "intake_paused": true,
+    "fingerprint": {
+        "orders": {
+            "count": 10,
+            "subtotal": "2259000",
+            "discount": "108000",
+            "delivery_fee": "25000",
+            "total": "2176000",
+            "sha256": "1c5528f34edae8ea2d9afc2762498f09937f39869f8b66c197839b78f7ab9717"
+        },
+        "items": {
+            "count": 10,
+            "quantity": "10",
+            "sha256": "8011dc8878772f9e2abbf90d5ab1182273996aab893cb84dc48143a743464c73"
+        },
+        "stock": {
+            "count": 18,
+            "available": "204",
+            "sha256": "e040f92bf0aa409983cade52548a7c24737461c67972f29abb032631cc2e9d58"
+        },
+        "coupons": {
+            "count": 2,
+            "used": "2",
+            "sha256": "8aba0055e91c67e2be50ff2749c80ee017593f8fa538883e1f44b7f6d960c52a"
+        },
+        "movements": {
+            "count": 4,
+            "sha256": "1dac01e5ac515b3c5dbba71c69aa4fef264c22678d533e062c3e1665f22377fc"
+        },
+        "tracking_and_idempotency_tokens_sha256": "6b6a59711b569acf5f3c4a1532d2a87184271bc4e9401344c77cf31261f18ec8",
+        "orders_service_visible": 10,
+        "detail_items_read": 10
+    },
+    "recorded_at": "2026-11-26T12:49:55+07:00"
+}

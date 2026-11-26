@@ -1,0 +1,21 @@
+
+> test:ssr
+> npm run build:ssr && node bootstrap/ssr/ssr.js --smoke
+
+
+> build:ssr
+> vite build --ssr
+
+vite v8.3.8 building ssr environment for production...
+transforming...
+✓ 6 modules transformed.
+rendering chunks...
+computing gzip size...
+bootstrap/ssr/ssr-manifest.json                0.30 kB │ gzip:  0.15 kB
+bootstrap/ssr/assets/public-info-BgNc9KIr.js   5.55 kB │ gzip:  1.64 kB
+bootstrap/ssr/ssr.js                           6.81 kB │ gzip:  2.45 kB
+bootstrap/ssr/assets/ui-DiFoquVe.js           16.52 kB │ gzip:  4.80 kB
+bootstrap/ssr/assets/storefront-DeJJRJYK.js   47.69 kB │ gzip: 10.56 kB
+
+✓ built in 35ms
+SSR smoke passed for five public pages; private pages refused.

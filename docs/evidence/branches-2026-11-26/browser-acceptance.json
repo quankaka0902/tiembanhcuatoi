@@ -1,0 +1,73 @@
+{
+  "date": "2026-11-26",
+  "tester": "Codex",
+  "environment": "HTTP loopback synthetic upgrade sandbox, Codex in-app browser",
+  "base_commit": "37ee0a14180425796023241a5e987fded2ba3562",
+  "source": "working tree; exact final commit recorded in validation.json",
+  "viewports": [
+    {
+      "width": 390,
+      "height": 844,
+      "client_width": 375,
+      "horizontal_overflow": false
+    },
+    {
+      "width": 1440,
+      "height": 900
+    }
+  ],
+  "cases": [
+    {
+      "id": "cart-switch",
+      "result": "passed",
+      "detail": "A cart with one cake required explicit confirmation before switching to B and clearing the cart."
+    },
+    {
+      "id": "branch-menu",
+      "result": "passed",
+      "a_price": 360000,
+      "a_prep_minutes": 120,
+      "b_price": 460000,
+      "b_prep_minutes": 240,
+      "b_initial_stock": 4,
+      "message_fee": 15000
+    },
+    {
+      "id": "guest-cod-B",
+      "result": "passed",
+      "order_code": "NB-261126-7F6515FD9B",
+      "total": 475000,
+      "slot": "2026-11-27 10:00",
+      "final_status": "completed",
+      "payment": "paid",
+      "payment_scope": "synthetic COD only, no real money"
+    },
+    {
+      "id": "chain-link",
+      "result": "passed",
+      "detail": "Chain dashboard showed 11 orders versus 10 at A; B order button switched validated admin scope to B and opened the order."
+    },
+    {
+      "id": "order-pickup-after-public-switch",
+      "result": "passed-after-fix",
+      "before": "Pickup card used selected A address while immutable order banner showed B.",
+      "after": "After reload of fixed build, selected public A while B order pickup/support remained B and completed/paid; tracking worked with intake paused."
+    },
+    {
+      "id": "mobile-admin-B",
+      "result": "passed",
+      "detail": "390x844, no document horizontal overflow; B selector and branch price/prep/stock forms visible; strawberry SKU stock3 after the B order."
+    }
+  ],
+  "console_error_counts": {
+    "customer": 0,
+    "admin": 0
+  },
+  "limitations": [
+    "Viewport emulation, not a physical phone",
+    "Local HTTP, not external trusted HTTPS staging",
+    "Synthetic menu/prices/addresses/accounts; no approval of real shop inputs",
+    "No raw tracking/action/reset URLs, cookies or credentials retained in this report"
+  ],
+  "tested_source_commit": "a874c44c2933b82fef7026b8acb3f23337f73d62"
+}

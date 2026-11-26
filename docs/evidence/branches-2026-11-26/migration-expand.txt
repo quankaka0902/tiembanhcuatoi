@@ -1,0 +1,4 @@
+
+   INFO  Running migrations.
+
+  2026_11_26_000001_add_branch_foundation .............................................................. 808.76ms DONE

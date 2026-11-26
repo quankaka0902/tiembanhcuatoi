@@ -1,0 +1,225 @@
+{
+  "date": "2026-11-26",
+  "timezone": "Asia/Ho_Chi_Minh",
+  "tester": "Codex",
+  "source": {
+    "legacy_commit": "37ee0a14180425796023241a5e987fded2ba3562",
+    "candidate": "Current working tree based on legacy_commit; final source commit and artifact hashes are recorded by the release manifest",
+    "dependencies": "Physical vendor copy with equal composer.lock SHA256; no vendor junction; old PSR paths resolve inside the exact archive"
+  },
+  "environment": {
+    "scope": "Local fake-data acceptance only, no public launch",
+    "schema": "tiembanh_branches_upgrade_test",
+    "mysql": "8.4.13",
+    "host": "127.0.0.1",
+    "mysql_port": 33317,
+    "current_url": "http://127.0.0.1:18936",
+    "mailer": "log",
+    "private_paths_and_credentials_excluded": true
+  },
+  "legacy_fixture": {
+    "seed_orders": 7,
+    "actual_service_orders_added": 3,
+    "held_cod": 1,
+    "held_bank_unpaid": 1,
+    "early_cancelled_cod": 1,
+    "service": "Archived Checkout::place for all three, archived Orders::change for early cancellation, coupon NHAMINH10",
+    "pre_migration_intake_paused": true
+  },
+  "before": {
+    "orders": {
+      "count": 10,
+      "subtotal": "2259000",
+      "discount": "108000",
+      "delivery_fee": "25000",
+      "total": "2176000",
+      "sha256": "1c5528f34edae8ea2d9afc2762498f09937f39869f8b66c197839b78f7ab9717"
+    },
+    "items": {
+      "count": 10,
+      "quantity": "10",
+      "sha256": "8011dc8878772f9e2abbf90d5ab1182273996aab893cb84dc48143a743464c73"
+    },
+    "stock": {
+      "count": 18,
+      "available": "204",
+      "sha256": "e040f92bf0aa409983cade52548a7c24737461c67972f29abb032631cc2e9d58"
+    },
+    "coupons": {
+      "count": 2,
+      "used": "2",
+      "sha256": "8aba0055e91c67e2be50ff2749c80ee017593f8fa538883e1f44b7f6d960c52a"
+    },
+    "movements": {
+      "count": 4,
+      "sha256": "1dac01e5ac515b3c5dbba71c69aa4fef264c22678d533e062c3e1665f22377fc"
+    },
+    "tracking_and_idempotency_tokens_sha256": "6b6a59711b569acf5f3c4a1532d2a87184271bc4e9401344c77cf31261f18ec8",
+    "orders_service_visible": 10,
+    "detail_items_read": 10
+  },
+  "after_expand_backfill_activate": {
+    "orders": {
+      "count": 10,
+      "subtotal": "2259000",
+      "discount": "108000",
+      "delivery_fee": "25000",
+      "total": "2176000",
+      "sha256": "1c5528f34edae8ea2d9afc2762498f09937f39869f8b66c197839b78f7ab9717"
+    },
+    "items": {
+      "count": 10,
+      "quantity": "10",
+      "sha256": "8011dc8878772f9e2abbf90d5ab1182273996aab893cb84dc48143a743464c73"
+    },
+    "stock": {
+      "count": 18,
+      "available": "204",
+      "sha256": "e040f92bf0aa409983cade52548a7c24737461c67972f29abb032631cc2e9d58"
+    },
+    "coupons": {
+      "count": 2,
+      "used": "2",
+      "sha256": "8aba0055e91c67e2be50ff2749c80ee017593f8fa538883e1f44b7f6d960c52a"
+    },
+    "movements": {
+      "count": 4,
+      "sha256": "1dac01e5ac515b3c5dbba71c69aa4fef264c22678d533e062c3e1665f22377fc"
+    },
+    "tracking_and_idempotency_tokens_sha256": "6b6a59711b569acf5f3c4a1532d2a87184271bc4e9401344c77cf31261f18ec8",
+    "orders_service_visible": 10,
+    "detail_items_read": 10
+  },
+  "legacy_code_after_rollback_read": {
+    "orders": {
+      "count": 10,
+      "subtotal": "2259000",
+      "discount": "108000",
+      "delivery_fee": "25000",
+      "total": "2176000",
+      "sha256": "1c5528f34edae8ea2d9afc2762498f09937f39869f8b66c197839b78f7ab9717"
+    },
+    "items": {
+      "count": 10,
+      "quantity": "10",
+      "sha256": "8011dc8878772f9e2abbf90d5ab1182273996aab893cb84dc48143a743464c73"
+    },
+    "stock": {
+      "count": 18,
+      "available": "204",
+      "sha256": "e040f92bf0aa409983cade52548a7c24737461c67972f29abb032631cc2e9d58"
+    },
+    "coupons": {
+      "count": 2,
+      "used": "2",
+      "sha256": "8aba0055e91c67e2be50ff2749c80ee017593f8fa538883e1f44b7f6d960c52a"
+    },
+    "movements": {
+      "count": 4,
+      "sha256": "1dac01e5ac515b3c5dbba71c69aa4fef264c22678d533e062c3e1665f22377fc"
+    },
+    "tracking_and_idempotency_tokens_sha256": "6b6a59711b569acf5f3c4a1532d2a87184271bc4e9401344c77cf31261f18ec8",
+    "orders_service_visible": 10,
+    "detail_items_read": 10
+  },
+  "comparisons": {
+    "before_after_all_fields_equal": true,
+    "old_code_reads_expanded_schema": true,
+    "original_tracking_and_idempotency_hash_unchanged": true,
+    "current_and_legacy_order_details_read": 10,
+    "repeated_backfill_did_not_re_reserve_or_restore_stock": true,
+    "amounts_include_cancelled_orders_not_revenue": true
+  },
+  "steps": [
+    {
+      "step": "backfill_first",
+      "passed": true,
+      "mode": null,
+      "checked_at": "2026-11-26T12:49:11+07:00",
+      "issues": []
+    },
+    {
+      "step": "backfill_second",
+      "passed": true,
+      "mode": null,
+      "checked_at": "2026-11-26T12:49:12+07:00",
+      "issues": []
+    },
+    {
+      "step": "verify",
+      "passed": true,
+      "mode": null,
+      "checked_at": "2026-11-26T12:49:12+07:00",
+      "issues": []
+    },
+    {
+      "step": "activate",
+      "passed": true,
+      "mode": "branch",
+      "checked_at": "2026-11-26T12:49:13+07:00",
+      "issues": []
+    },
+    {
+      "step": "rollback_read_compatible",
+      "passed": true,
+      "mode": "legacy",
+      "checked_at": null,
+      "issues": []
+    },
+    {
+      "step": "verify_again",
+      "passed": true,
+      "mode": null,
+      "checked_at": "2026-11-26T12:49:55+07:00",
+      "issues": []
+    },
+    {
+      "step": "activate_again",
+      "passed": true,
+      "mode": "branch",
+      "checked_at": "2026-11-26T12:49:55+07:00",
+      "issues": []
+    }
+  ],
+  "rollback_refusal_after_b": {
+    "passed": true,
+    "exit_code": 1,
+    "reasons": [
+      "Other branch has its own stock/variant configuration",
+      "Other branch has assigned staff"
+    ],
+    "data_retained": true,
+    "mode_retained": "branch",
+    "source_message": "Không thể quay lui chế độ đọc: Cơ sở khác có tồn hoặc cấu hình phiên bản riêng. Đã có phân công nhân viên cơ sở khác."
+  },
+  "runtime_initial_after_fixture": {
+    "schema": "tiembanh_branches_upgrade_test",
+    "mode": "branch",
+    "branches": [
+      {
+        "id": 1,
+        "code": "DEFAULT",
+        "active": true,
+        "accepting_orders": false
+      },
+      {
+        "id": 2,
+        "code": "TEST-B",
+        "active": true,
+        "accepting_orders": false
+      }
+    ],
+    "orders": 10,
+    "queued": 0,
+    "failed": 0,
+    "indexing_enabled": false,
+    "mail": "log",
+    "recorded_at": "2026-11-26T12:50:24+07:00"
+  },
+  "limitations": [
+    "Synthetic staging menu, addresses, fees, bank details and staff only; no real shop approval",
+    "Legacy compatibility verified by old Orders query/tracking/detail reads after expanded schema and safe read rollback; public launch and arbitrary older releases not certified",
+    "Local log-mail worker drained; no real SMTP/network/HTTPS service acceptance",
+    "Branch B stayed paused; later browser cases and final handoff state are separate evidence"
+  ]
+}

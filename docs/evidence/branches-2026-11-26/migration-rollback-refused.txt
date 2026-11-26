@@ -1,0 +1,1 @@
+Không thể quay lui chế độ đọc: Cơ sở khác có tồn hoặc cấu hình phiên bản riêng. Đã có phân công nhân viên cơ sở khác.

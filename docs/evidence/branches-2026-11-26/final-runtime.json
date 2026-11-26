@@ -1,0 +1,105 @@
+{
+  "date": "2026-11-26",
+  "tester": "Codex",
+  "environment": "local loopback synthetic upgrade sandbox",
+  "url": "http://127.0.0.1:18936",
+  "schema": "tiembanh_branches_upgrade_test",
+  "mode": "branch",
+  "indexing_enabled": false,
+  "branches": [
+    {
+      "id": 1,
+      "code": "DEFAULT",
+      "active": true,
+      "timezone": "Asia/Ho_Chi_Minh",
+      "accepting_orders": false,
+      "business_verified": false,
+      "orders": 10,
+      "available_stock": 204
+    },
+    {
+      "id": 2,
+      "code": "TEST-B",
+      "active": true,
+      "timezone": "Asia/Ho_Chi_Minh",
+      "accepting_orders": false,
+      "business_verified": false,
+      "orders": 1,
+      "available_stock": 71
+    }
+  ],
+  "orders": 11,
+  "global_legacy_stock_mirror": 204,
+  "coupon_used": 2,
+  "queued": 0,
+  "failed": 0,
+  "browser_cod": {
+    "code": "NB-261126-7F6515FD9B",
+    "branch_id": 2,
+    "status": "completed",
+    "payment": "paid",
+    "total": 475000,
+    "scheduled_at": "2026-11-27 10:00:00",
+    "prep_minutes": 240,
+    "branch_snapshot": {
+      "id": 2,
+      "code": "TEST-B",
+      "name": "[THỬ NGHIỆM] Cơ sở B",
+      "brand": "Tiệm Bánh Nhà Mình",
+      "phone": "0900 123 456",
+      "address": "[THỬ NGHIỆM] Điểm nhận B",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "provenance": "at_purchase"
+    },
+    "events": [
+      {
+        "kind": "status",
+        "value": "pending",
+        "previous_value": null
+      },
+      {
+        "kind": "status",
+        "value": "confirmed",
+        "previous_value": "pending"
+      },
+      {
+        "kind": "status",
+        "value": "preparing",
+        "previous_value": "confirmed"
+      },
+      {
+        "kind": "status",
+        "value": "ready",
+        "previous_value": "preparing"
+      },
+      {
+        "kind": "payment",
+        "value": "paid",
+        "previous_value": "unpaid"
+      },
+      {
+        "kind": "status",
+        "value": "completed",
+        "previous_value": "ready"
+      }
+    ],
+    "movements": [
+      {
+        "branch_id": 2,
+        "reason": "order",
+        "stock_before": 4,
+        "stock_after": 3,
+        "affected_quantity": 1
+      }
+    ],
+    "notifications": 6,
+    "sent_notifications": 6
+  },
+  "limitations": [
+    "Synthetic fixture only; no real business approval",
+    "HTTP loopback, not trusted external HTTPS staging",
+    "Mailer log only; no actual SMTP or payment",
+    "Local test evidence; GitHub CI for the new source not run until an authorized push"
+  ],
+  "tested_source_commit": "a874c44c2933b82fef7026b8acb3f23337f73d62"
+}
