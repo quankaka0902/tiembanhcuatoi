@@ -63,11 +63,22 @@ class LaunchReadiness
     public static function dataIssues(array $settings): array
     {
         $issues = [];
+        $branchId = (int) ($settings['branch_id'] ?? Branches::id());
         if (! ($settings['phone'] || $settings['email']) || ! $settings['address'] || ! $settings['order_policy'] || ! $settings['privacy_notice']) {
             $issues[] = 'Điền liên hệ, địa chỉ, chính sách đặt bánh và thông báo xử lý dữ liệu.';
         }
-        $prepMinutes = DB::table('products')->join('variants', 'variants.product_id', '=', 'products.id')
-            ->where('products.active', true)->where('variants.active', true)->where('variants.stock', '>', 0)->min('products.prep_minutes');
+        $menu = DB::table('products')->join('variants', 'variants.product_id', '=', 'products.id')
+            ->where('products.active', true)->where('variants.active', true);
+        if (Branches::enabled()) {
+            $menu->join('branch_variants', 'branch_variants.variant_id', '=', 'variants.id')
+                ->where('branch_variants.branch_id', $branchId)->where('branch_variants.active', true)->where('branch_variants.stock', '>', 0);
+            $prepMinutes = $menu->min(DB::raw('COALESCE(branch_variants.prep_minutes, products.prep_minutes)'));
+            if (! ($settings['business_verified'] ?? false)) {
+                $issues[] = 'Xác minh thông tin cơ sở thực tế trước khi mở nhận đơn.';
+            }
+        } else {
+            $prepMinutes = $menu->where('variants.stock', '>', 0)->min('products.prep_minutes');
+        }
         if ($prepMinutes === null) {
             $issues[] = 'Cần ít nhất một phiên bản bánh đang bán, còn tồn.';
         }
@@ -87,9 +98,40 @@ class LaunchReadiness
             $issues[] = 'Gỡ tài khoản mẫu và kiểm tra thông tin ngân hàng trước khi mở nhận đơn.';
         }
         $staff = DB::table('users')->whereIn('role', ['staff', 'admin'])->where('active', true);
+        if (Branches::enabled()) {
+            $staff->where(fn ($query) => $query->where('role', 'admin')->orWhereExists(fn ($membership) => $membership
+                ->selectRaw('1')->from('branch_memberships')->whereColumn('branch_memberships.user_id', 'users.id')
+                ->where('branch_id', $branchId)->where('branch_memberships.active', true)));
+        }
         if (! (clone $staff)->where('role', 'admin')->whereNotNull('two_factor_secret')->exists()
             || $staff->whereNull('two_factor_secret')->exists()) {
             $issues[] = 'Cấp khóa xác thực hai bước cho tài khoản nội bộ đang hoạt động.';
+        }
+
+        return $issues;
+    }
+
+    /** Default CLI readiness is an explicit aggregate across every active location. */
+    public static function branchDataIssues(?int $branchId = null): array
+    {
+        if (! Branches::enabled()) {
+            return self::dataIssues(Store::settings());
+        }
+        $branches = DB::table('branches')->when($branchId !== null,
+            fn ($query) => $query->where('id', $branchId), fn ($query) => $query->where('active', true))
+            ->orderBy('id')->get(['id', 'code', 'active']);
+        if ($branches->isEmpty()) {
+            return ['Không có cơ sở hợp lệ để kiểm tra mở nhận đơn.'];
+        }
+        $issues = [];
+        foreach ($branches as $branch) {
+            $local = Branches::run((int) $branch->id, fn () => self::dataIssues(Store::settings()));
+            if (! $branch->active) {
+                array_unshift($local, 'Cơ sở đang ngừng hoạt động.');
+            }
+            foreach ($local as $issue) {
+                $issues[] = '[Cơ sở #'.$branch->id.' '.$branch->code.'] '.$issue;
+            }
         }
 
         return $issues;

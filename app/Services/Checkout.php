@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -11,15 +12,18 @@ class Checkout
 {
     public function cart(array $cart): array
     {
-        $variants = $this->cartVariants(array_column($cart, 'variant_id'));
+        $currentRead = Branches::enabled() && DB::transactionLevel() > 0;
+        $variants = $this->cartVariants(array_column($cart, 'variant_id'), currentRead: $currentRead);
 
-        $choices = DB::table('variants')->whereIn('product_id', $variants->pluck('product_id'))
-            ->where('active', true)->orderBy('id')->get(['id', 'name', 'price', 'stock', 'product_id'])->groupBy('product_id');
+        $choiceIds = DB::table('variants')->whereIn('product_id', $variants->pluck('product_id'))->orderBy('id')->pluck('id')->all();
+        $choices = $this->cartVariants($choiceIds)->filter(fn ($variant) => $variant->active)
+            ->map(fn ($variant) => (object) array_intersect_key((array) $variant, array_flip(['id', 'name', 'price', 'stock', 'product_id'])))
+            ->groupBy('product_id');
         $requested = collect($cart)->groupBy('variant_id')->map(fn ($lines) => $lines->sum('quantity'));
 
-        return collect($cart)->map(function ($line, $key) use ($variants, $choices, $requested) {
+        return collect($cart)->map(function ($line, $key) use ($variants, $choices, $requested, $currentRead) {
             $variant = $variants->get($line['variant_id']);
-            $accessoryChoices = $variant ? ProductMetadata::accessories($variant->product_id) : collect();
+            $accessoryChoices = $variant ? ProductMetadata::accessories($variant->product_id, currentRead: $currentRead) : collect();
             $selectedIds = array_values(array_unique(array_map('intval', $line['accessories'] ?? [])));
             $accessories = $accessoryChoices->whereIn('id', $selectedIds)->values();
             $accessoriesAvailable = $accessories->count() === count($selectedIds);
@@ -77,21 +81,26 @@ class Checkout
         return [$cart, $added, $items->sum('quantity') - $added];
     }
 
-    private function cartVariants(array $ids): Collection
+    private function cartVariants(array $ids, bool $currentRead = false): Collection
     {
-        return DB::table('variants')->join('products', 'products.id', '=', 'variants.product_id')
+        $query = DB::table('variants')->join('products', 'products.id', '=', 'variants.product_id')
             ->whereIn('variants.id', $ids)
             ->select('variants.*', 'products.name as product_name', 'products.active as product_active',
-                'products.slug', 'products.images', 'products.prep_minutes', 'products.customizable', 'products.message_fee')
-            ->get()->keyBy('id');
+                'products.slug', 'products.images', 'products.prep_minutes', 'products.customizable', 'products.message_fee');
+        if (Branches::enabled()) {
+            $query->leftJoin('branch_variants as branch_sku', fn ($join) => $join->on('branch_sku.variant_id', '=', 'variants.id')->where('branch_sku.branch_id', Branches::id()))
+                ->selectRaw('COALESCE(branch_sku.price, variants.price) AS price, COALESCE(branch_sku.stock, 0) AS stock,
+                    CASE WHEN variants.active = 1 AND branch_sku.active = 1 THEN 1 ELSE 0 END AS active,
+                    COALESCE(branch_sku.prep_minutes, products.prep_minutes) AS prep_minutes');
+        }
+
+        return ($currentRead ? $query->sharedLock() : $query)->get()->keyBy('id');
     }
 
     public function slots(array $settings, int $prepMinutes): array
     {
-        $now = now();
+        $now = now($settings['timezone'] ?? 'Asia/Ho_Chi_Minh');
         $minimum = $now->copy()->addMinutes($prepMinutes);
-        $slots = $settings['slots'];
-        sort($slots);
         $result = [];
 
         for ($days = 0; $days < 14; $days++) {
@@ -100,6 +109,8 @@ class Checkout
                 continue;
             }
 
+            $slots = Store::exception($settings, $day)['slots'] ?? $settings['slots'];
+            sort($slots);
             foreach ($slots as $time) {
                 $date = $day->copy()->setTimeFromTimeString($time);
                 if ($date->greaterThanOrEqualTo($minimum)) {
@@ -114,22 +125,13 @@ class Checkout
     public function availableSlots(array $settings, int $prepMinutes): array
     {
         $slots = $this->slots($settings, $prepMinutes);
-        $limits = $settings['slot_limits'];
-        $limitedTimes = [];
-        foreach ($slots as $slot) {
-            if (isset($limits[substr($slot, 11)])) {
-                $limitedTimes[] = $slot.':00';
-            }
-        }
-        if (! $limitedTimes) {
-            return $slots;
-        }
+        $times = array_map(fn ($slot) => $slot.':00', $slots);
+        $booked = Branches::enabled()
+            ? DB::table('branch_slot_locks')->where('branch_id', Branches::id())->whereIn('scheduled_at', $times)->pluck('booked', 'scheduled_at')
+            : Orders::scheduled()->whereIn('scheduled_at', $times)->groupBy('scheduled_at')->selectRaw('scheduled_at, COUNT(*) AS booked')->pluck('booked', 'scheduled_at');
 
-        $booked = Orders::scheduled()->whereIn('scheduled_at', $limitedTimes)
-            ->groupBy('scheduled_at')->selectRaw('scheduled_at, COUNT(*) AS booked')->pluck('booked', 'scheduled_at');
-
-        return array_values(array_filter($slots, function (string $slot) use ($booked, $limits) {
-            $limit = $limits[substr($slot, 11)] ?? null;
+        return array_values(array_filter($slots, function (string $slot) use ($booked, $settings) {
+            $limit = $this->slotLimit($slot, $settings);
 
             return $limit === null || ($booked[$slot.':00'] ?? 0) < $limit;
         }));
@@ -139,6 +141,15 @@ class Checkout
     {
         if (! $settings['accepting_orders']) {
             $this->invalid('cart', Store::pauseMessage($settings));
+        }
+        if (Branches::enabled() && isset($fields['branch_id']) && (int) $fields['branch_id'] !== Branches::id()) {
+            $this->invalid('branch_id', 'Cơ sở đã thay đổi. Vui lòng kiểm tra lại giỏ và giờ nhận.');
+        }
+        if (! in_array($fields['fulfillment'], $settings['fulfillments'] ?? ['pickup', 'delivery'], true)) {
+            $this->invalid('fulfillment', 'Cơ sở không hỗ trợ phương thức nhận này.');
+        }
+        if (! empty($fields['method']) && ! in_array($fields['method'], $settings['payment_methods'] ?? ['cod', 'bank'], true)) {
+            $this->invalid('method', 'Cơ sở không hỗ trợ phương thức thanh toán này.');
         }
 
         if (! $lines || collect($lines)->contains('available', false)) {
@@ -159,6 +170,9 @@ class Checkout
                 || ($coupon->ends_on && $today > $coupon->ends_on) || ($coupon->usage_limit !== null && $coupon->used >= $coupon->usage_limit)
                 || $subtotal < $coupon->minimum) {
                 $this->invalid('coupon', 'Mã giảm giá không hợp lệ, đã hết lượt hoặc chưa đủ giá trị đơn tối thiểu.');
+            }
+            if ($coupon->branch_id !== null && (int) $coupon->branch_id !== Branches::id()) {
+                $this->invalid('coupon', 'Mã giảm giá không áp dụng cho cơ sở này.');
             }
 
             $discount = min($subtotal, $coupon->kind === 'percent' ? intdiv($subtotal * $coupon->amount, 100) : $coupon->amount);
@@ -181,26 +195,53 @@ class Checkout
         ];
     }
 
-    public function quoteToken(array $quote, array $lines, string $key): string
+    public function quoteToken(array $quote, array $lines, string $key, array $context = []): string
     {
         $prices = array_map(fn (array $line) => [
             $line['variant_id'], $line['quantity'], $line['unit_price'], $line['option_fee'],
             $line['accessory_fee'] ?? 0, $line['accessories'] ?? [],
+            $line['message'] ?? null, $line['note'] ?? null, $line['prep_minutes'] ?? 0,
         ], $lines);
 
-        return hash_hmac('sha256', json_encode([$key, $quote, $prices], JSON_THROW_ON_ERROR), config('app.key'));
+        $binding = [];
+        if (Branches::enabled()) {
+            $settings = Store::settings();
+            $binding = [Branches::id(), [$context['fulfillment'] ?? null, $context['region'] ?? null, $context['method'] ?? null, $context['slot'] ?? null],
+                array_intersect_key($settings, array_flip(['regions', 'free_from', 'slots', 'slot_limits', 'weekdays', 'closed_dates',
+                    'calendar_exceptions', 'fulfillments', 'payment_methods', 'bank_prepay_required', 'bank_due_minutes', 'timezone']))];
+        }
+
+        return hash_hmac('sha256', json_encode([$key, $quote, $prices, ...$binding], JSON_THROW_ON_ERROR), config('app.key'));
     }
 
     public function place(array $cart, array $fields, ?int $userId): array
     {
         return DB::transaction(function () use ($cart, $fields, $userId) {
-            // Serialize changes to the shop's inventory, coupon use and schedule.
-            // Catalog/configuration edits and cancellations take the same lock first.
-            $settings = Store::settings(lock: true);
             $requestKey = hash('sha256', $fields['key']);
-            $existing = Orders::query()->where('request_key', $requestKey)->first();
+            if (Branches::enabled()) {
+                DB::table('checkout_request_locks')->insertOrIgnore(['request_key' => $requestKey, 'branch_id' => Branches::id(), 'created_at' => now()]);
+                $claim = DB::table('checkout_request_locks')->where('request_key', $requestKey)->lockForUpdate()->first();
+                if ((int) $claim->branch_id !== Branches::id()) {
+                    $this->invalid('key', 'Yêu cầu đã được dùng tại cơ sở khác. Vui lòng tải lại bước đặt bánh.');
+                }
+            }
+            // Shared configuration lock permits independent SKU/slot bookings in this branch.
+            $settings = Store::settings(lock: true, shared: true);
+            $existing = DB::table('orders')->where('request_key', $requestKey)->lockForUpdate()->first();
             if ($existing) {
+                if ((int) ($existing->branch_id ?? 1) !== Branches::id()) {
+                    $this->invalid('key', 'Yêu cầu đã thuộc cơ sở khác.');
+                }
+
                 return [$existing, false];
+            }
+
+            if (Branches::enabled()) {
+                if (! empty($fields['coupon'])) {
+                    DB::table('coupons')->where('code', Str::upper(trim($fields['coupon'])))->lockForUpdate()->first();
+                }
+                Branches::lockSlots([$fields['slot'].':00']);
+                Inventory::lock(array_column($cart, 'variant_id'));
             }
 
             $lines = $this->cart($cart);
@@ -208,7 +249,7 @@ class Checkout
 
             $scheduledAt = $this->assertSlot($fields['slot'], $settings, max(array_column($lines, 'prep_minutes')));
 
-            if (! hash_equals($this->quoteToken($quote, $lines, $fields['key']), $fields['quote_token'])) {
+            if (! hash_equals($this->quoteToken($quote, $lines, $fields['key'], $fields), $fields['quote_token'])) {
                 $this->invalid('quote_token', 'Giá bánh, giảm giá hoặc phí giao đã thay đổi. Hãy kiểm tra tổng mới và xác nhận lại.');
             }
 
@@ -221,6 +262,12 @@ class Checkout
             $code = 'NB-'.$createdAt->format('ymd').'-'.strtoupper(bin2hex(random_bytes(5)));
             $id = DB::table('orders')->insertGetId([
                 ...$quote,
+                'branch_id' => Branches::id(), 'branch_snapshot' => json_encode(Branches::snapshot(), JSON_THROW_ON_ERROR),
+                'sales_context' => json_encode(['branch_id' => Branches::id(), 'timezone' => $settings['timezone'],
+                    'fulfillment' => $fields['fulfillment'], 'method' => $fields['method'], 'region_key' => $fields['region'] ?? null,
+                    'region_label' => $quote['region_label'], 'scheduled_local' => $fields['slot'],
+                    'delivery_fee' => $quote['delivery_fee'], 'free_from' => $settings['free_from'],
+                    'coupon_scope' => $quote['coupon_id'] ? (DB::table('coupons')->where('id', $quote['coupon_id'])->value('branch_id') === null ? 'chain' : 'branch') : null], JSON_THROW_ON_ERROR),
                 'location_id' => Store::locationId(), 'prep_minutes_snapshot' => max(array_column($lines, 'prep_minutes')),
                 'bank_prepay_required' => $fields['method'] === 'bank' && $settings['bank_prepay_required'],
                 'code' => $code, 'request_key' => $requestKey, 'tracking_token' => bin2hex(random_bytes(32)),
@@ -231,6 +278,7 @@ class Checkout
                 'bank_due_at' => $bank ? Orders::bankDueAt($createdAt, $scheduledAt, $settings['bank_due_minutes']) : null,
                 'created_at' => $createdAt, 'updated_at' => $createdAt,
             ]);
+            Branches::bookSlot($scheduledAt, 1);
 
             $quantities = collect($lines)->groupBy('variant_id')->map(fn (Collection $items) => $items->sum('quantity'));
             foreach ($quantities->sortKeys() as $variantId => $quantity) {
@@ -257,19 +305,31 @@ class Checkout
         }, 5);
     }
 
-    // The caller holds the shop settings lock until the booking or reschedule commits.
+    // The caller holds configuration shared + the branch/slot resource lock.
     public function assertSlot(string $slot, array $settings, int $prepMinutes): string
     {
         if (! in_array($slot, $this->slots($settings, $prepMinutes), true)) {
             $this->invalid('slot', 'Giờ nhận không còn phù hợp với lịch mở cửa hoặc thời gian làm bánh.');
         }
         $scheduledAt = $slot.':00';
-        $limit = $settings['slot_limits'][substr($slot, 11)] ?? null;
-        if ($limit !== null && Orders::scheduled()->where('scheduled_at', $scheduledAt)->count() >= $limit) {
+        $limit = $this->slotLimit($slot, $settings);
+        Branches::lockSlots([$scheduledAt]);
+        $booked = Branches::enabled()
+            ? (int) DB::table('branch_slot_locks')->where('branch_id', Branches::id())->where('scheduled_at', $scheduledAt)->lockForUpdate()->value('booked')
+            : Orders::scheduled()->where('scheduled_at', $scheduledAt)->count();
+        if ($limit !== null && $booked >= $limit) {
             $this->invalid('slot', 'Khung giờ vừa hết chỗ. Vui lòng chọn giờ khác.');
         }
 
         return $scheduledAt;
+    }
+
+    private function slotLimit(string $slot, array $settings): ?int
+    {
+        $exception = Store::exception($settings, CarbonImmutable::parse($slot, $settings['timezone'] ?? 'Asia/Ho_Chi_Minh'));
+        $limits = $exception['slot_limits'] ?? $settings['slot_limits'];
+
+        return isset($limits[substr($slot, 11)]) ? (int) $limits[substr($slot, 11)] : null;
     }
 
     private function invalid(string $field, string $message): never

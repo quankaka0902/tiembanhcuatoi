@@ -152,6 +152,14 @@ Khi cập nhật môi trường đã có, sao lưu trước, kiểm tra đúng s
 
 Lần kiểm tra 23/11/2026 đạt Pint, ESLint, build; MySQL 68/68 bài với 1.365 assertions, SQLite 61 bài đạt với 1.308 assertions và 7 ca MySQL được bỏ qua. Gồm hai tiến trình tranh khung cuối và gửi trùng yêu cầu. Giao diện thử ở 390×844 và 1366×900 trên HTTP loopback/schema riêng. SMTP và dữ liệu tiệm thật cần nghiệm thu riêng.
 
+## Nhiều cơ sở
+
+Menu, ảnh và thương hiệu dùng chung; mỗi cơ sở có giá ghi đè, tồn, thời gian chuẩn bị, lịch/công suất, vùng giao, thanh toán và công tắc nhận đơn riêng. Đổi cơ sở khi có giỏ cần xác nhận xóa giỏ. Quản trị chọn cơ sở theo phân công quản lý, nhân viên, bếp hoặc kế toán; chỉ quản trị chuỗi được đổi menu chung và xem tổng hợp toàn chuỗi.
+
+Migration giữ chế độ đọc một cơ sở. Trước khi chuyển, đọc [sao lưu, backfill, verify, activate và quay lại chế độ đọc cũ](docs/multi-branch.md); không sửa cờ DB thủ công. Activate và tạo cơ sở mới đều giữ nhận đơn đóng. Mã giảm chuỗi dùng bộ đếm chung, mã chữ vẫn duy nhất toàn hệ thống. Giai đoạn này chỉ hỗ trợ múi giờ Việt Nam và giữ nhiều cơ sở ở trạng thái `noindex` khi chưa có URL riêng.
+
+Xem [kiến trúc, phạm vi dữ liệu, ma trận quyền và thứ tự khóa](docs/branches-architecture.md). Trang bổ sung gồm **Cơ sở và phân công**, **Thực đơn cơ sở**, phạm vi tại **Tổng quan**, **Báo cáo**, **Mã giảm giá**. Đổi quyền nội bộ yêu cầu đăng nhập/TOTP lại. Dữ liệu thật và mở nhận phải được nghiệm thu riêng từng cơ sở; phần này không tự triển khai public.
+
 ## Kiểm thử
 
 Chạy từ thư mục repo sau khi build frontend và tạo khóa ứng dụng.

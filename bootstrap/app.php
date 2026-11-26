@@ -3,6 +3,7 @@
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\PublicResponsePolicy;
 use App\Http\Middleware\RequirePrivateStaging;
+use App\Http\Middleware\ResolveBranch;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -16,7 +17,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->append(RequirePrivateStaging::class);
         $middleware->append(PublicResponsePolicy::class);
-        $middleware->web(append: [HandleInertiaRequests::class]);
+        $middleware->web(append: [ResolveBranch::class, HandleInertiaRequests::class]);
         $middleware->redirectGuestsTo('/dang-nhap');
         $middleware->trustProxies(headers: Request::HEADER_X_FORWARDED_PROTO);
     })

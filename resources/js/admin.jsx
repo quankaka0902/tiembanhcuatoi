@@ -1,6 +1,6 @@
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import { ArrowLeft, ArrowUpRight, Banknote, CakeSlice, CalendarDays, ChartNoAxesCombined, ClipboardList, Download, LayoutDashboard, Package, Plus, Settings, Ticket, Users } from 'lucide-react';
-import { Brand, ButtonLink, date as formatDate, dateTime, ErrorList, Field, Image, money, Pagination, Pill } from './ui';
+import { Brand, BranchSelector, ButtonLink, date as formatDate, dateTime, ErrorList, Field, Image, money, Pagination, Pill } from './ui';
 import { ChangeRequestHistory, OrderEvents, OrderItems, Totals } from './checkout';
 
 const root = '/quan-tri';
@@ -11,32 +11,33 @@ const inventoryUrl = root + '/ton-kho';
 const inboxUrl = root + '/viec-can-xu-ly';
 const mailUrl = root + '/email-don';
 const nav = [
-    [root, 'Tổng quan', LayoutDashboard], [root + '/don-hang', 'Đơn hàng', ClipboardList],
-    [inboxUrl, 'Đơn cần xử lý', Package],
-    [scheduleUrl, 'Lịch làm bánh', CalendarDays],
-    [reconciliationUrl, 'Đối soát', Banknote],
-    [reportsUrl, 'Báo cáo', ChartNoAxesCombined], [inventoryUrl, 'Nhật ký tồn kho', Package, true],
-    [root + '/san-pham', 'Sản phẩm', CakeSlice, true], [root + '/ma-giam', 'Mã giảm giá', Ticket, true],
-    [root + '/cai-dat', 'Cấu hình', Settings, true], [root + '/nhan-su', 'Nhân sự', Users, true],
+    [root, 'Tổng quan', LayoutDashboard, 'view_orders'], [root + '/don-hang', 'Đơn hàng', ClipboardList, 'view_orders'],
+    [inboxUrl, 'Đơn cần xử lý', Package, 'orders'], [scheduleUrl, 'Lịch làm bánh', CalendarDays, 'production'],
+    [reconciliationUrl, 'Đối soát', Banknote, 'reconcile'], [reportsUrl, 'Báo cáo', ChartNoAxesCombined, 'reports'],
+    [inventoryUrl, 'Nhật ký tồn kho', Package, 'inventory'], [root + '/thuc-don-co-so', 'Thực đơn cơ sở', CakeSlice, 'branch_catalog'],
+    [root + '/san-pham', 'Danh mục bánh chung', CakeSlice, 'shared_catalog'], [root + '/ma-giam', 'Mã giảm giá', Ticket, 'branch_settings'],
+    [root + '/cai-dat', 'Cấu hình cơ sở', Settings, 'branch_settings'], [root + '/nhan-su', 'Tài khoản nội bộ', Users, 'manage_branches'],
+    [root + '/co-so', 'Cơ sở và phân công', Users, 'manage_branches'],
 ];
 
 function Admin({ title, detail, action, children }) {
-    const { auth, notice, shop } = usePage().props;
+    const { auth, notice, shop, branchContext } = usePage().props;
     const path = usePage().url.split('?')[0];
     return <div className="admin-shell">
         <Head title={title + ' | Quản trị'} />
         <aside className="admin-sidebar">
             <Brand shop={shop} />
             <nav aria-label="Quản trị cửa hàng">
-                {nav.filter(item => !item[3] || auth.role === 'admin').map(([url, label, Icon]) => {
+                {nav.filter(([url, , , permission]) => (branchContext?.capabilities?.[permission] ?? auth.role === 'admin') && (branchContext?.enabled || url !== '/quan-tri/thuc-don-co-so')).map(([url, label, Icon]) => {
                     const selected = path === url || (url !== root && path.startsWith(url + '/'));
                     return <Link key={url} className={selected ? 'selected' : ''} href={url} aria-current={selected ? 'page' : undefined}><Icon size={18} />{label}</Link>;
                 })}
             </nav>
-            <div className="admin-account"><strong>{auth.name}</strong><small>{auth.role === 'admin' ? 'Quản trị viên' : 'Nhân viên'}</small><Link as="button" method="post" href="/dang-xuat" className="text-action">Đăng xuất</Link></div>
+            <div className="admin-account"><strong>{auth.name}</strong><small>{{ chain_admin: 'Quản trị toàn chuỗi', manager: 'Quản lý cơ sở', kitchen: 'Bếp', accountant: 'Kế toán', staff: 'Nhân viên' }[branchContext?.role] || (auth.role === 'admin' ? 'Quản trị viên' : 'Nhân viên')}</small><Link as="button" method="post" href="/dang-xuat" className="text-action">Đăng xuất</Link></div>
         </aside>
         <main className="admin-main">
             <div className="admin-top"><span>Quản trị cửa hàng</span><Link className="subtle-link" href="/">Xem cửa hàng <ArrowUpRight size={16} /></Link></div>
+            <BranchSelector admin />
             {notice && <p className="toast" role="status">{notice}</p>}
             <div className="section-head admin-heading"><div><h1>{title}</h1>{detail && <p>{detail}</p>}</div>{action}</div>
             {children}
@@ -62,7 +63,7 @@ function OrderQueue({ headers, rows, empty }) {
     </>;
 }
 
-function DateFilters({ filters, url, statuses }) {
+function DateFilters({ filters, url, statuses, scope }) {
     const form = useForm({});
     return <form className="panel admin-filters" onSubmit={e => {
         e.preventDefault();
@@ -70,6 +71,7 @@ function DateFilters({ filters, url, statuses }) {
         form.transform(() => Object.fromEntries([...values].filter(([, value]) => value !== '')));
         form.get(url, { preserveState: true });
     }}>
+        {scope && <input type="hidden" name="scope" value={scope} />}
         {statuses && <><Field label="Mã đơn"><input name="code" defaultValue={filters.code ?? ''} placeholder="NB-" /></Field><Field label="Trạng thái"><select name="status" defaultValue={filters.status ?? ''}><option value="">Tất cả</option>{Object.entries(statuses).map(([key, label]) => <option value={key} key={key}>{label}</option>)}</select></Field></>}
         <Field label="Từ ngày"><input type="date" name="from" defaultValue={filters.from ?? ''} /></Field>
         <Field label="Đến ngày"><input type="date" name="to" defaultValue={filters.to ?? ''} /></Field>
@@ -77,17 +79,25 @@ function DateFilters({ filters, url, statuses }) {
     </form>;
 }
 
-export function AdminDashboard({ filters, total, revenue, working, low, lowCount, recent, statuses }) {
+function ReportScope({ url, scope, filters }) {
+    const { branchContext } = usePage().props;
+    return branchContext?.enabled && branchContext.capabilities.manage_branches ? <nav className="row-actions" aria-label="Phạm vi báo cáo">{[['branch', 'Cơ sở đang chọn'], ['chain', 'Toàn chuỗi']].map(([value, label]) => <Link key={value} href={url + '?' + new URLSearchParams({ ...filters, scope: value })} className={'button compact' + (scope === value ? '' : ' secondary')} aria-current={scope === value ? 'page' : undefined}>{label}</Link>)}</nav> : null;
+}
+
+export function AdminDashboard({ filters, total, revenue, working, low, lowCount, recent, statuses, scope = 'branch' }) {
+    const { branchContext } = usePage().props;
+    const branchName = id => branchContext?.allowed.find(branch => Number(branch.id) === Number(id))?.name ?? `Cơ sở ${id ?? 1}`;
     return <Admin title="Tổng quan" detail="Theo dõi đơn bánh, doanh thu và tồn kho."
         action={<ButtonLink href={inboxUrl}>Đơn cần xử lý</ButtonLink>}>
-        <DateFilters filters={filters} url={root} />
+        <ReportScope url={root} scope={scope} filters={filters} /><p className="muted">Phạm vi: {scope === 'chain' ? 'Toàn chuỗi' : branchContext?.enabled ? branchName(branchContext.currentId) : 'Cửa hàng hiện tại'}</p>
+        <DateFilters filters={filters} url={root} scope={scope} />
         <div className="stats">
             {[[ClipboardList, 'Số đơn', total], [Package, 'Đang xử lý', working], [Ticket, 'Doanh thu đã thanh toán', money(revenue)], [CakeSlice, 'Phiên bản sắp hết', lowCount]].map(([Icon, label, value]) =>
                 <div className="panel stat" key={label}><span className="service-icon"><Icon size={21} /></span><span>{label}</span><strong>{value}</strong></div>)}
         </div>
         <div className="admin-columns"><section className="panel"><div className="section-head"><h2>Đơn gần đây</h2><Link className="subtle-link" href={root + '/don-hang'}>Xem tất cả</Link></div>
-            <Table headers={['Mã đơn', 'Khách hàng', 'Trạng thái', 'Tổng']} rows={recent.map(order => [order.id, <Link className="table-link" href={root + '/don-hang/' + order.id}>{order.code}</Link>, order.name, <Pill value={order.status} labels={statuses} />, money(order.total)])} />
-        </section><section className="panel"><h2>Tồn kho thấp</h2><Table headers={['Bánh', 'Phiên bản', 'Còn']} rows={low.map((item, index) => [index, item.product_name, item.name, item.stock])} /></section></div>
+            <Table headers={['Mã đơn', 'Khách hàng', 'Trạng thái', 'Tổng']} rows={recent.map(order => [order.id, scope === 'chain' && Number(order.branch_id ?? 1) !== Number(branchContext?.currentId) ? <Link as="button" method="post" data={{ branch_id: order.branch_id ?? 1, order_id: order.id }} className="table-link" href={root + '/chon-co-so'}>{order.code}<small>Mở tại {branchName(order.branch_id)}</small></Link> : <Link className="table-link" href={root + '/don-hang/' + order.id}>{order.code}{scope === 'chain' && <small>{branchName(order.branch_id)}</small>}</Link>, order.name, <Pill value={order.status} labels={statuses} />, money(order.total)])} />
+        </section><section className="panel"><h2>Tồn kho thấp</h2><Table headers={['Bánh', 'Phiên bản', 'Còn']} rows={low.map((item, index) => [index, <span>{item.product_name}{scope === 'chain' && <small>{branchName(item.branch_id)}</small>}</span>, item.name, item.stock])} /></section></div>
     </Admin>;
 }
 
@@ -108,7 +118,7 @@ function IntakeControl({ intake }) {
 }
 
 export function AdminInbox({ filter, newCount, overdueCount, refundCount, requestCount = 0, exceptionCount = 0, inventoryCount = 0, orders, payments, statuses, intake }) {
-    const { auth } = usePage().props;
+    const { auth, branchContext } = usePage().props;
     const isAdmin = auth.role === 'admin';
     const tabs = [
         ['new', 'Chưa xác nhận', newCount, 'Giờ đặt', 'created_at', 'Hiện không có đơn chờ xác nhận.'],
@@ -138,7 +148,7 @@ export function AdminInbox({ filter, newCount, overdueCount, refundCount, reques
                 ])} />
             <Pagination page={orders} />
         </section>
-        {isAdmin && <IntakeControl key={JSON.stringify(intake)} intake={intake} />}
+        {(branchContext?.capabilities?.branch_settings ?? isAdmin) && <IntakeControl key={JSON.stringify(intake)} intake={intake} />}
     </Admin>;
 }
 
@@ -162,9 +172,9 @@ export function AdminMail({ queued, delayed, threshold, failures }) {
     </Admin>;
 }
 
-export function AdminReports({ filters, totals, days, top }) {
-    return <Admin title="Báo cáo kinh doanh" detail="Tính theo ngày hoàn tất của đơn đã thanh toán. Doanh thu là tổng tiền sau giảm giá, gồm phí giao hàng.">
-        <DateFilters filters={filters} url={reportsUrl} />
+export function AdminReports({ filters, totals, days, top, scope = 'branch' }) {
+    return <Admin title="Báo cáo kinh doanh" detail="Tính theo ngày hoàn tất của đơn đã thanh toán. Doanh thu là tổng tiền sau giảm giá, gồm phí giao hàng." action={<ButtonLink secondary href={root + '/don-hang/xuat?' + new URLSearchParams({ ...filters, scope })}><Download size={16} />Xuất đơn theo ngày tạo</ButtonLink>}>
+        <ReportScope url={reportsUrl} scope={scope} filters={filters} /><p className="muted">Phạm vi báo cáo: {scope === 'chain' ? 'Toàn chuỗi' : 'Cơ sở đang chọn'}.</p><DateFilters filters={filters} url={reportsUrl} scope={scope} />
         <section className="panel form-stack report-totals" aria-label="Tổng trong kỳ">
             <div className="stat"><span>Doanh thu trong kỳ</span><strong>{money(totals.revenue)}</strong></div>
             <div className="stat"><span>Đơn đã hoàn tất và thanh toán</span><strong>{totals.order_count}</strong></div>
@@ -219,7 +229,7 @@ export function AdminOrders({ orders, filters, statuses, payments }) {
     </Admin>;
 }
 
-function ScheduleSlot({ slot, statuses }) {
+function ScheduleSlot({ slot, statuses, productionOnly }) {
     const count = slot.orders.length;
     const full = slot.limit !== null && count >= slot.limit;
 
@@ -241,7 +251,7 @@ function ScheduleSlot({ slot, statuses }) {
             <div className="form-stack">{slot.orders.map(order => (
                 <article className="schedule-order" key={order.id}>
                     <div className="section-head">
-                        <Link className="table-link" href={root + '/don-hang/' + order.id}>{order.code}</Link>
+                        {productionOnly ? <strong>{order.code}</strong> : <Link className="table-link" href={root + '/don-hang/' + order.id}>{order.code}</Link>}
                         <Pill value={order.status} labels={statuses} />
                     </div>
                     <p className="muted">{order.fulfillment === 'delivery' ? 'Giao tận nơi' : 'Nhận tại tiệm'}</p>
@@ -254,6 +264,7 @@ function ScheduleSlot({ slot, statuses }) {
                             </span>
                         </li>
                     ))}</ul>
+                    {productionOnly && <ProductionActions order={order} statuses={statuses} />}
                 </article>
             ))}</div>
         </div>}
@@ -281,7 +292,15 @@ export function AdminReconciliation({ orders, filter }) {
     </Admin>;
 }
 
-export function AdminSchedule({ date, today, tomorrow, schedule, orderCount, cakeCount, statuses }) {
+function ProductionActions({ order, statuses }) {
+    const form = useForm({});
+    return <div className="form-stack"><div className="row-actions">{(order.next ?? []).map(status => <button key={status} className="button secondary compact" disabled={form.processing} onClick={() => {
+        form.transform(() => ({ kind: 'status', value: status, expected_status: order.status }));
+        form.patch(root + '/don-hang/' + order.id, { preserveScroll: true });
+    }}>{statuses[status]}</button>)}</div><ErrorList errors={form.errors} /></div>;
+}
+
+export function AdminSchedule({ date, today, tomorrow, schedule, orderCount, cakeCount, statuses, productionOnly = false }) {
     const form = useForm({});
 
     return <Admin title="Lịch làm bánh" detail={date.split('-').reverse().join('/') + ' · ' + orderCount + ' đơn · ' + cakeCount + ' bánh'}>
@@ -303,7 +322,7 @@ export function AdminSchedule({ date, today, tomorrow, schedule, orderCount, cak
         </div>
         <div className="form-stack schedule-list">
             {orderCount === 0 && <p className="panel muted">{schedule.length ? 'Chưa có đơn giao hoặc nhận trong ngày này.' : 'Tiệm nghỉ ngày này.'}</p>}
-            {schedule.map(slot => <ScheduleSlot key={slot.time} slot={slot} statuses={statuses} />)}
+            {schedule.map(slot => <ScheduleSlot key={slot.time} slot={slot} statuses={statuses} productionOnly={productionOnly} />)}
         </div>
     </Admin>;
 }
@@ -531,11 +550,13 @@ function TextArea({ form, field, label, ...props }) {
     return <Field label={label} error={form.errors[field]}><textarea rows="3" value={form.data[field] ?? ''} onChange={e => form.setData(field, e.target.value)} {...props} /></Field>;
 }
 
-function Flag({ form, field, label }) {
-    return <label className="checkbox"><input type="checkbox" checked={Boolean(form.data[field])} onChange={e => form.setData(field, e.target.checked)} />{label}</label>;
+function Flag({ form, field, label, disabled = false }) {
+    return <label className="checkbox"><input type="checkbox" disabled={disabled} checked={Boolean(form.data[field])} onChange={e => form.setData(field, e.target.checked)} />{label}</label>;
 }
 
 export function AdminProduct({ product, categories }) {
+    const { branchContext } = usePage().props;
+    const branchMode = branchContext?.enabled;
     const form = useForm({
         name: product?.name ?? '', slug: product?.slug ?? '', category_id: product?.category_id ?? '', description: product?.description ?? '',
         ingredients: product?.ingredients ?? '', allergens: product?.allergens ?? '', prep_minutes: product?.prep_minutes ?? 60,
@@ -561,7 +582,7 @@ export function AdminProduct({ product, categories }) {
     </div>}>
         <form className="form-stack" onSubmit={e => {
             e.preventDefault();
-            form.transform(data => ({ ...data, occasions: JSON.stringify(metadataLines(data.occasions)), flavors: JSON.stringify(metadataLines(data.flavors)) }));
+            form.transform(data => ({ ...data, variants: data.variants.map(variant => ({ ...variant, stock: variant.stock || 0 })), occasions: JSON.stringify(metadataLines(data.occasions)), flavors: JSON.stringify(metadataLines(data.flavors)) }));
             form.post(root + '/san-pham' + (product ? '/' + product.id : ''), { forceFormData: true, preserveState: 'errors' });
         }}>
             <div className="admin-columns">
@@ -591,8 +612,9 @@ export function AdminProduct({ product, categories }) {
                 </section>
             </div>
             <section className="panel form-stack"><h2>Phiên bản bánh</h2>
+                {branchMode && <p className="warning">Thông tin và giá gốc áp dụng chung toàn chuỗi. Điều chỉnh tồn, giá riêng và trạng thái bán của từng cơ sở tại <Link href="/quan-tri/thuc-don-co-so">Thực đơn cơ sở</Link>.</p>}
                 {form.data.variants.map((variant, index) => <div className="variant-edit" key={variant.id ?? index}>
-                    {[['name', 'Tên phiên bản', 'text'], ['price', 'Giá (₫)', 'number'], ['stock', 'Tồn kho', 'number']].map(([field, label, type]) => <Field key={field} label={label} error={form.errors['variants.' + index + '.' + field]}><input required type={type} min={type === 'number' ? '0' : undefined} value={variant[field]} onChange={e => variantChange(index, field, e.target.value)} /></Field>)}
+                    {[['name', 'Tên phiên bản', 'text'], ['price', branchMode ? 'Giá gốc (₫)' : 'Giá (₫)', 'number'], ...(!branchMode ? [['stock', 'Tồn kho', 'number']] : [])].map(([field, label, type]) => <Field key={field} label={label} error={form.errors['variants.' + index + '.' + field]}><input required type={type} min={type === 'number' ? '0' : undefined} value={variant[field]} onChange={e => variantChange(index, field, e.target.value)} /></Field>)}
                     <Field label="Kích thước hoặc khối lượng" error={form.errors['variants.' + index + '.size_label']}><input maxLength={80} value={variant.size_label} onChange={e => variantChange(index, 'size_label', e.target.value)} placeholder="Để trống nếu tiệm chưa xác nhận" /></Field>
                     <Field label="Khẩu phần tối thiểu (người)" error={form.errors['variants.' + index + '.servings_min']}><input type="number" min="1" max="200" required={variant.servings_verified} value={variant.servings_min} onChange={e => variantChange(index, 'servings_min', e.target.value)} /></Field>
                     <Field label="Khẩu phần tối đa (người)" error={form.errors['variants.' + index + '.servings_max']}><input type="number" min="1" max="200" required={variant.servings_verified} value={variant.servings_max} onChange={e => variantChange(index, 'servings_max', e.target.value)} /></Field>
@@ -626,7 +648,7 @@ export function AdminProduct({ product, categories }) {
     </Admin>;
 }
 
-function PublicContentSettings({ form, businessChange }) {
+function PublicContentSettings({ form, businessChange, canEditBrand = true }) {
     const contentChange = (key, value) => form.setData(data => ({ ...data, [key]: value, public_content_approved: false }));
     function faqChange(index, key, value) {
         contentChange('faq_items', form.data.faq_items.map((row, i) => i === index ? { ...row, [key]: value } : row));
@@ -635,7 +657,7 @@ function PublicContentSettings({ form, businessChange }) {
         businessChange('business_opening_hours', form.data.business_opening_hours.map((row, i) => i === index ? { ...row, [key]: value } : row));
     }
     return <>
-        <section className="panel form-stack"><h2>Nội dung giới thiệu và FAQ</h2>
+        {canEditBrand && <section className="panel form-stack"><h2>Nội dung giới thiệu và FAQ</h2>
             <TextArea form={form} field="about_text" label="Giới thiệu do tiệm cung cấp" maxLength={6000} onChange={e => contentChange('about_text', e.target.value)} />
             <TextArea form={form} field="contact_text" label="Hướng dẫn liên hệ" maxLength={3000} onChange={e => contentChange('contact_text', e.target.value)} />
             {form.data.faq_items.map((row, index) => <fieldset className="form-stack" key={index}><legend>Câu hỏi {index + 1}</legend>
@@ -645,7 +667,7 @@ function PublicContentSettings({ form, businessChange }) {
             </fieldset>)}
             <button type="button" className="button secondary compact" disabled={form.data.faq_items.length >= 30} onClick={() => contentChange('faq_items', [...form.data.faq_items, { question: '', answer: '' }])}>Thêm câu hỏi</button>
             <Flag form={form} field="public_content_approved" label="Tiệm đã duyệt nội dung giới thiệu, hướng dẫn liên hệ và FAQ hiện tại" />
-        </section>
+        </section>}
         <section className="panel form-stack"><h2>Thông tin cơ sở công khai</h2>
             <p className="muted">Nhập dữ liệu thật từ người phụ trách. Phần chưa xác minh không được dùng làm dữ liệu doanh nghiệp cho công cụ tìm kiếm. Duyệt nội dung không tự mở bán hoặc bật lập chỉ mục.</p>
             <Text form={form} field="business_street_address" label="Số nhà, đường" maxLength={250} onChange={e => businessChange('business_street_address', e.target.value)} />
@@ -669,12 +691,13 @@ function PublicContentSettings({ form, businessChange }) {
     </>;
 }
 
-export function AdminSettings({ settings }) {
+export function AdminSettings({ settings, canEditBrand = true }) {
     const { logo, weekdays, slots, slot_limits, closed_dates, regions, ...fields } = settings;
     const form = useForm({
         ...fields, logo: null, remove_logo: false, weekdays, closedText: closed_dates.join('\n'), regions,
         faq_items: settings.faq_items ?? [], business_opening_hours: settings.business_opening_hours ?? [],
         slotRows: slots.map(time => ({ time, limit: slot_limits[time] ?? '' })),
+        exceptionsText: JSON.stringify(settings.calendar_exceptions ?? [], null, 2),
     });
     const lines = value => value.split(/[\n,]+/).map(line => line.trim()).filter(Boolean);
     function slotChange(index, key, value) {
@@ -689,23 +712,24 @@ export function AdminSettings({ settings }) {
     return <Admin title="Cấu hình cửa hàng">
         <form className="form-stack" onSubmit={e => {
             e.preventDefault();
-            form.transform(({ slotRows, closedText, ...data }) => ({
+            form.transform(({ slotRows, closedText, exceptionsText, ...data }) => ({
                 ...data,
                 slots: slotRows.map(slot => slot.time),
                 slot_limits: Object.fromEntries(slotRows.map(slot => [slot.time, slot.limit])),
                 closed_dates: lines(closedText),
                 faq_items: JSON.stringify(data.faq_items), business_opening_hours: JSON.stringify(data.business_opening_hours),
+                calendar_exceptions: exceptionsText,
             }));
             form.post(root + '/cai-dat', { forceFormData: true, preserveState: 'errors' });
         }}>
             <div className="admin-columns"><section className="panel form-stack"><h2>Thông tin tiệm</h2>
-                <Text form={form} field="name" label="Tên cửa hàng" required maxLength={100} onChange={e => businessChange('name', e.target.value)} /><Text form={form} field="address" label="Địa chỉ" maxLength={250} onChange={e => businessChange('address', e.target.value)} />
+                {canEditBrand ? <Text form={form} field="name" label="Tên thương hiệu toàn chuỗi" required maxLength={100} onChange={e => businessChange('name', e.target.value)} /> : <p className="muted">Thương hiệu, logo và chính sách chung do quản trị toàn chuỗi quản lý.</p>}<Text form={form} field="address" label="Địa chỉ cơ sở" maxLength={250} onChange={e => businessChange('address', e.target.value)} />
                 <div className="two-fields"><Text form={form} field="phone" label="Số điện thoại" onChange={e => businessChange('phone', e.target.value)} /><Text form={form} field="email" label="Email liên hệ" type="email" onChange={e => businessChange('email', e.target.value)} /></div>
-                <TextArea form={form} field="order_policy" label="Chính sách đổi giờ, hủy đơn và hoàn tiền" maxLength={4000} />
-                <TextArea form={form} field="privacy_notice" label="Thông báo xử lý dữ liệu khách hàng" maxLength={4000} />
-                <Text form={form} field="hours" label="Giờ mở cửa hiển thị" required onChange={e => businessChange('hours', e.target.value)} /><Field label="Logo" hint="JPEG, PNG hoặc WebP, tối đa 4 MB"><input type="file" accept="image/jpeg,image/png,image/webp" onChange={e => form.setData(data => ({ ...data, logo: e.target.files?.[0] ?? null, logo_approved: false }))} /></Field>
-                {logo && <><img className="logo-preview" src={logo} alt="Logo hiện tại" /><Flag form={form} field="remove_logo" label="Bỏ logo hiện tại" /></>}
-                <Flag form={form} field="logo_approved" label="Logo hiện tại đã được tiệm xác nhận quyền sử dụng" />
+                {canEditBrand && <><TextArea form={form} field="order_policy" label="Chính sách đổi giờ, hủy đơn và hoàn tiền toàn chuỗi" maxLength={4000} /><TextArea form={form} field="privacy_notice" label="Thông báo xử lý dữ liệu khách hàng" maxLength={4000} /></>}
+                <Text form={form} field="hours" label="Giờ mở cửa hiển thị" required onChange={e => businessChange('hours', e.target.value)} />
+                {canEditBrand && <><Field label="Logo" hint="JPEG, PNG hoặc WebP, tối đa 4 MB"><input type="file" accept="image/jpeg,image/png,image/webp" onChange={e => form.setData(data => ({ ...data, logo: e.target.files?.[0] ?? null, logo_approved: false }))} /></Field>
+                    {logo && <><img className="logo-preview" src={logo} alt="Logo hiện tại" /><Flag form={form} field="remove_logo" label="Bỏ logo hiện tại" /></>}
+                    <Flag form={form} field="logo_approved" label="Logo hiện tại đã được tiệm xác nhận quyền sử dụng" /></>}
             </section><section className="panel form-stack"><h2>Lịch nhận bánh</h2>
                 <div className="weekdays">{[[1, 'T2'], [2, 'T3'], [3, 'T4'], [4, 'T5'], [5, 'T6'], [6, 'T7'], [7, 'CN']].map(([day, name]) => <label className="checkbox" key={day}><input type="checkbox" checked={form.data.weekdays.includes(day)} onChange={e => form.setData('weekdays', e.target.checked ? [...form.data.weekdays, day] : form.data.weekdays.filter(value => value !== day))} />{name}</label>)}</div>
                 <div className="form-stack">
@@ -723,8 +747,10 @@ export function AdminSettings({ settings }) {
                     <button type="button" className="button secondary compact" disabled={form.data.slotRows.length >= 48} onClick={() => form.setData('slotRows', [...form.data.slotRows, { time: '', limit: '' }])}><Plus size={16} />Thêm khung giờ</button>
                 </div>
                 <Field label="Ngày nghỉ" hint="Mỗi ngày một dòng, định dạng YYYY-MM-DD."><textarea rows="4" value={form.data.closedText} onChange={e => form.setData('closedText', e.target.value)} /></Field>
+                <Field label="Lịch ngoại lệ theo ngày (JSON)" error={form.errors.calendar_exceptions} hint={'Để [] nếu không có. Ví dụ cấu trúc: [{"date":"2027-01-01","closed":true,"slots":[],"slot_limits":{}}]. Ngày mở đặc biệt dùng closed:false và danh sách slots HH:mm.'}><textarea rows="7" value={form.data.exceptionsText} onChange={e => form.setData('exceptionsText', e.target.value)} spellCheck={false} /></Field>
             </section></div>
             <section className="panel form-stack"><h2>Giao hàng</h2>
+                <fieldset><legend>Hình thức nhận bánh của cơ sở</legend>{[['pickup', 'Nhận tại tiệm'], ['delivery', 'Giao tận nơi']].map(([key, label]) => <label className="checkbox" key={key}><input type="checkbox" checked={form.data.fulfillments.includes(key)} onChange={e => form.setData('fulfillments', e.target.checked ? [...form.data.fulfillments, key] : form.data.fulfillments.filter(item => item !== key))} />{label}</label>)}</fieldset>
                 <Text form={form} field="free_from" label="Miễn phí giao hàng từ (₫, sau giảm giá)" type="number" min="0" />
                 {form.data.regions.map((area, i) => <div className="variant-edit" key={i}>
                     {[['key', 'Mã khu vực', 'text'], ['name', 'Tên khu vực', 'text'], ['fee', 'Phí giao (₫)', 'number']].map(([key, label, type]) => <Field label={label} key={key}><input required type={type} min={type === 'number' ? '0' : undefined} value={area[key]} onChange={e => regionChange(i, key, e.target.value)} /></Field>)}
@@ -733,6 +759,7 @@ export function AdminSettings({ settings }) {
                 <button type="button" className="button secondary compact" onClick={() => form.setData('regions', [...form.data.regions, { key: '', name: '', fee: 0 }])}><Plus size={16} />Thêm khu vực</button>
             </section>
             <section className="panel form-stack"><h2>Chuyển khoản thủ công</h2><p className="muted">Điền cả ba trường để mở chuyển khoản. Xóa cả ba trường để tắt.</p>
+                <fieldset><legend>Phương thức thanh toán của cơ sở</legend>{[['cod', 'Thanh toán khi nhận bánh'], ['bank', 'Chuyển khoản thủ công']].map(([key, label]) => <label className="checkbox" key={key}><input type="checkbox" checked={form.data.payment_methods.includes(key)} onChange={e => form.setData('payment_methods', e.target.checked ? [...form.data.payment_methods, key] : form.data.payment_methods.filter(item => item !== key))} />{label}</label>)}</fieldset>
                 <div className="three-fields"><Text form={form} field="bank_name" label="Ngân hàng" /><Text form={form} field="bank_account" label="Số tài khoản" /><Text form={form} field="bank_holder" label="Chủ tài khoản" /></div>
                 <Text form={form} field="bank_due_minutes" label="Thời hạn chuyển khoản (phút)" type="number" required min="1" max="1440" />
                 <Flag form={form} field="bank_demo" label="Hiển thị cảnh báo thông tin chuyển khoản mẫu" />
@@ -744,21 +771,25 @@ export function AdminSettings({ settings }) {
                 <Flag form={form} field="coupon_return_on_early_cancel" label="Trả lượt mã giảm khi hủy trước khi bắt đầu làm" />
                 <p className="muted">Lượt mã giảm được xử lý riêng với tồn. Hủy sau khi bắt đầu làm không tự nhập bánh vào tồn bán, quản lý phải kiểm tra và ghi rõ phần chưa làm, còn bán được hoặc hỏng.</p>
             </section>
-            <PublicContentSettings form={form} businessChange={businessChange} />
+            <PublicContentSettings form={form} businessChange={businessChange} canEditBrand={canEditBrand} />
             <ErrorList errors={form.errors} /><button className="button" disabled={form.processing}>{form.processing ? 'Đang lưu…' : 'Lưu cấu hình'}</button>
         </form>
     </Admin>;
 }
 
-export function AdminCoupons({ coupon, coupons }) {
+export function AdminCoupons({ coupon, coupons, couponScope = 'branch', canManageChainCoupons = false }) {
+    const { branchContext } = usePage().props;
     const url = root + '/ma-giam';
-    const form = useForm({ code: coupon?.code ?? '', kind: coupon?.kind ?? 'percent', amount: coupon?.amount ?? '',
+    const scopeQuery = '?scope=' + couponScope;
+    const form = useForm({ scope: couponScope, branch_id: couponScope === 'chain' ? null : branchContext?.currentId ?? 1, code: coupon?.code ?? '', kind: coupon?.kind ?? 'percent', amount: coupon?.amount ?? '',
         minimum: coupon?.minimum ?? 0, usage_limit: coupon?.usage_limit ?? '', starts_on: coupon?.starts_on ?? '', ends_on: coupon?.ends_on ?? '', active: Boolean(coupon?.active ?? true) });
     return <Admin title="Mã giảm giá">
+        {branchContext?.enabled && canManageChainCoupons && <ReportScope url={url} scope={couponScope} filters={{}} />}
+        <p className="muted">Phạm vi mã: {branchContext?.enabled ? couponScope === 'chain' ? 'Toàn chuỗi; lượt dùng và giới hạn được tính chung ở mọi cơ sở.' : 'Chỉ cơ sở đang chọn; lượt dùng và giới hạn thuộc riêng mã này.' : 'Cửa hàng hiện tại.'} Mã đã dùng vẫn giữ nguyên bộ đếm khi sửa hoặc tắt.</p>
         <div className="admin-columns">
-            <div className="panel"><h2>Danh sách mã</h2><Table headers={['Mã', 'Mức giảm', 'Sử dụng', 'Trạng thái']} rows={coupons.data.map(item => [item.id, <Link className="table-link" href={url + '/' + item.id}>{item.code}</Link>, item.kind === 'percent' ? item.amount + '%' : money(item.amount), item.used + ' / ' + (item.usage_limit ?? '∞'), item.active ? 'Đang bật' : 'Đã tắt'])} /><Pagination page={coupons} /></div>
+            <div className="panel"><h2>Danh sách mã</h2><Table headers={['Mã', 'Mức giảm', 'Sử dụng', 'Trạng thái']} rows={coupons.data.map(item => [item.id, <Link className="table-link" href={url + '/' + item.id + scopeQuery}>{item.code}</Link>, item.kind === 'percent' ? item.amount + '%' : money(item.amount), item.used + ' / ' + (item.usage_limit ?? '∞'), item.active ? 'Đang bật' : 'Đã tắt'])} /><Pagination page={coupons} /></div>
             <form className="panel form-stack" onSubmit={e => { e.preventDefault(); form.post(url + (coupon ? '/' + coupon.id : ''), { preserveState: 'errors' }); }}>
-                <div className="section-head"><h2>{coupon ? 'Sửa mã' : 'Tạo mã'}</h2>{coupon && <Link className="subtle-link" href={url}>Tạo mã mới</Link>}</div>
+                <div className="section-head"><h2>{coupon ? 'Sửa mã' : 'Tạo mã'}</h2>{coupon && <Link className="subtle-link" href={url + scopeQuery}>Tạo mã mới</Link>}</div>
                 <Text form={form} field="code" label="Mã giảm giá" required maxLength={32} />
                 <div className="two-fields">
                     <Field label="Loại giảm"><select value={form.data.kind} onChange={e => form.setData('kind', e.target.value)}><option value="percent">Phần trăm</option><option value="fixed">Số tiền</option></select></Field>
@@ -773,9 +804,11 @@ export function AdminCoupons({ coupon, coupons }) {
 }
 
 export function AdminUsers({ selected, users }) {
+    const { branchContext } = usePage().props;
     const url = root + '/nhan-su';
     const form = useForm({ name: selected?.name ?? '', email: selected?.email ?? '', password: '', role: selected?.role ?? 'staff', active: Boolean(selected?.active ?? true), can_reconcile: Boolean(selected?.can_reconcile) });
     return <Admin title="Tài khoản nội bộ">
+        {branchContext?.enabled && <p className="warning">Tài khoản nhân viên cần được cấp vai trò tại <Link href="/quan-tri/co-so">Cơ sở và phân công</Link>. Quyền đối soát và vai trò cơ sở được quản lý ở đó; cờ đối soát tại trang này dành cho chế độ một cơ sở.</p>}
         <div className="admin-columns"><div className="panel"><h2>Nhân sự</h2><Table headers={['Tên', 'Quyền', 'Trạng thái']} rows={users.data.map(user => [user.id,
             <Link className="table-link" href={url + '/' + user.id}>{user.name}<small>{user.email}</small></Link>, user.role === 'admin' ? 'Quản trị viên' : user.can_reconcile ? 'Nhân viên · Đối soát' : 'Nhân viên', user.active ? 'Hoạt động' : 'Đã khóa'])} /><Pagination page={users} /></div>
             <form className="panel form-stack" onSubmit={e => { e.preventDefault(); form.post(url + (selected ? '/' + selected.id : ''), { preserveState: 'errors', onFinish: () => form.reset('password') }); }}>
@@ -789,4 +822,52 @@ export function AdminUsers({ selected, users }) {
             </form>
         </div>
     </Admin>;
+}
+
+export function AdminBranchCatalog({ variants }) {
+    return <Admin title="Thực đơn riêng của cơ sở" detail="Giá để trống dùng giá gốc toàn chuỗi. Tồn bán và trạng thái chỉ áp dụng cho cơ sở đang chọn.">
+        <p className="warning">Kiểm tra đúng cơ sở phía trên trước khi nhập tồn. Bánh mới chưa có cấu hình riêng sẽ không bán tại cơ sở này.</p>
+        <div className="form-stack">{variants.map(variant => <BranchVariant key={variant.id + ':' + (variant.branch_updated_at ?? '') + ':' + (variant.stock ?? 0)} variant={variant} />)}</div>
+    </Admin>;
+}
+
+function BranchVariant({ variant }) {
+    const form = useForm({ active: Boolean(variant.branch_active), price: variant.branch_price ?? '', prep_minutes: variant.branch_prep_minutes ?? '', stock: variant.stock ?? 0, expected_stock: variant.stock ?? 0, note: '' });
+    return <form className="panel form-stack" onSubmit={event => { event.preventDefault(); form.patch(root + '/thuc-don-co-so/' + variant.id, { preserveScroll: true, preserveState: 'errors' }); }}>
+        <h2>{variant.product_name} · {variant.name}</h2><p className="muted">Giá gốc {money(variant.base_price)} · Chuẩn bị mặc định {variant.base_prep_minutes} phút{!variant.product_active || !variant.variant_active ? ' · Bánh hoặc phiên bản đang ẩn toàn chuỗi' : ''}</p>
+        <div className="three-fields"><Text form={form} field="price" label="Giá riêng (₫, để trống dùng giá gốc)" type="number" min="0" max="100000000" /><Text form={form} field="prep_minutes" label="Chuẩn bị riêng (phút, để trống dùng mặc định)" type="number" min="0" max="14400" /><Text form={form} field="stock" label="Tồn bán của cơ sở" type="number" required min="0" max="1000000" /></div>
+        <Flag form={form} field="active" label="Cho bán phiên bản tại cơ sở này" /><Text form={form} field="note" label="Lý do điều chỉnh giá, tồn hoặc trạng thái" required minLength={3} maxLength={250} /><ErrorList errors={form.errors} />
+        <button className="button secondary compact" disabled={form.processing}>{form.processing ? 'Đang lưu…' : 'Lưu cho cơ sở này'}</button>
+    </form>;
+}
+
+export function AdminBranches({ branches, memberships, staffUsers, branchMode }) {
+    return <Admin title="Cơ sở và phân công" detail="Quản trị toàn chuỗi. Cơ sở mới luôn được tạo ở trạng thái nháp và tạm ngừng nhận đơn.">
+        {!branchMode && <p className="warning">Chế độ một cơ sở đang được giữ. Chỉ kích hoạt nhiều cơ sở bằng quy trình sao lưu, backfill và đối chiếu trong CLI; trang này không tự chuyển chế độ.</p>}
+        <section className="form-stack"><h2>Các cơ sở</h2>{branches.map(branch => <BranchEditor key={branch.id + ':' + branch.name + ':' + branch.active} branch={branch} />)}<BranchEditor /></section>
+        <section className="form-stack"><h2>Phân công nhân sự theo cơ sở</h2><p className="muted">Tạo tài khoản nội bộ trước, rồi cấp vai trò theo từng cơ sở. Thay đổi quyền yêu cầu nhân sự đăng nhập và xác thực lại. Quyền quản trị toàn chuỗi được quản lý ở Tài khoản nội bộ.</p>
+            {memberships.map(member => <MembershipEditor key={member.id + ':' + member.role + ':' + member.active + ':' + member.can_reconcile} member={member} branches={branches} staffUsers={staffUsers} />)}
+            <MembershipEditor branches={branches} staffUsers={staffUsers} />
+        </section>
+    </Admin>;
+}
+
+function BranchEditor({ branch }) {
+    const form = useForm({ code: branch?.code ?? '', slug: branch?.slug ?? '', name: branch?.name ?? '', timezone: branch?.timezone ?? 'Asia/Ho_Chi_Minh', active: Boolean(branch?.active) });
+    return <form className="panel form-stack" onSubmit={event => { event.preventDefault(); form.post(root + '/co-so' + (branch ? '/' + branch.id : ''), { preserveScroll: true, preserveState: 'errors' }); }}>
+        <h3>{branch ? branch.name : 'Tạo cơ sở nháp'}</h3><div className="three-fields"><Text form={form} field="code" label="Mã cơ sở" required maxLength={32} pattern="[A-Z0-9][A-Z0-9_-]*" /><Text form={form} field="slug" label="Định danh đường dẫn" required maxLength={120} pattern="[a-z0-9]+(-[a-z0-9]+)*" /><Text form={form} field="name" label="Tên cơ sở" required maxLength={150} /></div>
+        <Field label="Múi giờ vận hành"><select value={form.data.timezone} onChange={event => form.setData('timezone', event.target.value)}><option value="Asia/Ho_Chi_Minh">Asia/Ho_Chi_Minh (Việt Nam)</option></select></Field>
+        {branch && <Flag form={form} field="active" label="Cho khách chọn cơ sở này (không tự bật nhận đơn)" />}<ErrorList errors={form.errors} /><button className="button secondary compact" disabled={form.processing}>{branch ? 'Lưu cơ sở' : 'Tạo nháp, chưa nhận đơn'}</button>
+    </form>;
+}
+
+function MembershipEditor({ member, branches, staffUsers }) {
+    const form = useForm({ branch_id: member?.branch_id ?? '', user_id: member?.user_id ?? '', role: member?.role ?? 'staff', active: Boolean(member?.active ?? true), can_reconcile: Boolean(member?.can_reconcile) });
+    return <form className="panel form-stack" onSubmit={event => { event.preventDefault(); form.post(root + '/phan-cong-co-so', { preserveScroll: true, preserveState: 'errors' }); }}>
+        <h3>{member ? member.name : 'Thêm phân công'}</h3><div className="three-fields">
+            <Field label="Cơ sở" error={form.errors.branch_id}><select required disabled={Boolean(member)} value={form.data.branch_id} onChange={event => form.setData('branch_id', event.target.value)}><option value="">Chọn cơ sở</option>{branches.map(branch => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select></Field>
+            <Field label="Nhân sự" error={form.errors.user_id}><select required disabled={Boolean(member)} value={form.data.user_id} onChange={event => form.setData('user_id', event.target.value)}><option value="">Chọn tài khoản</option>{staffUsers.map(user => <option key={user.id} value={user.id}>{user.name} · {user.email}{!user.active ? ' · Đã khóa' : ''}</option>)}</select></Field>
+            <Field label="Vai trò tại cơ sở" error={form.errors.role}><select value={form.data.role} onChange={event => form.setData(data => ({ ...data, role: event.target.value, can_reconcile: event.target.value === 'kitchen' ? false : data.can_reconcile }))}>{[['manager', 'Quản lý cơ sở'], ['staff', 'Nhân viên'], ['kitchen', 'Bếp'], ['accountant', 'Kế toán']].map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
+        </div><Flag form={form} field="active" label="Phân công đang hoạt động" /><Flag form={form} field="can_reconcile" disabled={form.data.role === 'kitchen'} label="Cho phép đối soát chuyển khoản và hoàn tiền" /><ErrorList errors={form.errors} /><button className="button secondary compact" disabled={form.processing}>Lưu phân công và yêu cầu xác thực lại</button>
+    </form>;
 }

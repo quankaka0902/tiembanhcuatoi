@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\Branches;
 use App\Services\OrderRequests;
 use App\Services\Orders;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
@@ -69,7 +71,7 @@ class OrderChanges extends Controller
 
             return $this->expiredResponse($request);
         }
-        $order = Orders::query()->find($change->order_id);
+        $order = DB::table('orders')->find($change->order_id);
 
         return redirect(Orders::link($order))->with('notice', 'Tiệm đã nhận yêu cầu và sẽ phản hồi. Liên kết thao tác này đã được dùng, liên kết tra cứu vẫn hoạt động.');
     }
@@ -85,8 +87,9 @@ class OrderChanges extends Controller
     private function owned(Request $request, string $code): object
     {
         abort_unless($request->user()?->fresh()?->active, 403);
-        $order = Orders::query()->where('user_id', $request->user()->id)->where('code', $code)->first();
+        $order = DB::table('orders')->where('user_id', $request->user()->id)->where('code', $code)->first();
         abort_unless($order, 404);
+        Branches::use((int) ($order->branch_id ?? 1));
 
         return $order;
     }

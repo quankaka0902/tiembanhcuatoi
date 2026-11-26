@@ -33,6 +33,7 @@ class PublicSeo
         $host = strtolower((string) parse_url($origin ?? '', PHP_URL_HOST));
 
         return app()->environment('production') && (bool) config('bakery.seo.indexing_enabled')
+            && ! Branches::enabled()
             && ! config('bakery.demo_seed') && ! config('bakery.rehearsal') && str_starts_with($origin ?? '', 'https://')
             && ! LaunchReadiness::loopback($host) && ! str_ends_with($host, '.localhost');
     }
@@ -116,7 +117,7 @@ class PublicSeo
                 '@context' => 'https://schema.org', '@type' => 'Product', '@id' => self::url($path).'#product',
                 'name' => $product->name, 'description' => self::description($product->description), 'url' => self::url($path), 'image' => [$image['url']],
             ];
-            if ($settings['accepting_orders']) {
+            if ($settings['accepting_orders'] && ! Branches::enabled()) {
                 $item['offers'] = $product->variants->map(fn ($variant) => [
                     '@type' => 'Offer', 'name' => $variant->name, 'url' => self::url($path),
                     'priceCurrency' => 'VND', 'price' => (int) $variant->price,

@@ -128,9 +128,12 @@ class ProductMetadata
         return $fields;
     }
 
-    public static function accessories(int $productId, bool $publicOnly = true): Collection
+    public static function accessories(int $productId, bool $publicOnly = true, bool $currentRead = false): Collection
     {
         $query = DB::table('product_accessories')->where('product_id', $productId)->orderBy('id');
+        if ($currentRead) {
+            $query->sharedLock();
+        }
 
         return $publicOnly ? $query->where('active', true)->where('approved', true)->get(['id', 'name', 'price']) : $query->get();
     }

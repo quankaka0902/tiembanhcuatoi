@@ -22,7 +22,8 @@ class Orders
 
     public static function query(): Builder
     {
-        return DB::table('orders')->where('orders.location_id', Store::locationId());
+        return Branches::enabled() ? Branches::scope(DB::table('orders'), column: 'orders.branch_id')
+            : DB::table('orders')->where('orders.location_id', 1);
     }
 
     public static function scheduled(): Builder
@@ -51,7 +52,7 @@ class Orders
 
     public static function canReconcile(User $actor): bool
     {
-        return $actor->active && ($actor->role === 'admin' || ($actor->role === 'staff' && $actor->can_reconcile));
+        return Branches::can($actor, 'reconcile');
     }
 
     public static function canReschedule(object $order, bool $manager = false): bool
@@ -61,7 +62,8 @@ class Orders
 
     public static function prepMinutes(int $orderId): int
     {
-        $order = self::query()->find($orderId);
+        $query = self::query();
+        $order = (DB::transactionLevel() > 0 ? $query->lockForUpdate() : $query)->find($orderId);
         abort_unless($order, 404);
         if ($order->prep_minutes_snapshot !== null) {
             return (int) $order->prep_minutes_snapshot;
@@ -94,12 +96,13 @@ class Orders
     public static function reschedule(int $id, User $actor, array $fields, Checkout $checkout): void
     {
         DB::transaction(function () use ($id, $actor, $fields, $checkout) {
-            $settings = Store::settings(lock: true);
+            Branches::authorize($actor, 'orders');
+            $settings = Store::settings(lock: true, shared: true);
             $actor = $actor->fresh();
             abort_unless($actor?->active && $actor->isStaff(), 403);
             $order = self::query()->lockForUpdate()->find($id);
             abort_unless($order, 404);
-            if (! self::canReschedule($order, $actor->role === 'admin') || $order->scheduled_at !== $fields['previous_slot'].':00') {
+            if (! self::canReschedule($order, Branches::isManager($actor)) || $order->scheduled_at !== $fields['previous_slot'].':00') {
                 throw ValidationException::withMessages(['slot' => 'Đơn đã thay đổi hoặc đã vào khâu chuẩn bị. Vui lòng tải lại trang.']);
             }
             if ($fields['slot'] === $fields['previous_slot']) {
@@ -109,10 +112,13 @@ class Orders
                 throw ValidationException::withMessages(['slot' => 'Quản lý cần xác minh thời gian chuẩn bị của đơn cũ trước khi đổi lịch.']);
             }
             if (! self::canCustomerRequest($order)) {
-                abort_unless($actor->role === 'admin', 403);
+                abort_unless(Branches::isManager($actor), 403);
                 self::requiredNote($fields);
             }
-            $scheduledAt = $checkout->assertSlot($fields['slot'], $settings, self::prepMinutes($id));
+            Branches::lockSlots([$order->scheduled_at, $fields['slot'].':00']);
+            $scheduledAt = $checkout->assertSlot($fields['slot'], $settings, (int) $order->prep_minutes_snapshot);
+            Branches::bookSlot($order->scheduled_at, -1);
+            Branches::bookSlot($scheduledAt, 1);
             $update = ['scheduled_at' => $scheduledAt, 'updated_at' => now()];
             if ($order->method === 'bank' && $order->payment === 'unpaid' && $order->bank_due_at !== null) {
                 $update['bank_due_at'] = min($order->bank_due_at, $scheduledAt);
@@ -126,18 +132,28 @@ class Orders
     public static function change(int $id, User $actor, array $fields): void
     {
         DB::transaction(function () use ($id, $actor, $fields) {
-            $settings = Store::settings(lock: true);
+            $hint = self::query()->find($id);
+            abort_unless($hint, 404);
+            $action = $fields['kind'] === 'payment'
+                ? ($hint->method === 'cod' && $fields['value'] === 'paid' && Branches::can($actor, 'orders') ? 'orders' : 'reconcile')
+                : (in_array($fields['kind'], ['lead_time', 'prepay_exception'], true) ? 'configure'
+                    : (Branches::can($actor, 'orders') ? 'orders' : 'production'));
+            Branches::authorize($actor, $action);
+            $settings = Store::settings(lock: true, shared: true);
             $actor = $actor->fresh();
             abort_unless($actor?->active && in_array($actor->role, ['admin', 'staff'], true), 403);
             $order = self::query()->lockForUpdate()->find($id);
             abort_unless($order, 404);
             $value = $fields['value'];
+            if (Branches::role($actor) === 'kitchen' && ($fields['kind'] !== 'status' || ! in_array($value, ['preparing', 'ready'], true))) {
+                abort(403);
+            }
             if (isset($fields['expected_status']) && $fields['expected_status'] !== $order->status) {
                 throw ValidationException::withMessages(['value' => 'Đơn đã được người khác cập nhật. Vui lòng tải lại trang.']);
             }
 
             if (in_array($fields['kind'], ['lead_time', 'prepay_exception'], true)) {
-                abort_unless($actor->role === 'admin', 403);
+                abort_unless(Branches::isManager($actor), 403);
                 $note = self::requiredNote($fields);
                 if ($fields['kind'] === 'lead_time') {
                     if ($order->prep_minutes_snapshot !== null || ! self::canReschedule($order)
@@ -193,10 +209,18 @@ class Orders
                     throw ValidationException::withMessages(['value' => 'Đơn chuyển khoản cần được người có quyền xác nhận đã thu đủ trước khi vào bếp hoặc giao.']);
                 }
                 if ($value === 'cancelled' && (self::productionStarted($order) || ! self::canCustomerRequest($order))) {
-                    abort_unless($actor->role === 'admin', 403);
+                    abort_unless(Branches::isManager($actor), 403);
                 }
                 if ($value === 'cancelled') {
                     self::requiredNote($fields);
+                    if (Branches::enabled()) {
+                        if ($order->coupon_id) {
+                            DB::table('coupons')->where('id', $order->coupon_id)->lockForUpdate()->first();
+                        }
+                        Branches::lockSlots([$order->scheduled_at]);
+                        $skuIds = DB::table('order_items')->where('order_id', $id)->pluck('variant_id')->all();
+                        Inventory::lock($skuIds);
+                    }
                 }
                 if (in_array($value, ['delivery_failed', 'uncollected'], true)
                     || in_array($order->status, ['delivery_failed', 'uncollected'], true)) {
@@ -225,6 +249,7 @@ class Orders
                     $update['inventory_processed_at'] = now();
                 }
                 if ($value === 'cancelled') {
+                    Branches::bookSlot($order->scheduled_at, -1);
                     $update['inventory_review_required'] = self::productionStarted($order);
                     if (! self::productionStarted($order) && $settings['coupon_return_on_early_cancel'] && ! $order->coupon_released_at && $order->coupon_id) {
                         DB::table('coupons')->where('id', $order->coupon_id)->where('used', '>', 0)->decrement('used');
@@ -244,9 +269,10 @@ class Orders
     public static function disposeInventory(int $id, User $actor, array $fields): void
     {
         DB::transaction(function () use ($id, $actor, $fields) {
-            Store::settings(lock: true);
+            Branches::authorize($actor, 'inventory');
+            Store::settings(lock: true, shared: true);
             $actor = $actor->fresh();
-            abort_unless($actor?->active && $actor->role === 'admin', 403);
+            abort_unless($actor?->active && Branches::isManager($actor), 403);
             $order = self::query()->lockForUpdate()->find($id);
             abort_unless($order, 404);
             if ($order->status !== 'cancelled' || ! $order->inventory_review_required || $order->inventory_processed_at) {
@@ -317,10 +343,23 @@ class Orders
             $data = array_intersect_key($data, array_flip([
                 'code', 'fulfillment', 'address', 'region_label', 'scheduled_at',
                 'method', 'payment', 'status', 'subtotal', 'discount', 'delivery_fee', 'total', 'bank_due_at',
+                'branch_id', 'branch_snapshot',
             ]));
             if (! $owner) {
                 unset($data['address']);
             }
+        }
+        $data['branch_snapshot'] = $order->branch_snapshot ? json_decode($order->branch_snapshot, true, flags: JSON_THROW_ON_ERROR)
+            : ['id' => (int) ($order->branch_id ?? 1), 'provenance' => 'legacy_unknown', 'historical_details_known' => false];
+        $branchId = (int) ($order->branch_id ?? 1);
+        $branchSettings = Store::settings(branchId: $branchId);
+        $branch = Branches::find($branchId);
+        $data['branch_contact'] = [
+            'id' => $branchId, 'name' => $branch?->name ?? $branchSettings['name'],
+            'phone' => $branchSettings['phone'], 'email' => $branchSettings['email'],
+        ];
+        if ($internal) {
+            $data['sales_context'] = $order->sales_context ? json_decode($order->sales_context, true, flags: JSON_THROW_ON_ERROR) : null;
         }
         $showBank = $internal || ($order->status !== 'cancelled' && $order->payment === 'unpaid');
         $data['bank_snapshot'] = $showBank && $order->bank_snapshot ? json_decode($order->bank_snapshot, true, flags: JSON_THROW_ON_ERROR) : null;

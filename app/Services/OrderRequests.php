@@ -21,7 +21,7 @@ class OrderRequests
         $owner = self::isOwner($order, $actor);
         $verified = $owner || $guestVerified;
         $eligible = Orders::canCustomerRequest($order);
-        $history = self::history($order->id, verified: $verified);
+        $history = Branches::run((int) ($order->branch_id ?? 1), fn () => self::history($order->id, verified: $verified));
         $pending = $history->firstWhere('status', 'pending');
         $cutoff = $order->prep_minutes_snapshot === null ? null
             : CarbonImmutable::parse($order->scheduled_at)->subMinutes((int) $order->prep_minutes_snapshot)->toDateTimeString();
@@ -35,7 +35,8 @@ class OrderRequests
                 'requestKey' => (string) Str::uuid(),
                 'submitUrl' => $owner ? '/don-cua-toi/'.$order->code.'/yeu-cau' : null,
                 'actionLinkUrl' => $eligible && ! $verified ? '/tra-cuu/'.$order->tracking_token.'/lien-ket-thao-tac' : null,
-                'slots' => $eligible && $verified ? app(Checkout::class)->availableSlots(Store::settings(), Orders::prepMinutes($order->id)) : [],
+                'slots' => $eligible && $verified ? Branches::run((int) ($order->branch_id ?? 1),
+                    fn () => app(Checkout::class)->availableSlots(Store::settings(), Orders::prepMinutes($order->id))) : [],
             ],
             'changeRequests' => $history,
         ];
@@ -66,8 +67,12 @@ class OrderRequests
 
     public static function requestLink(string $trackingToken, string $email): void
     {
-        DB::transaction(function () use ($trackingToken, $email) {
-            Store::settings(lock: true);
+        $candidate = DB::table('orders')->where('tracking_token', $trackingToken)->first();
+        if (! $candidate) {
+            return;
+        }
+        Branches::run((int) ($candidate->branch_id ?? 1), fn () => DB::transaction(function () use ($trackingToken, $email) {
+            Store::settings(lock: true, shared: true);
             $order = Orders::query()->where('tracking_token', $trackingToken)->lockForUpdate()->first();
             if (! $order || ! hash_equals(Str::lower(trim($order->email)), Str::lower(trim($email))) || ! Orders::canCustomerRequest($order)) {
                 return;
@@ -85,7 +90,7 @@ class OrderRequests
                 'created_at' => now(),
             ]);
             OrderNotices::actionLink($order->id, $token, $expiresAt);
-        }, 5);
+        }, 5));
     }
 
     public static function guestAccess(string $token): array
@@ -93,8 +98,9 @@ class OrderRequests
         $link = self::findLink($token);
         self::assertLive($link);
         abort_if($link->used_at !== null, 410, 'Liên kết đã được dùng. Vui lòng yêu cầu liên kết mới từ trang tra cứu.');
-        $order = Orders::query()->find($link->order_id);
+        $order = DB::table('orders')->find($link->order_id);
         abort_unless($order, 410);
+        Branches::use((int) ($order->branch_id ?? 1));
 
         return [$order, $link];
     }
@@ -102,23 +108,27 @@ class OrderRequests
     public static function submitOwner(int $orderId, User $actor, array $fields): object
     {
         $fields = Validator::make($fields, self::rules())->validate();
+        $candidate = DB::table('orders')->find($orderId);
+        abort_unless($candidate && self::isOwner($candidate, $actor), 404);
 
-        return DB::transaction(function () use ($orderId, $actor, $fields) {
-            Store::settings(lock: true);
+        return Branches::run((int) ($candidate->branch_id ?? 1), fn () => DB::transaction(function () use ($orderId, $actor, $fields) {
+            Store::settings(lock: true, shared: true);
             $order = Orders::query()->lockForUpdate()->find($orderId);
             abort_unless($order && self::isOwner($order, $actor), 404);
 
             return self::submit($order, $actor->id, $fields);
-        }, 5);
+        }, 5));
     }
 
     public static function submitGuest(string $token, array $fields): object
     {
         $fields = Validator::make($fields, self::rules())->validate();
         $candidate = self::findLink($token);
+        $order = DB::table('orders')->find($candidate->order_id);
+        abort_unless($order, 410);
 
-        return DB::transaction(function () use ($candidate, $token, $fields) {
-            Store::settings(lock: true);
+        return Branches::run((int) ($order->branch_id ?? 1), fn () => DB::transaction(function () use ($candidate, $token, $fields) {
+            Store::settings(lock: true, shared: true);
             $order = Orders::query()->lockForUpdate()->find($candidate->order_id);
             $link = DB::table('order_action_links')->where('token_hash', hash('sha256', $token))->lockForUpdate()->first();
             self::assertLive($link);
@@ -136,22 +146,25 @@ class OrderRequests
             ]);
 
             return $change;
-        }, 5);
+        }, 5));
     }
 
     public static function resolve(int $requestId, User $actor, array $fields): object
     {
+        Branches::authorize($actor, 'orders');
         $fields = Validator::make($fields, ['decision' => 'required|in:approved,rejected', 'note' => 'required|string|max:200'])->validate();
-        $candidate = DB::table('order_change_requests')->find($requestId);
+        $candidate = DB::table('order_change_requests')->whereIn('order_id', Orders::query()->select('orders.id'))->find($requestId);
         abort_unless($candidate, 404);
 
         return DB::transaction(function () use ($candidate, $requestId, $actor, $fields) {
-            Store::settings(lock: true);
             $actor = $actor->fresh();
-            abort_unless($actor?->active && $actor->isStaff(), 403);
+            abort_unless($actor, 403);
+            Branches::authorize($actor, 'orders');
+            Store::settings(lock: true, shared: true);
             $order = Orders::query()->lockForUpdate()->find($candidate->order_id);
+            abort_unless($order, 404);
             $change = DB::table('order_change_requests')->lockForUpdate()->find($requestId);
-            abort_unless($order && $change, 404);
+            abort_unless($change && (int) $change->order_id === (int) $order->id, 404);
             if ($change->status !== 'pending') {
                 if ($change->status === $fields['decision'] && $change->response_message === $fields['note']) {
                     return $change;

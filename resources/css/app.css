@@ -350,3 +350,11 @@ td small { display: block; color: var(--muted); }
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
 }
+
+.branch-selector-wrap { padding-block: 16px 0; }
+.branch-selector { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; padding: 14px; margin-block: 0 18px; border: 1px solid #9c777f; border-radius: 14px; background: #fffaf5; }
+.branch-selector .field { flex: 1 1 240px; margin: 0; min-width: 0; }
+.branch-selector select { width: 100%; border-color: #9c777f; }
+.branch-confirm { flex-basis: 100%; line-height: 1.5; }
+.branch-selector button { flex-shrink: 0; }
+@media (max-width: 560px) { .branch-selector { align-items: stretch; } .branch-selector button { width: 100%; } }

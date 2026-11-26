@@ -49,7 +49,7 @@ function CurrentLocation({ location, compact = false }) {
     const current = location ?? shop;
     const regions = current.regions ?? [];
     return <section className={'sf-location panel ' + (compact ? 'sf-location-compact' : '')} id={compact ? undefined : 'co-so-dang-phuc-vu'} aria-label="Cơ sở đang phục vụ">
-        <div className="sf-location-heading"><MapPin size={21} /><div><small>Cơ sở đang phục vụ</small><h2>{current.name || shop.name}</h2></div></div>
+        <div className="sf-location-heading"><MapPin size={21} /><div><small>Cơ sở đang phục vụ</small><h2>{current.branch?.name || shop.branch?.name || current.name || shop.name}</h2></div></div>
         <div className="sf-location-details">
             <p>{current.address || 'Tiệm chưa cập nhật địa chỉ nhận bánh.'}</p>
             <p><Clock3 size={16} />{current.hours || 'Liên hệ tiệm để xác nhận giờ mở cửa.'}</p>
@@ -159,7 +159,7 @@ export function Product({ product, suggestedVariantId, selectionFilters }) {
     const initial = suggested ?? (hasSelectionFilters && suggestedVariantId === null ? null : product.variants.find(choice => Number(choice.stock) > 0) ?? product.variants[0]);
     const [photo, setPhoto] = useState(0);
     const formElement = useRef(null);
-    const form = useForm({ variant_id: initial?.id ?? '', quantity: 1, message: '', note: '', accessories: [] });
+    const form = useForm({ branch_id: shop.branch?.id ?? 1, variant_id: initial?.id ?? '', quantity: 1, message: '', note: '', accessories: [] });
     const variant = product.variants.find(option => Number(option.id) === Number(form.data.variant_id));
     const accessories = product.accessories ?? [];
     const accessoriesPrice = accessories.filter(item => form.data.accessories.includes(item.id)).reduce((sum, item) => sum + Number(item.price), 0);
@@ -183,7 +183,7 @@ export function Product({ product, suggestedVariantId, selectionFilters }) {
             <section className="sf-product-info"><span className="product-category">{product.category}</span><h1>{product.name}</h1>
                 <p className="intro">{product.description}</p>
                 <div className="sf-product-price"><strong>{variant ? money(variant.price) : product.variants.length ? 'Chọn cỡ bánh để xem giá' : 'Chưa mở bán'}</strong>{variant && <span>/ bánh, chưa gồm tùy chọn</span>}</div>
-                <p className="sf-lead-time"><Clock3 size={17} />Thời gian chuẩn bị: {Number(product.prep_minutes) > 0 ? `${product.prep_minutes} phút` : 'Xem khung giờ khi đặt'}<small>Đây là thời gian chuẩn bị. Giờ giao hoặc nhận còn chỗ được kiểm tra khi đặt bánh.</small></p>
+                <p className="sf-lead-time"><Clock3 size={17} />Thời gian chuẩn bị: {Number(variant?.prep_minutes ?? product.prep_minutes) > 0 ? `${variant?.prep_minutes ?? product.prep_minutes} phút` : 'Xem khung giờ khi đặt'}<small>Áp dụng cho phiên bản tại cơ sở đang chọn. Giờ giao hoặc nhận còn chỗ được kiểm tra khi đặt bánh.</small></p>
                 {hasSelectionFilters && suggestedVariantId === null && <p className="warning" role="status">Chưa có cỡ bánh khớp đầy đủ lựa chọn bạn mang từ thực đơn. Hãy xem và chọn lại cỡ phù hợp bên dưới.</p>}
                 {!verified(product.details_verified) && <p className="sf-verification-note">Thông tin chi tiết đang chờ tiệm xác minh. Nếu bạn có yêu cầu về khẩu phần hoặc chế độ ăn, hãy liên hệ tiệm trước khi đặt.</p>}
                 <section className="sf-allergen-info"><h2>Cảnh báo dị ứng</h2><p>{product.allergens || 'Tiệm chưa cung cấp cảnh báo dị ứng. Vui lòng hỏi tiệm nếu bạn có dị ứng hoặc chế độ ăn cần lưu ý.'}</p></section>

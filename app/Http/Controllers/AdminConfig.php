@@ -3,10 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Services\Branches;
 use App\Services\LaunchReadiness;
 use App\Services\ProductMetadata;
 use App\Services\PublicSeo;
 use App\Services\Store;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -19,18 +21,21 @@ class AdminConfig extends Controller
 {
     public function settings()
     {
+        Branches::authorize(request()->user(), 'branch_settings');
         $settings = Store::settings();
         unset($settings['accepting_orders'], $settings['pause_message']);
 
-        return Inertia::render('AdminSettings', ['settings' => $settings]);
+        return Inertia::render('AdminSettings', ['settings' => $settings, 'canEditBrand' => request()->user()->role === 'admin']);
     }
 
     public function saveIntake(Request $request)
     {
+        Branches::authorize($request->user(), 'branch_settings');
         $fields = $request->validate([
             'accepting_orders' => 'required|boolean', 'pause_message' => 'nullable|string|max:250',
         ]);
         DB::transaction(function () use ($fields) {
+            Branches::authorize(request()->user(), 'branch_settings');
             $current = Store::settings(lock: true);
             if ($fields['accepting_orders'] && ! $current['accepting_orders'] && LaunchReadiness::required()) {
                 $errors = [
@@ -45,7 +50,7 @@ class AdminConfig extends Controller
                 'accepting_orders' => (bool) $fields['accepting_orders'],
                 'pause_message' => $fields['pause_message'] ?? null,
             ]);
-            DB::table('store_settings')->where('id', 1)->update(['data' => json_encode($settings, JSON_THROW_ON_ERROR)]);
+            Store::saveSettings($settings);
         }, 5);
 
         return back()->with('notice', $fields['accepting_orders'] ? 'Tiệm đang nhận đơn mới.' : 'Đã tạm ngừng nhận đơn mới.');
@@ -53,6 +58,14 @@ class AdminConfig extends Controller
 
     public function saveSettings(Request $request, AdminCatalog $catalog)
     {
+        Branches::authorize($request->user(), 'branch_settings');
+        if (is_string($request->input('calendar_exceptions'))) {
+            $decoded = json_decode($request->input('calendar_exceptions'), true);
+            if (! is_array($decoded) || ! array_is_list($decoded)) {
+                throw ValidationException::withMessages(['calendar_exceptions' => 'Nhập danh sách JSON ngày ngoại lệ hợp lệ.']);
+            }
+            $request->merge(['calendar_exceptions' => $decoded]);
+        }
         foreach (['faq_items', 'business_opening_hours'] as $field) {
             if ($request->exists($field)) {
                 $request->merge([$field => ProductMetadata::listInput($request->input($field))]);
@@ -81,15 +94,33 @@ class AdminConfig extends Controller
             'bank_prepay_required' => 'sometimes|required|boolean',
             'allow_payment_override' => 'sometimes|required|boolean',
             'coupon_return_on_early_cancel' => 'sometimes|required|boolean',
+            'fulfillments' => 'sometimes|required|array|min:1|max:2', 'fulfillments.*' => 'required|distinct|in:pickup,delivery',
+            'payment_methods' => 'sometimes|required|array|min:1|max:2', 'payment_methods.*' => 'required|distinct|in:cod,bank',
+            'calendar_exceptions' => 'sometimes|array|max:100', 'calendar_exceptions.*' => 'required|array:date,closed,slots,slot_limits',
+            'calendar_exceptions.*.date' => 'required|date_format:Y-m-d|distinct', 'calendar_exceptions.*.closed' => 'required|boolean',
+            'calendar_exceptions.*.slots' => 'present|array|max:48', 'calendar_exceptions.*.slots.*' => 'required|date_format:H:i',
+            'calendar_exceptions.*.slot_limits' => 'present|array|max:48', 'calendar_exceptions.*.slot_limits.*' => 'required|integer|min:1|max:1000',
             ...PublicSeo::settingsRules(),
         ]);
         $slotTimes = array_flip($fields['slots']);
         if (array_diff_key($fields['slot_limits'] ?? [], $slotTimes)) {
             throw ValidationException::withMessages(['slot_limits' => 'Chỉ đặt giới hạn cho khung giờ có trong lịch nhận bánh.']);
         }
-        DB::transaction(function () use ($fields, $catalog, $slotTimes) {
+        foreach ($fields['calendar_exceptions'] ?? [] as $index => $exception) {
+            if ((! $exception['closed'] && ! $exception['slots']) || count(array_unique($exception['slots'])) !== count($exception['slots']) || array_diff_key($exception['slot_limits'], array_flip($exception['slots']))) {
+                throw ValidationException::withMessages(["calendar_exceptions.{$index}" => 'Ngày mở cần ít nhất một khung giờ riêng; giới hạn chỉ được đặt cho giờ của ngày đó.']);
+            }
+        }
+        DB::transaction(function () use ($fields, $catalog, $slotTimes, $request) {
+            Branches::authorize($request->user(), 'branch_settings');
             $current = Store::settings(lock: true);
             $fields = PublicSeo::settingsFields($fields, $current);
+            if ($request->user()->role !== 'admin') {
+                foreach (['name', 'logo', 'logo_approved', 'privacy_notice', 'about_text', 'faq_items', 'public_content_approved', 'order_policy'] as $key) {
+                    abort_if(array_key_exists($key, $fields) && $fields[$key] != ($current[$key] ?? null), 403);
+                }
+                abort_if($fields['remove_logo'], 403);
+            }
             $logo = isset($fields['logo']) ? $catalog->uploadedImage($fields['logo']) : ($fields['remove_logo'] ? null : $current['logo']);
             $limits = array_filter(array_intersect_key($fields['slot_limits'] ?? $current['slot_limits'], $slotTimes));
             unset($fields['remove_logo']);
@@ -103,24 +134,47 @@ class AdminConfig extends Controller
                 'allow_payment_override' => (bool) ($fields['allow_payment_override'] ?? $current['allow_payment_override']),
                 'coupon_return_on_early_cancel' => (bool) ($fields['coupon_return_on_early_cancel'] ?? $current['coupon_return_on_early_cancel']),
             ]);
-            DB::table('store_settings')->where('id', 1)->update(['data' => json_encode($settings, JSON_THROW_ON_ERROR)]);
+            Store::saveSettings($settings);
         });
 
         return back()->with('notice', 'Đã lưu cấu hình cửa hàng.');
     }
 
-    public function coupons(?int $coupon = null)
+    private function couponScope(Request $request): string
     {
-        $row = $coupon ? DB::table('coupons')->find($coupon) : null;
+        $scope = $request->validate(['scope' => 'nullable|in:branch,chain'])['scope']
+            ?? (Branches::enabled() && $request->user()->role === 'admin' ? 'chain' : 'branch');
+        if ($scope === 'chain') {
+            Branches::authorize($request->user(), 'chain');
+        }
+
+        return $scope;
+    }
+
+    private function couponQuery(string $scope): Builder
+    {
+        return DB::table('coupons')->when(Branches::enabled(), fn ($query) => $scope === 'chain'
+            ? $query->whereNull('branch_id') : $query->where('branch_id', Branches::id()));
+    }
+
+    public function coupons(Request $request, ?int $coupon = null)
+    {
+        Branches::authorize($request->user(), 'branch_settings');
+        $scope = $this->couponScope($request);
+        $query = $this->couponQuery($scope);
+        $row = $coupon ? (clone $query)->find($coupon) : null;
         abort_if($coupon && ! $row, 404);
 
-        return Inertia::render('AdminCoupons', ['coupon' => $row, 'coupons' => DB::table('coupons')->latest('id')->paginate(20)]);
+        return Inertia::render('AdminCoupons', ['coupon' => $row, 'couponScope' => $scope,
+            'canManageChainCoupons' => $request->user()->role === 'admin', 'coupons' => $query->latest('id')->paginate(20)->appends(['scope' => $scope])]);
     }
 
     public function saveCoupon(Request $request, ?int $coupon = null)
     {
+        Branches::authorize($request->user(), 'branch_settings');
+        $scope = $this->couponScope($request);
         if ($coupon) {
-            abort_unless(DB::table('coupons')->find($coupon), 404);
+            abort_unless($this->couponQuery($scope)->find($coupon), 404);
         }
         if (is_string($code = $request->input('code'))) {
             $request->merge(['code' => Str::upper($code)]);
@@ -132,17 +186,27 @@ class AdminConfig extends Controller
             'starts_on' => 'nullable|date_format:Y-m-d',
             'ends_on' => 'nullable|date_format:Y-m-d'.($request->filled('starts_on') ? '|after_or_equal:starts_on' : ''),
             'active' => 'required|boolean',
+            'branch_id' => ['sometimes', 'nullable', 'integer', Rule::in([Branches::id()])],
         ]);
-        DB::transaction(function () use ($fields, $coupon) {
+        if ($scope === 'chain' && $request->filled('branch_id')) {
+            throw ValidationException::withMessages(['branch_id' => 'Mã toàn chuỗi không gắn riêng với một cơ sở.']);
+        }
+        unset($fields['branch_id']);
+        DB::transaction(function () use ($fields, $coupon, $scope) {
+            Branches::authorize(request()->user(), 'branch_settings');
+            if ($scope === 'chain') {
+                Branches::authorize(request()->user(), 'chain');
+            }
             Store::settings(lock: true);
             if ($coupon) {
-                DB::table('coupons')->where('id', $coupon)->update($fields);
+                abort_unless($this->couponQuery($scope)->where('id', $coupon)->lockForUpdate()->first(), 404);
+                $this->couponQuery($scope)->where('id', $coupon)->update($fields);
             } else {
-                DB::table('coupons')->insert($fields);
+                DB::table('coupons')->insert($fields + (Branches::enabled() ? ['branch_id' => $scope === 'chain' ? null : Branches::id()] : []));
             }
         });
 
-        return redirect('/quan-tri/ma-giam')->with('notice', 'Đã lưu mã giảm giá.');
+        return redirect('/quan-tri/ma-giam'.(Branches::enabled() ? '?scope='.$scope : ''))->with('notice', 'Đã lưu mã giảm giá.');
     }
 
     public function users(?int $user = null)
@@ -177,10 +241,22 @@ class AdminConfig extends Controller
         }
 
         DB::transaction(function () use ($record, $fields, $request, $user) {
-            Store::settings(lock: true);
-            abort_unless($request->user()->fresh()?->active && $request->user()->fresh()?->role === 'admin', 403);
-            $record->forceFill($fields)->save();
-            if ($user && (! $fields['active'] || isset($fields['password'])) && config('session.driver') === 'database') {
+            $ids = array_unique(array_filter([$request->user()->id, $user]));
+            sort($ids);
+            DB::table('users')->whereIn('id', $ids)->orderBy('id')->lockForUpdate()->get();
+            Branches::authorize($request->user(), 'staff');
+            $target = $user ? User::lockForUpdate()->findOrFail($user) : $record;
+            $before = $target->only('role', 'active', 'can_reconcile');
+            $emailChanged = $user && $target->email !== $fields['email'];
+            $permissionChanged = $user && ($target->role !== $fields['role'] || (bool) $target->active !== (bool) $fields['active'] || (bool) $target->can_reconcile !== (bool) $fields['can_reconcile']);
+            $revoke = $user && ($permissionChanged || $emailChanged || isset($fields['password']));
+            $target->forceFill($fields);
+            if ($revoke) {
+                $target->authorization_version++;
+            }
+            $target->save();
+            Branches::audit($user ? 'user.updated' : 'user.created', ['user_id' => $target->id, 'before' => $user ? $before : null, 'after' => $target->only('role', 'active', 'can_reconcile'), 'password_changed' => isset($fields['password']), 'email_changed' => (bool) $emailChanged], actorId: $request->user()->id);
+            if ($revoke && config('session.driver') === 'database') {
                 DB::table(config('session.table'))->where('user_id', $user)->delete();
             }
         });

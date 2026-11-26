@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Models\User;
+use App\Services\Branches;
 use App\Services\PrivateStaging;
 use App\Services\PublicRenderingGateway;
 use App\Services\PublicSeo;
@@ -25,6 +26,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(Gateway::class, PublicRenderingGateway::class);
+        $this->app->scoped(Branches::class, fn () => new Branches);
     }
 
     public function boot(): void
@@ -33,9 +35,14 @@ class AppServiceProvider extends ServiceProvider
         Vite::createAssetPathsUsing(fn (string $path) => (PublicSeo::origin() ?? '').'/'.ltrim($path, '/'));
         TrustProxies::at(config('bakery.trusted_proxies'));
         Event::listen(MessageSending::class, PrivateStaging::class.'@checkOutgoingMail');
-        Gate::define('active-account', fn (User $user) => $user->active);
-        Gate::define('staff', fn (User $user) => $user->active && in_array($user->role, ['admin', 'staff'], true));
-        Gate::define('admin', fn (User $user) => $user->active && $user->role === 'admin');
+        Gate::define('active-account', fn (User $user) => (bool) $user->fresh()?->active);
+        Gate::define('staff', function (User $user) {
+            $fresh = $user->fresh();
+
+            return $fresh?->active && $fresh->isStaff()
+                && (! Branches::enabled() || count(Branches::allowedIds($fresh)) > 0);
+        });
+        Gate::define('admin', fn (User $user) => ($fresh = $user->fresh()) && $fresh->active && $fresh->role === 'admin');
 
         RateLimiter::for('login', fn (Request $request) => [
             Limit::perMinute(25)->by('ip:'.$request->ip()),

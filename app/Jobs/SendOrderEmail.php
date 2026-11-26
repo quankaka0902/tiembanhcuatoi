@@ -2,9 +2,11 @@
 
 namespace App\Jobs;
 
+use App\Services\Branches;
 use App\Services\OrderNotices;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class SendOrderEmail implements ShouldQueue
@@ -39,10 +41,17 @@ class SendOrderEmail implements ShouldQueue
 
     public function handle(): void
     {
-        $noticeId = $this->noticeId ?? OrderNotices::legacy($this->orderId, $this->status,
-            $this->deliveryKey ?? ('old-job:'.($this->job?->uuid() ?? $this->job?->getJobId() ?? $this->orderId.':'.$this->status)));
-        if ($noticeId !== null) {
-            OrderNotices::deliver($noticeId);
+        // A worker has no browser/session branch. Resolve only the persisted order.
+        $order = DB::table('orders')->find($this->orderId);
+        if (! $order) {
+            return;
         }
+        Branches::run((int) ($order->branch_id ?? 1), function () {
+            $noticeId = $this->noticeId ?? OrderNotices::legacy($this->orderId, $this->status,
+                $this->deliveryKey ?? ('old-job:'.($this->job?->uuid() ?? $this->job?->getJobId() ?? $this->orderId.':'.$this->status)));
+            if ($noticeId !== null && DB::table('order_notifications')->where('id', $noticeId)->where('order_id', $this->orderId)->exists()) {
+                OrderNotices::deliver($noticeId);
+            }
+        });
     }
 }

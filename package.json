@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "engines": { "node": "^22.12.0 || >=24" },
-  "scripts": { "dev": "vite", "build": "vite build", "build:ssr": "vite build --ssr", "test:ssr": "npm run build:ssr && node bootstrap/ssr/ssr.js --smoke", "lint": "eslint resources/js vite.config.js" },
+  "scripts": { "dev": "vite", "build": "vite build", "build:ssr": "vite build --ssr", "test:ssr": "npm run build:ssr && node bootstrap/ssr/ssr.js --smoke", "test:orders": "node --test tests/Frontend/order-location.test.js", "lint": "eslint resources/js vite.config.js" },
   "dependencies": { "@inertiajs/react": "^2.2.0", "lucide-react": "^0.577.0", "react": "^19.2.0", "react-dom": "^19.2.0" },
   "devDependencies": {
     "@eslint/js": "^9.39.0", "@tailwindcss/vite": "^4.2.0", "@vitejs/plugin-react": "^6.0.0",

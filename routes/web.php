@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Accounts;
+use App\Http\Controllers\AdminBranches;
 use App\Http\Controllers\AdminCatalog;
 use App\Http\Controllers\AdminConfig;
 use App\Http\Controllers\AdminOrders;
@@ -8,12 +9,14 @@ use App\Http\Controllers\AdminSchedule;
 use App\Http\Controllers\OrderChanges;
 use App\Http\Controllers\PublicPages;
 use App\Http\Controllers\Storefront;
+use App\Http\Middleware\ResolveBranch;
 use App\Http\Middleware\VerifyStaffFactor;
 use App\Services\ResponsiveImages;
 use Illuminate\Support\Facades\Route;
 
 Route::controller(Storefront::class)->group(function () {
     Route::get('/', 'home');
+    Route::post('/co-so/chon', 'selectBranch')->block();
     Route::get('/thuc-don', 'catalog');
     Route::get('/thuc-don/{categorySlug}', 'catalog')->where('categorySlug', '[a-z0-9]+(?:-[a-z0-9]+)*');
     Route::get('/banh/{slug}', 'product');
@@ -72,6 +75,15 @@ Route::middleware('guest')->group(function () {
 Route::post('/dang-xuat', [Accounts::class, 'logout'])->middleware('auth');
 
 Route::prefix('quan-tri')->middleware(['auth', 'can:staff', VerifyStaffFactor::class])->group(function () {
+    Route::post('/chon-co-so', [ResolveBranch::class, 'selectAdmin'])->block();
+    Route::get('/thuc-don-co-so', [AdminCatalog::class, 'branchCatalog']);
+    Route::patch('/thuc-don-co-so/{variant}', [AdminCatalog::class, 'saveBranchVariant'])->whereNumber('variant');
+    Route::get('/ton-kho', [AdminCatalog::class, 'inventory']);
+    Route::get('/cai-dat', [AdminConfig::class, 'settings']);
+    Route::post('/cai-dat', [AdminConfig::class, 'saveSettings']);
+    Route::post('/nhan-don', [AdminConfig::class, 'saveIntake']);
+    Route::get('/ma-giam/{coupon?}', [AdminConfig::class, 'coupons'])->whereNumber('coupon');
+    Route::post('/ma-giam/{coupon?}', [AdminConfig::class, 'saveCoupon'])->whereNumber('coupon');
     Route::patch('/yeu-cau-don/{requestId}', [OrderChanges::class, 'resolve'])->whereNumber('requestId');
     Route::get('/lich-lam-banh', AdminSchedule::class);
 
@@ -89,9 +101,11 @@ Route::prefix('quan-tri')->middleware(['auth', 'can:staff', VerifyStaffFactor::c
     });
 
     Route::middleware('can:admin')->group(function () {
+        Route::get('/co-so', [AdminBranches::class, 'index']);
+        Route::post('/co-so/{branch?}', [AdminBranches::class, 'save'])->whereNumber('branch');
+        Route::post('/phan-cong-co-so', [AdminBranches::class, 'membership']);
         Route::get('/email-don', [AdminOrders::class, 'mail']);
         Route::controller(AdminCatalog::class)->group(function () {
-            Route::get('/ton-kho', 'inventory');
             Route::get('/san-pham', 'index');
             Route::get('/san-pham/them', 'edit');
             Route::get('/san-pham/{product}', 'edit')->whereNumber('product');
@@ -99,11 +113,6 @@ Route::prefix('quan-tri')->middleware(['auth', 'can:staff', VerifyStaffFactor::c
             Route::post('/danh-muc/{category?}', 'category')->whereNumber('category');
         });
         Route::controller(AdminConfig::class)->group(function () {
-            Route::get('/cai-dat', 'settings');
-            Route::post('/cai-dat', 'saveSettings');
-            Route::post('/nhan-don', 'saveIntake');
-            Route::get('/ma-giam/{coupon?}', 'coupons')->whereNumber('coupon');
-            Route::post('/ma-giam/{coupon?}', 'saveCoupon')->whereNumber('coupon');
             Route::get('/nhan-su/{user?}', 'users')->whereNumber('user');
             Route::post('/nhan-su/{user?}', 'saveUser')->whereNumber('user');
         });

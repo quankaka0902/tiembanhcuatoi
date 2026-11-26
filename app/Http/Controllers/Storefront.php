@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Jobs\SendOrderEmail;
+use App\Services\Branches;
 use App\Services\Catalog;
 use App\Services\Checkout;
 use App\Services\OrderRequests;
@@ -21,6 +22,25 @@ use Throwable;
 
 class Storefront extends Controller
 {
+    public function selectBranch(Request $request)
+    {
+        abort_unless(Branches::enabled(), 404);
+        $fields = $request->validate(['branch_id' => 'required|integer|min:1', 'confirm_clear' => 'sometimes|boolean']);
+        $branch = Branches::find((int) $fields['branch_id']);
+        abort_unless($branch && $branch->active, 404);
+        $cartAtAnotherBranch = $request->session()->get('cart') && (int) $request->session()->get('cart_branch_id', 1) !== (int) $branch->id;
+        if ((int) $branch->id !== Branches::id() || $cartAtAnotherBranch) {
+            if ($request->session()->get('cart') && ! ($fields['confirm_clear'] ?? false)) {
+                throw ValidationException::withMessages(['branch_id' => 'Đổi cơ sở sẽ xóa giỏ hiện tại. Hãy xác nhận trước khi đổi.']);
+            }
+            $request->session()->forget(['cart', 'cart_branch_id', 'checkout_key']);
+            $request->session()->put('branch_id', (int) $branch->id);
+            Branches::use((int) $branch->id);
+        }
+
+        return redirect('/thuc-don')->with('notice', 'Đã chọn cơ sở '.$branch->name.'. Giá, tồn và lịch nhận áp dụng theo cơ sở này.');
+    }
+
     public function home()
     {
         return Inertia::render('Home', [
@@ -102,8 +122,8 @@ class Storefront extends Controller
             return redirect()->away($destination, 301);
         }
         $product = Catalog::images($product);
-        $product->variants = DB::table('variants')->where('product_id', $product->id)->where('active', true)
-            ->orderBy('id')->get(['id', 'name', 'price', 'stock', 'size_label', 'servings_min', 'servings_max', 'servings_verified']);
+        $product->variants = Catalog::variants()->where('product_id', $product->id)
+            ->orderBy('id')->get(['id', 'name', 'price', 'stock', 'size_label', 'servings_min', 'servings_max', 'servings_verified', ...(Branches::enabled() ? ['prep_minutes'] : [])]);
         $rules = Catalog::filterRules();
         $rules['max'] = 'nullable|integer|min:0|max:100000000'.($request->filled('min') ? '|gte:min' : '');
         $filters = $request->validate($rules);
@@ -120,17 +140,21 @@ class Storefront extends Controller
 
     public function cart(Request $request, Checkout $checkout)
     {
+        $this->guardCartBranch($request);
+
         return Inertia::render('Cart', ['lines' => $checkout->cart($request->session()->get('cart', []))]);
     }
 
     public function saveLine(Request $request, Checkout $checkout, ?string $line = null)
     {
+        $this->guardCartBranch($request);
         $cart = $request->session()->get('cart', []);
         abort_if($line !== null && ! isset($cart[$line]), 404);
         $data = $request->validate([
             'variant_id' => 'required|integer|exists:variants,id', 'quantity' => 'required|integer|min:1|max:30',
             'message' => 'nullable|string|max:60', 'note' => 'nullable|string|max:250',
             'accessories' => 'sometimes|array|max:20', 'accessories.*' => 'required|integer|distinct|min:1',
+            'branch_id' => [Branches::enabled() ? 'required' : 'sometimes', 'integer', Rule::in([Branches::id()])],
         ]);
         $data = [
             'variant_id' => (int) $data['variant_id'], 'quantity' => (int) $data['quantity'],
@@ -160,7 +184,7 @@ class Storefront extends Controller
             throw ValidationException::withMessages(['message' => 'Bánh này không hỗ trợ ghi lời chúc.']);
         }
 
-        $request->session()->put(['cart' => $cart, 'checkout_key' => (string) Str::uuid()]);
+        $request->session()->put(['cart' => $cart, 'cart_branch_id' => Branches::id(), 'checkout_key' => (string) Str::uuid()]);
 
         return redirect($line ? '/gio-hang' : '/banh/'.$updated['slug'])
             ->with('notice', $line ? 'Đã cập nhật giỏ hàng.' : 'Đã thêm bánh vào giỏ.');
@@ -177,6 +201,7 @@ class Storefront extends Controller
 
     public function checkout(Request $request, Checkout $checkout)
     {
+        $this->guardCartBranch($request);
         $settings = Store::settings();
         if (! $settings['accepting_orders']) {
             return redirect('/gio-hang');
@@ -195,11 +220,14 @@ class Storefront extends Controller
             'regions' => $settings['regions'], 'bankEnabled' => Store::bank($settings) !== null, 'keyToken' => $key,
             'policy' => $settings['order_policy'],
             'privacy' => $settings['privacy_notice'],
+            'fulfillments' => $settings['fulfillments'] ?? ['pickup', 'delivery'],
+            'paymentMethods' => $settings['payment_methods'] ?? ['cod', 'bank'],
         ]);
     }
 
     public function quote(Request $request, Checkout $checkout)
     {
+        $this->guardCartBranch($request);
         $data = $request->validate($this->quoteRules());
         $lines = $checkout->cart($request->session()->get('cart', []));
         $quote = $checkout->quote($lines, $data, Store::settings());
@@ -213,13 +241,14 @@ class Storefront extends Controller
             'line_totals' => array_column($lines, 'subtotal', 'key'),
             'slots' => $lines && ! collect($lines)->contains('available', false)
                 ? $checkout->availableSlots(Store::settings(), max(array_column($lines, 'prep_minutes'))) : [],
-            'quote_token' => $checkout->quoteToken($quote, $lines, $key),
+            'quote_token' => $checkout->quoteToken($quote, $lines, $key, $data),
         ])->header('Cache-Control', 'private, no-store');
     }
 
     public function place(Request $request, Checkout $checkout)
     {
         try {
+            $this->guardCartBranch($request);
             $fields = $request->validate([
                 ...$this->quoteRules(), 'key' => 'required|uuid', 'name' => 'required|string|max:120',
                 'email' => 'required|email|max:254', 'phone' => ['required', 'string', 'regex:/^(?:\+84|0)[0-9]{9,10}$/'],
@@ -238,7 +267,7 @@ class Storefront extends Controller
         } catch (ValidationException $failure) {
             throw $failure->redirectTo('/dat-banh');
         }
-        $request->session()->forget('cart');
+        $request->session()->forget(['cart', 'cart_branch_id']);
 
         return redirect(Orders::link($order));
     }
@@ -269,7 +298,7 @@ class Storefront extends Controller
             'code' => 'required|string|max:22|regex:/^[a-zA-Z0-9-]+$/',
             'email' => 'required|email|max:254',
         ]);
-        $order = Orders::query()->where('code', Str::upper($fields['code']))->first(['id', 'email']);
+        $order = DB::table('orders')->where('code', Str::upper($fields['code']))->first(['id', 'email']);
         if ($order && hash_equals(Str::lower(trim($order->email)), Str::lower($fields['email']))) {
             try {
                 Bus::dispatch(new SendOrderEmail($order->id));
@@ -283,7 +312,7 @@ class Storefront extends Controller
 
     public function tracked(string $token)
     {
-        $order = Orders::query()->where('tracking_token', $token)->first();
+        $order = DB::table('orders')->where('tracking_token', $token)->first();
         abort_unless($order, 404);
 
         return $this->orderResponse($order);
@@ -291,7 +320,7 @@ class Storefront extends Controller
 
     public function history(Request $request)
     {
-        $orders = Orders::query()->where('user_id', $request->user()->id)->latest('id')
+        $orders = DB::table('orders')->where('user_id', $request->user()->id)->latest('id')
             ->paginate(12, ['code', 'status', 'payment', 'total', 'created_at']);
 
         return Inertia::render('History', ['orders' => $orders, 'statuses' => Orders::STATUSES])->toResponse($request)->header('Cache-Control', 'private, no-store');
@@ -304,6 +333,9 @@ class Storefront extends Controller
 
     public function reorder(Request $request, string $code, Checkout $checkout)
     {
+        $request->validate(['branch_id' => [Branches::enabled() ? 'required' : 'sometimes', 'integer', Rule::in([Branches::id()])]]);
+        $this->guardCartBranch($request);
+        $this->guardCartBranch($request);
         $order = $this->ownedOrder($request, $code);
         $items = DB::table('order_items')->where('order_id', $order->id)->orderBy('id')->get(['variant_id', 'quantity']);
         [$cart, $added, $skipped] = $checkout->reorder($request->session()->get('cart', []), $items);
@@ -311,8 +343,8 @@ class Storefront extends Controller
             return back()->with('notice', 'Giỏ đã đầy hoặc các bánh trong đơn này hiện không còn đủ tồn để thêm.');
         }
 
-        $request->session()->put(['cart' => $cart, 'checkout_key' => (string) Str::uuid()]);
-        $notice = "Đã thêm {$added} bánh vào giỏ theo giá hiện tại.";
+        $request->session()->put(['cart' => $cart, 'cart_branch_id' => Branches::id(), 'checkout_key' => (string) Str::uuid()]);
+        $notice = "Đã thêm {$added} bánh vào giỏ theo giá hiện tại của cơ sở đang chọn.";
         if ($skipped > 0) {
             $notice .= " Còn {$skipped} bánh chưa thể thêm do tồn kho, trạng thái bán hoặc giới hạn giỏ hàng.";
         }
@@ -322,7 +354,7 @@ class Storefront extends Controller
 
     private function ownedOrder(Request $request, string $code): object
     {
-        $order = Orders::query()->where('user_id', $request->user()->id)->where('code', $code)->first();
+        $order = DB::table('orders')->where('user_id', $request->user()->id)->where('code', $code)->first();
         abort_unless($order, 404);
 
         return $order;
@@ -330,12 +362,26 @@ class Storefront extends Controller
 
     private function orderResponse(object $order, bool $canReorder = false)
     {
-        return Inertia::render('Order', [
+        $props = Branches::run((int) ($order->branch_id ?? 1), fn () => [
             'order' => Orders::detail($order, owner: $canReorder), 'statuses' => Orders::STATUSES, 'payments' => Orders::PAYMENTS,
             'trackingLink' => Orders::link($order), 'canReorder' => $canReorder,
             ...OrderRequests::customerData($order, $canReorder ? request()->user() : null),
-        ])->toResponse(request())->header('Cache-Control', 'private, no-store')
+        ]);
+
+        return Inertia::render('Order', $props)->toResponse(request())->header('Cache-Control', 'private, no-store')
             ->header('Referrer-Policy', 'no-referrer')->header('X-Robots-Tag', 'noindex, nofollow');
+    }
+
+    private function guardCartBranch(Request $request): void
+    {
+        if (! Branches::enabled() || ! $request->session()->get('cart')) {
+            return;
+        }
+        // Pre-migration carts belong to the original branch; never silently reprice them at another branch.
+        $branchId = (int) $request->session()->get('cart_branch_id', 1);
+        if ($branchId !== Branches::id()) {
+            throw ValidationException::withMessages(['cart' => 'Giỏ đang thuộc cơ sở khác. Chọn lại cơ sở của giỏ hoặc xác nhận đổi cơ sở để tạo giỏ mới.']);
+        }
     }
 
     private function quoteRules(): array
@@ -344,6 +390,9 @@ class Storefront extends Controller
             'fulfillment' => ['required', Rule::in(['pickup', 'delivery'])],
             'region' => 'nullable|required_if:fulfillment,delivery|string|max:60',
             'coupon' => 'nullable|string|max:32',
+            'branch_id' => [Branches::enabled() ? 'required' : 'sometimes', 'integer', Rule::in([Branches::id()])],
+            'method' => 'sometimes|required|in:cod,bank',
+            'slot' => 'nullable|date_format:Y-m-d H:i',
         ];
     }
 }

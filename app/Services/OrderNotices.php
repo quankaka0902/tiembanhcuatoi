@@ -27,6 +27,9 @@ class OrderNotices
             if (! $order) {
                 throw new RuntimeException('Không tìm thấy đơn để tạo thông báo.');
             }
+            if ($eventId !== null && ! DB::table('order_events')->where('id', $eventId)->where('order_id', $orderId)->exists()) {
+                throw new RuntimeException('Sự kiện thông báo không thuộc đơn hàng.');
+            }
             [$subject, $body] = self::content($order, $type, $payload);
             $key = hash('sha256', $orderId.'|'.$type.'|'.($dedupeKey ?? ($eventId !== null ? 'event:'.$eventId : (string) Str::uuid())));
             $created = DB::table('order_notifications')->insertOrIgnore([
@@ -146,6 +149,18 @@ class OrderNotices
         }
         if (in_array($type, ['request_approved', 'request_rejected'], true) && filled($payload['response_message'] ?? null)) {
             $body .= "\n\nPhản hồi của tiệm: ".$payload['response_message'];
+        }
+        $location = isset($order->branch_snapshot) && $order->branch_snapshot
+            ? json_decode($order->branch_snapshot, true, flags: JSON_THROW_ON_ERROR) : null;
+        if ($location && filled($location['name'] ?? null)) {
+            $body .= "\n\nCơ sở xử lý đơn: ".$location['name'];
+            foreach (['address' => 'Địa chỉ', 'phone' => 'Điện thoại'] as $field => $label) {
+                if (filled($location[$field] ?? null)) {
+                    $body .= "\n".$label.': '.$location[$field];
+                }
+            }
+        } elseif (Branches::enabled()) {
+            $body .= "\n\nCơ sở xử lý đơn: #".($order->branch_id ?? 1).'. Thông tin tại lúc đặt chưa có bản chụp đầy đủ.';
         }
 
         return [$subject, $body."\n\nThông báo ghi nhận lúc ".now()->format('H:i d/m/Y').'.'

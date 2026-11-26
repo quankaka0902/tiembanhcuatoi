@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Jobs\SendOrderEmail;
+use App\Services\Branches;
 use App\Services\Checkout;
 use App\Services\OrderRequests;
 use App\Services\Orders;
@@ -19,24 +20,28 @@ class AdminOrders extends Controller
 {
     public function dashboard(Request $request)
     {
+        Branches::authorize($request->user(), 'view_orders');
+        $chain = $this->chain($request);
         $filters = $this->filters($request);
-        $orders = $this->dateRange(Orders::query(), $filters, 'created_at');
-        $revenue = $this->dateRange($this->completedSales(), $filters, 'completed_at');
-        $low = DB::table('variants')->join('products', 'products.id', '=', 'variants.product_id')
-            ->where('products.active', true)->where('variants.active', true)->where('variants.stock', '<=', 5);
+        $orders = $this->dateRange($this->orderQuery($chain), $filters, 'created_at');
+        $revenue = $this->dateRange($this->completedSales($chain), $filters, 'completed_at');
+        $low = $this->lowStock($chain);
 
         return Inertia::render('AdminDashboard', [
             'filters' => $filters, 'total' => (clone $orders)->count(), 'revenue' => (int) $revenue->sum('total'),
             'working' => (clone $orders)->whereIn('status', ['pending', 'confirmed', 'preparing', 'ready', 'shipping', 'delivery_failed', 'uncollected'])->count(),
             'lowCount' => (clone $low)->count(),
             'low' => $low->orderBy('variants.stock')->limit(25)->get(['products.id as product_id', 'products.name as product_name', 'variants.name', 'variants.stock']),
-            'recent' => $orders->latest('id')->limit(6)->get(['id', 'code', 'name', 'status', 'payment', 'total']),
+            'recent' => $orders->latest('id')->limit(6)->get(['id', 'code', 'name', 'status', 'payment', 'total', ...(Branches::enabled() ? ['branch_id'] : [])]),
             'statuses' => Orders::STATUSES,
+            'scope' => $chain ? 'chain' : 'branch',
         ]);
     }
 
     public function index(Request $request)
     {
+        Branches::authorize($request->user(), 'view_orders');
+        abort_if($request->input('scope') === 'chain', 403);
         $filters = $this->filters($request);
 
         return Inertia::render('AdminOrders', [
@@ -47,6 +52,7 @@ class AdminOrders extends Controller
 
     public function inbox(Request $request)
     {
+        Branches::authorize($request->user(), 'view_orders');
         $fields = $request->validate(['filter' => 'nullable|in:new,overdue,refund,requests,exception,inventory']);
         $filter = $fields['filter'] ?? 'new';
         $new = Orders::query()->where('status', 'pending');
@@ -79,6 +85,7 @@ class AdminOrders extends Controller
 
     public function mail(Request $request)
     {
+        Branches::authorize($request->user(), 'chain');
         $connection = SendOrderEmail::CONNECTION;
         $queue = config("queue.connections.{$connection}.queue");
         $jobs = DB::table(config("queue.connections.{$connection}.table"))->where('queue', $queue);
@@ -96,12 +103,14 @@ class AdminOrders extends Controller
 
     public function reports(Request $request)
     {
+        Branches::authorize($request->user(), 'reports');
+        $chain = $this->chain($request);
         $filters = $request->validate($this->dateRules($request));
         if (empty($filters['from']) && empty($filters['to'])) {
             $today = now();
             $filters = ['from' => $today->copy()->startOfMonth()->toDateString(), 'to' => $today->toDateString()];
         }
-        $orders = $this->dateRange($this->completedSales()->whereNotNull('completed_at'), $filters, 'orders.completed_at');
+        $orders = $this->dateRange($this->completedSales($chain)->whereNotNull('completed_at'), $filters, 'orders.completed_at');
         $report = DB::transaction(function () use ($orders) {
             $summary = (clone $orders)->selectRaw('COUNT(*) AS order_count, COALESCE(SUM(total), 0) AS revenue')->first();
             $days = (clone $orders)->selectRaw('DATE(completed_at) AS day, COUNT(*) AS order_count, SUM(total) AS revenue')
@@ -119,12 +128,13 @@ class AdminOrders extends Controller
             ];
         });
 
-        return Inertia::render('AdminReports', ['filters' => $filters, ...$report])
+        return Inertia::render('AdminReports', ['filters' => $filters, 'scope' => $chain ? 'chain' : 'branch', ...$report])
             ->toResponse($request)->header('Cache-Control', 'private, no-store');
     }
 
     public function reconciliation(Request $request)
     {
+        Branches::authorize($request->user(), Branches::enabled() ? 'reconcile' : 'view_orders');
         $fields = $request->validate(['filter' => 'nullable|in:pending,overdue']);
         $filter = $fields['filter'] ?? 'pending';
         $now = now()->toDateTimeString();
@@ -150,24 +160,41 @@ class AdminOrders extends Controller
 
     public function show(Request $request, int $order, Checkout $checkout)
     {
+        Branches::authorize($request->user(), 'view_orders');
         $row = Orders::query()->find($order);
         abort_unless($row, 404);
 
-        $manager = $request->user()->role === 'admin';
+        $manager = Branches::isManager($request->user());
+        $canProcess = Branches::can($request->user(), 'orders');
         $settings = Store::settings();
         $detail = Orders::detail($row, internal: true);
         if (! Orders::canReconcile($request->user())) {
             unset($detail['refund_evidence']);
         }
+        if (Branches::enabled() && Branches::role($request->user()) === 'accountant') {
+            foreach (['email', 'phone', 'address', 'note', 'inventory_dispositions'] as $private) {
+                unset($detail[$private]);
+            }
+            $detail['items'] = $detail['items']->map(function ($item) {
+                unset($item->message, $item->note);
+
+                return $item;
+            });
+            $detail['events'] = $detail['events']->map(function ($event) {
+                unset($event->note);
+
+                return $event;
+            });
+        }
 
         return Inertia::render('AdminOrder', [
             'order' => $detail, 'statuses' => Orders::STATUSES, 'payments' => Orders::PAYMENTS,
-            'next' => array_values(array_filter(Orders::next($row), fn ($next) => $next !== 'cancelled' || $manager || Orders::canCustomerRequest($row))),
+            'next' => $canProcess ? array_values(array_filter(Orders::next($row), fn ($next) => $next !== 'cancelled' || $manager || Orders::canCustomerRequest($row))) : [],
             'reconcile' => Orders::canReconcile($request->user()),
             'manager' => $manager, 'prepayRequired' => Orders::prepayRequired($row, $settings),
             'prepayExceptionAllowed' => (bool) $settings['allow_payment_override'],
-            'changeRequests' => OrderRequests::history($order, internal: true),
-            'rescheduleSlots' => Orders::canReschedule($row, $manager) && $row->prep_minutes_snapshot !== null && ($manager || Orders::canCustomerRequest($row))
+            'changeRequests' => $canProcess ? OrderRequests::history($order, internal: true) : [],
+            'rescheduleSlots' => $canProcess && Orders::canReschedule($row, $manager) && $row->prep_minutes_snapshot !== null && ($manager || Orders::canCustomerRequest($row))
                 ? array_values(array_diff($checkout->availableSlots($settings, Orders::prepMinutes($order)), [substr($row->scheduled_at, 0, 16)]))
                 : null,
         ])->toResponse($request)->header('Cache-Control', 'private, no-store');
@@ -193,7 +220,8 @@ class AdminOrders extends Controller
 
     public function disposeInventory(Request $request, int $order)
     {
-        abort_unless($request->user()->role === 'admin', 403);
+        Branches::authorize($request->user(), 'inventory');
+        abort_unless(Branches::isManager($request->user()), 403);
         $fields = $request->validate([
             'items' => 'required|array|min:1|max:100', 'items.*' => 'required|array:item_id,unmade,sellable,waste',
             'items.*.item_id' => 'required|integer|distinct|min:1',
@@ -208,6 +236,7 @@ class AdminOrders extends Controller
 
     public function reschedule(Request $request, int $order, Checkout $checkout)
     {
+        Branches::authorize($request->user(), 'orders');
         $url = '/quan-tri/don-hang/'.$order;
         try {
             $fields = $request->validate([
@@ -224,16 +253,21 @@ class AdminOrders extends Controller
 
     public function export(Request $request)
     {
-        $query = $this->filtered($this->filters($request));
+        Branches::authorize($request->user(), 'export');
+        $query = $this->filtered($this->filters($request), $this->chain($request));
+        $branchCodes = Branches::enabled()
+            ? DB::table('branches')->whereIn('id', Branches::allowedIds($request->user()))->pluck('code', 'id')->all()
+            : null;
 
-        return response()->streamDownload(function () use ($query) {
+        return response()->streamDownload(function () use ($query, $branchCodes) {
             $file = fopen('php://output', 'wb');
             fwrite($file, "\xEF\xBB\xBF");
-            fputcsv($file, ['Mã đơn', 'Ngày đặt', 'Khách hàng', 'Trạng thái', 'Thanh toán', 'Tổng VND'], escape: '');
-            $query->reorder('id', 'desc')->chunkByIdDesc(250, function ($orders) use ($file) {
+            fputcsv($file, ['Mã đơn', 'Ngày đặt', 'Khách hàng', 'Trạng thái', 'Thanh toán', 'Tổng VND', ...($branchCodes === null ? [] : ['Cơ sở'])], escape: '');
+            $query->reorder('id', 'desc')->chunkByIdDesc(250, function ($orders) use ($file, $branchCodes) {
                 foreach ($orders as $order) {
                     $name = preg_match('/^(?:\s*[=+@-]|[\t\r\n])/', $order->name) ? "'".$order->name : $order->name;
-                    fputcsv($file, [$order->code, $order->created_at, $name, Orders::STATUSES[$order->status], Orders::PAYMENTS[$order->payment], $order->total], escape: '');
+                    $location = $branchCodes === null ? [] : [($order->branch_id ?? 1).' · '.($branchCodes[$order->branch_id ?? 1] ?? '')];
+                    fputcsv($file, [$order->code, $order->created_at, $name, Orders::STATUSES[$order->status], Orders::PAYMENTS[$order->payment], $order->total, ...$location], escape: '');
                 }
             });
             fclose($file);
@@ -257,14 +291,47 @@ class AdminOrders extends Controller
         ];
     }
 
-    private function completedSales(): Builder
+    private function chain(Request $request): bool
     {
-        return Orders::query()->where('orders.status', 'completed')->where('orders.payment', 'paid');
+        $fields = $request->validate(['scope' => 'nullable|in:branch,chain']);
+        if (($fields['scope'] ?? 'branch') !== 'chain') {
+            return false;
+        }
+        Branches::authorize($request->user(), 'chain');
+
+        return Branches::enabled();
     }
 
-    private function filtered(array $filters): Builder
+    private function orderQuery(bool $chain = false): Builder
     {
-        return $this->dateRange(Orders::query(), $filters, 'created_at')
+        return $chain
+            ? DB::table('orders')->whereIn('orders.branch_id', Branches::allowedIds(request()->user()))
+            : Orders::query();
+    }
+
+    private function lowStock(bool $chain): Builder
+    {
+        if (! Branches::enabled()) {
+            return DB::table('variants')->join('products', 'products.id', '=', 'variants.product_id')
+                ->where('products.active', true)->where('variants.active', true)->where('variants.stock', '<=', 5);
+        }
+
+        return DB::table('branch_variants as variants')
+            ->join('variants as menu_variants', 'menu_variants.id', '=', 'variants.variant_id')
+            ->join('products', 'products.id', '=', 'menu_variants.product_id')
+            ->where('products.active', true)->where('menu_variants.active', true)->where('variants.active', true)
+            ->whereIn('variants.branch_id', $chain ? Branches::allowedIds(request()->user()) : [Branches::id()])
+            ->where('variants.stock', '<=', 5)->select('products.id as product_id', 'products.name as product_name', 'menu_variants.name', 'variants.stock', 'variants.branch_id');
+    }
+
+    private function completedSales(bool $chain = false): Builder
+    {
+        return $this->orderQuery($chain)->where('orders.status', 'completed')->where('orders.payment', 'paid');
+    }
+
+    private function filtered(array $filters, bool $chain = false): Builder
+    {
+        return $this->dateRange($this->orderQuery($chain), $filters, 'created_at')
             ->when($filters['code'] ?? null, fn ($query, $code) => $query->where('code', 'like', strtoupper($code).'%'))
             ->when($filters['status'] ?? null, fn ($query, $status) => $query->where('status', $status))
             ->latest('id');

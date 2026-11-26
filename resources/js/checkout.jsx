@@ -2,9 +2,11 @@ import { Link, router, useForm, usePage } from '@inertiajs/react';
 import { ArrowLeft, ArrowRight, Banknote, CalendarClock, Check, Clipboard, CreditCard, MapPin, Search, ShoppingBag, ShoppingCart, Store, Trash2, Truck } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Breadcrumb, ButtonLink, date as formatDate, dateTime, Empty, ErrorList, Field, Image, Layout, money, Pagination, Pill } from './ui';
+import { orderLocation } from './order-location';
 
 function CartLine({ line }) {
-    const form = useForm({ variant_id: line.variant_id, quantity: line.quantity, message: line.message ?? '', note: line.note ?? '', accessories: (line.accessories ?? []).map(item => Number(item.id)) });
+    const { shop } = usePage().props;
+    const form = useForm({ branch_id: shop.branch?.id ?? 1, variant_id: line.variant_id, quantity: line.quantity, message: line.message ?? '', note: line.note ?? '', accessories: (line.accessories ?? []).map(item => Number(item.id)) });
     const variant = line.choices.find(choice => Number(choice.id) === Number(form.data.variant_id));
     const choices = line.accessory_choices ?? [];
     const stockUnavailable = line.stock_available === undefined ? !line.available : !line.stock_available;
@@ -107,10 +109,10 @@ function CheckoutSchedule({ slots, form, selectedSlot, refreshing, onRefresh, on
     </fieldset>;
 }
 
-export function Checkout({ lines, slots, regions, bankEnabled, keyToken, policy, privacy }) {
+export function Checkout({ lines, slots, regions, bankEnabled, keyToken, policy, privacy, fulfillments = ['pickup', 'delivery'], paymentMethods = ['cod', 'bank'] }) {
     const { auth, shop } = usePage().props;
     const subtotal = lines.reduce((sum, line) => sum + Number(line.subtotal), 0);
-    const form = useForm({ key: keyToken, name: auth?.name ?? '', email: auth?.email ?? '', phone: '', fulfillment: 'pickup', region: '', address: '', slot: '', method: 'cod', coupon: '' });
+    const form = useForm({ key: keyToken, branch_id: shop.branch?.id ?? 1, name: auth?.name ?? '', email: auth?.email ?? '', phone: '', fulfillment: fulfillments[0] ?? 'pickup', region: '', address: '', slot: '', method: paymentMethods.includes('cod') ? 'cod' : 'bank', coupon: '' });
     const { fulfillment, region } = form.data;
     const [appliedCode, setAppliedCode] = useState('');
     const [quoteAttempt, setQuoteAttempt] = useState(0);
@@ -120,7 +122,7 @@ export function Checkout({ lines, slots, regions, bankEnabled, keyToken, policy,
     const [submissionError, setSubmissionError] = useState('');
     const submissionActive = useRef(false);
     const scheduleRefreshActive = useRef(false);
-    const quoteKey = JSON.stringify({ fulfillment, region, coupon: appliedCode });
+    const quoteKey = JSON.stringify({ branch_id: form.data.branch_id, fulfillment, region, coupon: appliedCode, method: form.data.method, slot: form.data.slot || null });
     const attemptKey = JSON.stringify([keyToken, quoteKey, quoteAttempt]);
     const waitingForRegion = fulfillment === 'delivery' && !region;
     const displayed = quoteResult?.key === attemptKey ? quoteResult : null;
@@ -163,7 +165,7 @@ export function Checkout({ lines, slots, regions, bankEnabled, keyToken, policy,
             if (response.status !== 422 && !response.ok) return { error: connectionError };
             const data = await response.json();
             if (response.ok && typeof data.quote_token === 'string') return { data };
-            const field = ['coupon', 'cart', 'region', 'fulfillment'].find(name => data.errors?.[name]);
+            const field = ['coupon', 'cart', 'branch_id', 'region', 'fulfillment', 'method', 'slot'].find(name => data.errors?.[name]);
             const error = field && data.errors[field];
             return { field, error: (Array.isArray(error) ? error[0] : error) || connectionError };
         }).then(result => {
@@ -246,8 +248,8 @@ export function Checkout({ lines, slots, regions, bankEnabled, keyToken, policy,
                     <fieldset className="checkout-choice-group" id="checkout-fulfillment" tabIndex={-1} aria-describedby={fieldErrors.fulfillment ? 'checkout-fulfillment-error' : undefined}>
                         <legend className="visually-hidden">Chọn cách nhận bánh</legend>
                         <div className="choices">
-                            <label><input type="radio" name="fulfillment" value="pickup" checked={fulfillment === 'pickup'} onChange={e => { form.setData('fulfillment', e.target.value); form.clearErrors('fulfillment', 'region', 'address'); }} /><Store size={19} aria-hidden="true" />Nhận tại tiệm</label>
-                            <label><input type="radio" name="fulfillment" value="delivery" checked={fulfillment === 'delivery'} onChange={e => { form.setData('fulfillment', e.target.value); form.clearErrors('fulfillment'); }} disabled={!regions.length} /><Truck size={19} aria-hidden="true" />Giao tận nơi</label>
+                            {fulfillments.includes('pickup') && <label><input type="radio" name="fulfillment" value="pickup" checked={fulfillment === 'pickup'} onChange={e => { form.setData('fulfillment', e.target.value); form.clearErrors('fulfillment', 'region', 'address'); }} /><Store size={19} aria-hidden="true" />Nhận tại tiệm</label>}
+                            {fulfillments.includes('delivery') && <label><input type="radio" name="fulfillment" value="delivery" checked={fulfillment === 'delivery'} onChange={e => { form.setData('fulfillment', e.target.value); form.clearErrors('fulfillment'); }} disabled={!regions.length} /><Truck size={19} aria-hidden="true" />Giao tận nơi</label>}
                         </div>
                         {fieldErrors.fulfillment && <small className="field-error" id="checkout-fulfillment-error">{fieldErrors.fulfillment}</small>}
                     </fieldset>
@@ -263,8 +265,8 @@ export function Checkout({ lines, slots, regions, bankEnabled, keyToken, policy,
                 <section className="panel form-stack"><h2>Thanh toán</h2>
                     <fieldset className="checkout-choice-group" id="checkout-method" tabIndex={-1} aria-describedby={form.errors.method ? 'checkout-method-error' : undefined}>
                         <legend className="visually-hidden">Chọn phương thức thanh toán</legend><div className="choices">
-                            <label><input type="radio" name="method" value="cod" checked={form.data.method === 'cod'} onChange={e => { form.setData('method', e.target.value); form.clearErrors('method'); }} /><Banknote size={19} aria-hidden="true" />Khi nhận bánh</label>
-                            {bankEnabled && <label><input type="radio" name="method" value="bank" checked={form.data.method === 'bank'} onChange={e => { form.setData('method', e.target.value); form.clearErrors('method'); }} /><CreditCard size={19} aria-hidden="true" />Chuyển khoản</label>}
+                            {paymentMethods.includes('cod') && <label><input type="radio" name="method" value="cod" checked={form.data.method === 'cod'} onChange={e => { form.setData('method', e.target.value); form.clearErrors('method'); }} /><Banknote size={19} aria-hidden="true" />Khi nhận bánh</label>}
+                            {bankEnabled && paymentMethods.includes('bank') && <label><input type="radio" name="method" value="bank" checked={form.data.method === 'bank'} onChange={e => { form.setData('method', e.target.value); form.clearErrors('method'); }} /><CreditCard size={19} aria-hidden="true" />Chuyển khoản</label>}
                         </div>
                         {form.errors.method && <small className="field-error" id="checkout-method-error">{form.errors.method}</small>}
                     </fieldset>
@@ -464,7 +466,8 @@ export function OrderAction({ expired, ...props }) {
 
 export function Order({ order, statuses, payments, trackingLink, canReorder, changeRequest, changeRequests = [], expiresAt, actionMode = false }) {
     const { shop } = usePage().props;
-    const reorder = useForm({});
+    const location = orderLocation(order);
+    const reorder = useForm({ branch_id: shop.branch?.id ?? 1 });
     const awaitingTransfer = order.bank_snapshot && order.payment === 'unpaid' && order.status !== 'cancelled';
     const nextStep = {
         pending: 'Tiệm sẽ xác nhận bánh và giờ hẹn. Hãy lưu mã đơn để theo dõi.',
@@ -479,7 +482,9 @@ export function Order({ order, statuses, payments, trackingLink, canReorder, cha
     return <Layout title={'Đơn ' + order.code}><div className="wrap page">
         <Breadcrumb>{canReorder ? <Link href="/don-cua-toi">Đơn của tôi</Link> : <Link href="/tra-cuu">Tra cứu đơn</Link>}<span aria-hidden="true">/</span><span>{order.code}</span></Breadcrumb>
         <div className="page-heading order-heading"><h1>Đơn bánh {order.code}</h1><div className="row-actions"><Pill value={order.status} labels={statuses} /><Pill value={order.payment} labels={payments} /></div>
+            <p>Cơ sở xử lý đơn: <strong>{location.name}</strong>{location.address && ' · ' + location.address}</p>
             {!awaitingTransfer && nextStep && <p>{nextStep}</p>}
+            {canReorder && shop.branch_mode && <p className="muted">Mua lại sẽ dùng giá, tồn và lịch của cơ sở đang chọn: {shop.branch?.name}. Bạn có thể đổi cơ sở trước khi mua lại.</p>}
         </div>
         <div className="order-grid">
             <div className="form-stack">
@@ -493,7 +498,12 @@ export function Order({ order, statuses, payments, trackingLink, canReorder, cha
                     {order.bank_due_at && <p className="warning">Hạn chuyển khoản · {dateTime(order.bank_due_at)}</p>}
                     <p className="muted">Tiệm cập nhật thanh toán sau khi nhân viên đối soát.</p>
                 </section>}
-                <section className="panel form-stack"><h2>Cách nhận bánh</h2><p className="icon-text"><MapPin size={19} />{order.fulfillment === 'pickup' ? 'Nhận tại tiệm · ' + shop.address : (order.address || 'Giao tận nơi') + ' · ' + order.region_label}</p><p className="icon-text"><CalendarClock size={19} />{dateTime(order.scheduled_at)}</p></section>
+                <section className="panel form-stack"><h2>Cách nhận bánh</h2><p className="icon-text"><MapPin size={19} />{order.fulfillment === 'pickup' ? location.pickupText : (order.address || 'Giao tận nơi') + ' · ' + order.region_label}</p><p className="icon-text"><CalendarClock size={19} />{dateTime(order.scheduled_at)}</p>
+                    {(location.phone || location.email) && <div className="form-stack"><p className="muted">{location.currentContact ? 'Liên hệ hiện tại của ' : 'Liên hệ cơ sở xử lý đơn: '}{location.contactName}</p>
+                        {location.phone && <a className="subtle-link" href={'tel:' + location.phone.replace(/[^+\d]/g, '')}>Gọi cơ sở {location.phone}</a>}
+                        {location.email && <a className="subtle-link" href={'mailto:' + location.email}>{location.email}</a>}
+                    </div>}
+                </section>
                 {order.status === 'cancelled' && order.payment === 'paid' && <p className="warning" role="status">Đơn đã hủy và đang chờ tiệm xử lý hoàn tiền. Tiệm chỉ ghi nhận đã hoàn sau khi xác minh việc hoàn trả.</p>}
                 {order.payment === 'refunded' && <p className="warning" role="status">Tiệm đã ghi nhận hoàn tiền. Nếu chưa nhận được khoản hoàn, vui lòng liên hệ tiệm kèm mã đơn.</p>}
                 {changeRequest && <section className="panel form-stack"><h2>{actionMode ? 'Gửi yêu cầu thay đổi đơn' : 'Đổi giờ hoặc hủy đơn'}</h2>
@@ -501,7 +511,7 @@ export function Order({ order, statuses, payments, trackingLink, canReorder, cha
                         <CustomerChangeForm key={changeRequest.requestKey} changeRequest={changeRequest} expiresAt={expiresAt} /> :
                         changeRequest.actionLinkUrl ? <GuestActionLink url={changeRequest.actionLinkUrl} /> :
                             <p className="muted">Đơn hiện chưa thể gửi thêm yêu cầu trực tuyến. Nếu đơn đang được làm, đã đến hạn xử lý hoặc có yêu cầu đang chờ, hãy liên hệ tiệm để được hỗ trợ.</p>}
-                    {shop.phone && <a className="subtle-link" href={`tel:${shop.phone.replace(/[^+\d]/g, '')}`}>Gọi tiệm {shop.phone}</a>}
+                    {location.phone && <a className="subtle-link" href={'tel:' + location.phone.replace(/[^+\d]/g, '')}>{location.currentContact ? 'Liên hệ hiện tại của cơ sở' : 'Gọi cơ sở'} {location.phone}</a>}
                 </section>}
                 {changeRequest && <section className="panel form-stack"><h2>Yêu cầu đã gửi</h2><ChangeRequestHistory requests={changeRequests} /></section>}
                 <section className="panel form-stack"><h2>Lịch sử đơn</h2><OrderEvents events={order.events} statuses={statuses} payments={payments} /></section>

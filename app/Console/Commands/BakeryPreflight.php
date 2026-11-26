@@ -3,9 +3,9 @@
 namespace App\Console\Commands;
 
 use App\Jobs\SendOrderEmail;
+use App\Services\Branches;
 use App\Services\LaunchReadiness;
 use App\Services\PrivateStaging;
-use App\Services\Store;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -13,12 +13,18 @@ use Throwable;
 
 class BakeryPreflight extends Command
 {
-    protected $signature = 'bakery:preflight {--staging : Kiểm tra staging kín hoặc môi trường local nghiệm thu}';
+    protected $signature = 'bakery:preflight {--staging : Kiểm tra staging kín hoặc môi trường local nghiệm thu}
+        {--branch= : Chỉ nghiệm thu một cơ sở; bỏ trống để kiểm tra mọi cơ sở hoạt động}';
 
     protected $description = 'Kiểm tra cấu hình và dữ liệu cần thiết trước khi mở nhận đơn';
 
     public function handle(): int
     {
+        if ($this->option('branch') !== null && (! ctype_digit((string) $this->option('branch')) || (int) $this->option('branch') < 1)) {
+            $this->error('--branch phải là mã số cơ sở hợp lệ.');
+
+            return self::FAILURE;
+        }
         $staging = $this->option('staging');
         $url = (string) config('app.url');
         $host = strtolower((string) parse_url($url, PHP_URL_HOST));
@@ -109,8 +115,12 @@ class BakeryPreflight extends Command
             if (! DB::table('users')->where('role', 'admin')->where('active', true)->exists()) {
                 $errors[] = 'Tạo tài khoản quản trị đang hoạt động bằng bakery:admin.';
             }
-            if ($checkLaunchData) {
-                array_push($errors, ...LaunchReadiness::dataIssues(Store::settings()));
+            if ($checkLaunchData || Branches::enabled()) {
+                if (! Branches::enabled() && $this->option('branch') !== null && (int) $this->option('branch') !== 1) {
+                    $errors[] = 'Chế độ một cơ sở chỉ hỗ trợ --branch=1.';
+                } else {
+                    array_push($errors, ...LaunchReadiness::branchDataIssues($this->option('branch') === null ? null : (int) $this->option('branch')));
+                }
             }
 
             return $errors;

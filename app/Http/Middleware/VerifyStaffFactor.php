@@ -11,8 +11,12 @@ class VerifyStaffFactor
 {
     public function handle(Request $request, Closure $next): Response
     {
-        $proof = $request->user()->staffProof();
+        $user = $request->user()?->fresh();
+        $proof = $user?->staffProof();
         if ($proof && hash_equals($proof, (string) $request->session()->get('staff_mfa_verified'))) {
+            Auth::setUser($user);
+            $request->setUserResolver(fn () => $user);
+
             return $next($request);
         }
 

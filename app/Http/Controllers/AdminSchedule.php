@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\Branches;
 use App\Services\Orders;
 use App\Services\Store;
 use Carbon\CarbonImmutable;
@@ -13,6 +14,7 @@ class AdminSchedule extends Controller
 {
     public function __invoke(Request $request)
     {
+        Branches::authorize($request->user(), 'production');
         $fields = $request->validate(['date' => 'nullable|date_format:Y-m-d']);
         $today = CarbonImmutable::today();
         $date = isset($fields['date']) ? CarbonImmutable::parse($fields['date']) : $today;
@@ -20,11 +22,15 @@ class AdminSchedule extends Controller
         $orders = Orders::scheduled()->where('scheduled_at', '>=', $date->toDateTimeString())
             ->where('scheduled_at', '<', $date->addDay()->toDateTimeString())
             ->orderBy('scheduled_at')->orderBy('id')->get(['id', 'code', 'scheduled_at', 'fulfillment', 'status']);
+        $kitchen = Branches::enabled() && Branches::role($request->user()) === 'kitchen';
         $items = DB::table('order_items')->whereIntegerInRaw('order_id', $orders->pluck('id'))
-            ->orderBy('id')->get(['id', 'order_id', 'variant_id', 'product_name', 'variant_name', 'quantity', 'message', 'note']);
+            ->orderBy('id')->get(['id', 'order_id', 'variant_id', 'product_name', 'variant_name', 'quantity', 'message', ...($kitchen ? [] : ['note'])]);
         $itemsByOrder = $items->groupBy('order_id');
         foreach ($orders as $order) {
             $order->items = $itemsByOrder->get($order->id, []);
+            if ($kitchen) {
+                $order->next = array_values(array_intersect(Orders::next($order), ['preparing', 'ready']));
+            }
         }
 
         $ordersByTime = $orders->groupBy(fn ($order) => substr($order->scheduled_at, 11, 5));
@@ -50,6 +56,7 @@ class AdminSchedule extends Controller
             'date' => $date->toDateString(), 'today' => $today->toDateString(), 'tomorrow' => $today->addDay()->toDateString(),
             'orderCount' => $orders->count(), 'cakeCount' => $items->sum('quantity'), 'schedule' => $schedule,
             'statuses' => Orders::STATUSES,
+            'productionOnly' => $kitchen,
         ])->toResponse($request)->header('Cache-Control', 'private, no-store');
     }
 }

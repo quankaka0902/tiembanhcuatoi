@@ -1,4 +1,4 @@
-import { Head, Link, usePage } from '@inertiajs/react';
+import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import { ArrowRight, CakeSlice, Check, Clock3, Cookie, Croissant, CupSoda, LayoutDashboard, MapPin, Menu, Phone, Search, ShoppingBag, UserRound } from 'lucide-react';
 import { Children, cloneElement, isValidElement, useId, useState } from 'react';
 
@@ -46,6 +46,7 @@ export function Layout({ title, children }) {
             </div>
         </header>
         <main id="main" tabIndex={-1}>
+            {shop.branch_mode && <div className="wrap branch-selector-wrap"><BranchSelector /></div>}
             {!shop.accepting_orders && <div className="wrap pause-wrap"><p className="warning pause-banner" role="status">
                 <span>{shop.pause_message}</span>
                 {shop.phone && <a className="subtle-link" href={`tel:${shop.phone.replace(/[^+\d]/g, '')}`}>Gọi tiệm {shop.phone}</a>}
@@ -62,6 +63,29 @@ export function Layout({ title, children }) {
             </div>
         </footer>
     </>;
+}
+
+export function BranchSelector({ admin = false }) {
+    const { shop, branchContext, cartCount, cartBranchId = 1 } = usePage().props;
+    const choices = admin ? branchContext?.allowed ?? [] : shop.branches ?? [];
+    const current = Number(admin ? branchContext?.currentId : shop.branch?.id);
+    const form = useForm({ branch_id: current, confirm_clear: false });
+    const selected = Number(form.data.branch_id);
+    const cartAtAnotherBranch = !admin && cartCount > 0 && Number(cartBranchId) !== current;
+    const needsConfirmation = !admin && cartCount > 0 && (selected !== current || cartAtAnotherBranch);
+    if (!(admin ? branchContext?.enabled : shop.branch_mode)) return null;
+    return <form className="branch-selector" onSubmit={event => {
+        event.preventDefault();
+        form.post(admin ? '/quan-tri/chon-co-so' : '/co-so/chon', { preserveState: false });
+    }}>
+        <Field label={admin ? 'Cơ sở đang quản trị' : 'Chọn cơ sở nhận hoặc giao bánh'} error={form.errors.branch_id}>
+            <select value={form.data.branch_id} onChange={event => form.setData({ branch_id: Number(event.target.value), confirm_clear: false })}>
+                {choices.map(branch => <option key={branch.id} value={branch.id}>{branch.name}{branch.active === false || branch.active === 0 ? ' · Đang ẩn' : ''}</option>)}
+            </select>
+        </Field>
+        {needsConfirmation && <label className="checkbox branch-confirm"><input type="checkbox" checked={form.data.confirm_clear} onChange={event => form.setData('confirm_clear', event.target.checked)} />Tôi đồng ý xóa giỏ hiện tại để đặt ở cơ sở mới. Giá, lịch và phí giao sẽ được tính lại.</label>}
+        <button className="button secondary compact" disabled={form.processing || !choices.length || (selected === current && !cartAtAnotherBranch) || (needsConfirmation && !form.data.confirm_clear)}>{form.processing ? 'Đang đổi…' : 'Chọn cơ sở'}</button>
+    </form>;
 }
 
 export function ButtonLink({ href, children, secondary = false, ...props }) {

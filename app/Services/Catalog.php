@@ -28,7 +28,17 @@ class Catalog
 
     public static function variants(array $filters = []): Builder
     {
-        return DB::table('variants')->where('active', true)
+        $variants = DB::table('variants')->where('variants.active', true);
+        if (Branches::enabled()) {
+            $variants->join('branch_variants as branch', fn ($join) => $join->on('branch.variant_id', '=', 'variants.id')->where('branch.branch_id', Branches::id()))
+                ->join('products as variant_product', 'variant_product.id', '=', 'variants.product_id')
+                ->where('branch.active', true)
+                ->select('variants.id', 'variants.product_id', 'variants.name', 'variants.active', 'variants.size_label', 'variants.servings_min', 'variants.servings_max', 'variants.servings_verified')
+                ->selectRaw('COALESCE(branch.price, variants.price) as price, branch.stock, COALESCE(branch.prep_minutes, variant_product.prep_minutes) as prep_minutes');
+            $variants = DB::query()->fromSub($variants, 'variants');
+        }
+
+        return $variants
             ->when(isset($filters['guests']), fn ($q) => $q->where('servings_verified', true)
                 ->where('servings_min', '<=', (int) $filters['guests'])->where('servings_max', '>=', (int) $filters['guests']))
             ->when(isset($filters['min']), fn ($q) => $q->where('price', '>=', (int) $filters['min']))
@@ -49,6 +59,9 @@ class Catalog
                 'products.prep_minutes', 'products.occasions', 'products.flavors', 'products.details_verified', 'products.images_approved',
                 'categories.name as category', 'categories.slug as category_slug',
                 'availability.price', 'availability.min_variant_price', 'availability.max_price', 'availability.stock');
+        if (Branches::enabled()) {
+            $query->whereNotNull('availability.product_id');
+        }
         if (isset($filters['guests']) || isset($filters['min']) || isset($filters['max'])) {
             $query->whereNotNull('availability.product_id');
         }
@@ -79,7 +92,9 @@ class Catalog
 
     public static function filterOptions(): array
     {
-        $products = DB::table('products')->where('active', true)->where('details_verified', true)->get(['occasions', 'flavors']);
+        $products = DB::table('products')->where('active', true)->where('details_verified', true)
+            ->when(Branches::enabled(), fn ($query) => $query->whereExists(self::variants()->whereColumn('variants.product_id', 'products.id')->selectRaw('1')))
+            ->get(['occasions', 'flavors']);
         $result = [];
         foreach (['occasions', 'flavors'] as $field) {
             $result[$field] = $products->flatMap(fn ($row) => ProductMetadata::stringList($row->{$field}))->unique()->sort()->values()->all();
@@ -92,7 +107,10 @@ class Catalog
     {
         $settings = Store::settings();
 
-        return array_intersect_key($settings, array_flip(['name', 'address', 'hours', 'regions', 'free_from']));
+        $branch = Branches::enabled() ? Branches::find() : null;
+
+        return array_intersect_key($settings, array_flip(['name', 'address', 'hours', 'regions', 'free_from']))
+            + ['branch' => $branch ? ['id' => $branch->id, 'name' => $branch->name] : null];
     }
 
     public static function images(object $product): object

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\Branches;
 use App\Services\Catalog;
 use App\Services\Inventory;
 use App\Services\ProductMetadata;
@@ -21,6 +22,8 @@ class AdminCatalog extends Controller
 
     public function index()
     {
+        Branches::authorize(request()->user(), 'shared_catalog');
+
         return Inertia::render('AdminProducts', [
             'products' => DB::table('products')->join('categories', 'categories.id', '=', 'products.category_id')
                 ->select('products.id', 'products.name', 'products.active', 'products.featured', 'products.details_verified', 'products.images_approved', 'categories.name as category')
@@ -31,6 +34,7 @@ class AdminCatalog extends Controller
 
     public function edit(?int $product = null)
     {
+        Branches::authorize(request()->user(), 'shared_catalog');
         $row = $product ? DB::table('products')->find($product) : null;
         abort_if($product && ! $row, 404);
         if ($row) {
@@ -44,12 +48,14 @@ class AdminCatalog extends Controller
 
     public function inventory(Request $request)
     {
+        Branches::authorize($request->user(), 'inventory');
         $filters = $request->validate([
             'reason' => ['nullable', Rule::in(array_keys(Inventory::REASONS))],
             'product' => 'nullable|integer|exists:products,id',
         ]);
         $product = isset($filters['product']) ? DB::table('products')->find($filters['product'], ['id', 'name']) : null;
         $movements = DB::table('stock_movements as moves')
+            ->when(Branches::enabled(), fn ($query) => $query->where('moves.branch_id', Branches::id()))
             ->join('variants', 'variants.id', '=', 'moves.variant_id')
             ->join('products', 'products.id', '=', 'variants.product_id')
             ->leftJoin('orders', 'orders.id', '=', 'moves.order_id')
@@ -69,6 +75,7 @@ class AdminCatalog extends Controller
 
     public function save(Request $request, ?int $product = null)
     {
+        Branches::authorize($request->user(), 'shared_catalog');
         foreach (['occasions', 'flavors'] as $field) {
             if ($request->exists($field)) {
                 $request->merge([$field => ProductMetadata::listInput($request->input($field))]);
@@ -93,8 +100,9 @@ class AdminCatalog extends Controller
 
         $actorId = $request->user()->id;
         $id = DB::transaction(function () use ($data, $product, $actorId) {
-            Store::settings(lock: true);
-            $existing = $product ? DB::table('products')->find($product) : null;
+            Branches::authorize(request()->user(), 'shared_catalog');
+            $this->lockCatalog();
+            $existing = $product ? DB::table('products')->where('id', $product)->lockForUpdate()->first() : null;
             abort_if($product && ! $existing, 404);
             $slug = $data['slug'] ?? $existing?->slug;
             if (! $slug) {
@@ -105,7 +113,7 @@ class AdminCatalog extends Controller
                 || DB::table('product_slug_history')->where('slug', $slug)->when($product, fn ($q) => $q->where('product_id', '<>', $product))->exists()) {
                 throw ValidationException::withMessages(['slug' => 'Đường dẫn đang dùng hoặc thuộc lịch sử của bánh khác.']);
             }
-            $previous = $existing ? DB::table('variants')->where('product_id', $product)->get()->keyBy('id') : collect();
+            $previous = $existing ? DB::table('variants')->where('product_id', $product)->orderBy('id')->lockForUpdate()->get()->keyBy('id') : collect();
             foreach ($data['variants'] as $index => $variant) {
                 $variantId = $variant['id'] ?? null;
                 if (! $variantId) {
@@ -115,7 +123,7 @@ class AdminCatalog extends Controller
                 if (! $stored || ! isset($variant['expected_stock'])) {
                     throw ValidationException::withMessages(['variants' => 'Phiên bản bánh không hợp lệ. Vui lòng tải lại trang.']);
                 }
-                if ((int) $variant['expected_stock'] !== (int) $variant['stock'] && (int) $stored->stock !== (int) $variant['expected_stock']) {
+                if (! Branches::enabled() && (int) $variant['expected_stock'] !== (int) $variant['stock'] && (int) $stored->stock !== (int) $variant['expected_stock']) {
                     throw ValidationException::withMessages(["variants.{$index}.stock" => 'Tồn kho vừa thay đổi. Hãy tải lại trang trước khi sửa tồn.']);
                 }
             }
@@ -157,18 +165,23 @@ class AdminCatalog extends Controller
 
             foreach ($data['variants'] as $index => $variant) {
                 $fields = array_intersect_key($variant, array_flip(['name', 'price', 'active', 'stock'])) + $variantMetadata[$index];
+                if (Branches::enabled()) {
+                    unset($fields['stock']);
+                }
                 if (! empty($variant['id'])) {
                     $id = (int) $variant['id'];
                     $after = (int) $variant['stock'];
-                    if ($after === (int) $variant['expected_stock']) {
+                    if (Branches::enabled() || $after === (int) $variant['expected_stock']) {
                         unset($fields['stock']);
                     } else {
                         Inventory::record($id, (int) $previous->get($id)->stock, $after, 'manual', actorId: $actorId, note: $variant['stock_note'] ?? null);
                     }
                     DB::table('variants')->where('id', $id)->update($fields);
                 } else {
-                    $id = DB::table('variants')->insertGetId($fields + ['product_id' => $product]);
-                    Inventory::record($id, 0, (int) $variant['stock'], 'initial', actorId: $actorId, note: $variant['stock_note'] ?? null);
+                    $id = DB::table('variants')->insertGetId($fields + ['product_id' => $product, 'stock' => 0]);
+                    if (! Branches::enabled()) {
+                        Inventory::record($id, 0, (int) $variant['stock'], 'initial', actorId: $actorId, note: $variant['stock_note'] ?? null);
+                    }
                 }
             }
             if (array_key_exists('accessories', $data)) {
@@ -187,13 +200,14 @@ class AdminCatalog extends Controller
             }
 
             return $product;
-        });
+        }, 5);
 
         return redirect('/quan-tri/san-pham/'.$id)->with('notice', 'Đã lưu sản phẩm.');
     }
 
     public function category(Request $request, ?int $category = null)
     {
+        Branches::authorize($request->user(), 'shared_catalog');
         if ($category) {
             abort_unless(DB::table('categories')->find($category), 404);
         }
@@ -202,7 +216,8 @@ class AdminCatalog extends Controller
             'icon' => 'required|in:cake,croissant,cupcake,cookie',
         ]);
         DB::transaction(function () use ($data, $category) {
-            Store::settings(lock: true);
+            Branches::authorize(request()->user(), 'shared_catalog');
+            $this->lockCatalog();
             $previous = $category ? DB::table('categories')->find($category) : null;
             abort_if($category && ! $previous, 404);
             if (DB::table('categories')->where('slug', $data['slug'])->when($category, fn ($q) => $q->where('id', '<>', $category))->exists()
@@ -230,5 +245,58 @@ class AdminCatalog extends Controller
         app(ResponsiveImages::class)->generate($url);
 
         return $url;
+    }
+
+    private function lockCatalog(): void
+    {
+        if (Branches::enabled()) {
+            // Lock every branch before the shared chain row. Interleaving branch/chain
+            // locks could deadlock with a concurrent configuration change in branch B.
+            $branches = DB::table('branches')->orderBy('id')->lockForUpdate()->get(['id']);
+            foreach ($branches as $branch) {
+                $id = $branch->id;
+                Store::settings(lock: true, branchId: $id);
+            }
+        } else {
+            Store::settings(lock: true);
+        }
+    }
+
+    public function branchCatalog()
+    {
+        Branches::authorize(request()->user(), 'branch_catalog');
+        abort_unless(Branches::enabled(), 404);
+        $variants = DB::table('variants')->join('products', 'products.id', '=', 'variants.product_id')
+            ->leftJoin('branch_variants as branch', fn ($join) => $join->on('branch.variant_id', '=', 'variants.id')->where('branch.branch_id', Branches::id()))
+            ->orderBy('products.name')->orderBy('variants.id')
+            ->get(['variants.id', 'variants.name', 'variants.price as base_price', 'variants.active as variant_active', 'products.active as product_active', 'products.name as product_name', 'products.prep_minutes as base_prep_minutes', 'branch.price as branch_price', 'branch.prep_minutes as branch_prep_minutes', 'branch.stock', 'branch.active as branch_active', 'branch.updated_at as branch_updated_at']);
+
+        return Inertia::render('AdminBranchCatalog', ['variants' => $variants]);
+    }
+
+    public function saveBranchVariant(Request $request, int $variant)
+    {
+        Branches::authorize($request->user(), 'branch_catalog');
+        abort_unless(Branches::enabled(), 404);
+        $fields = $request->validate([
+            'active' => 'required|boolean', 'price' => 'nullable|integer|min:0|max:100000000',
+            'prep_minutes' => 'nullable|integer|min:0|max:14400', 'stock' => 'required|integer|min:0|max:1000000',
+            'expected_stock' => 'required|integer|min:0|max:1000000', 'note' => 'required|string|min:3|max:250',
+        ]);
+        DB::transaction(function () use ($request, $variant, $fields) {
+            Branches::authorize($request->user(), 'branch_catalog');
+            Store::settings(lock: true);
+            abort_unless(DB::table('variants')->find($variant), 404);
+            DB::table('branch_variants')->insertOrIgnore(['branch_id' => Branches::id(), 'variant_id' => $variant, 'stock' => 0, 'active' => false, 'created_at' => now(), 'updated_at' => now()]);
+            $row = DB::table('branch_variants')->where('branch_id', Branches::id())->where('variant_id', $variant)->lockForUpdate()->first();
+            if ((int) $row->stock !== (int) $fields['expected_stock']) {
+                throw ValidationException::withMessages(['stock' => 'Tồn của cơ sở vừa thay đổi. Tải lại trước khi điều chỉnh.']);
+            }
+            Inventory::move($variant, (int) $fields['stock'] - (int) $row->stock, 'manual', actorId: $request->user()->id, note: $fields['note'], branchId: Branches::id());
+            DB::table('branch_variants')->where('id', $row->id)->update(array_intersect_key($fields, array_flip(['active', 'price', 'prep_minutes'])) + ['updated_at' => now()]);
+            DB::table('branch_audits')->insert(['actor_id' => $request->user()->id, 'branch_id' => Branches::id(), 'action' => 'variant.updated', 'data' => json_encode(['variant_id' => $variant, 'before' => ['active' => (bool) $row->active, 'price' => $row->price, 'prep_minutes' => $row->prep_minutes, 'stock' => $row->stock], 'after' => $fields], JSON_THROW_ON_ERROR), 'created_at' => now()]);
+        }, 5);
+
+        return back()->with('notice', 'Đã lưu giá, tồn và trạng thái bán riêng của cơ sở.');
     }
 }
