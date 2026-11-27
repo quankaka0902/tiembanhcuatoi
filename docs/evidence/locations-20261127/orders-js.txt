@@ -1,19 +1,21 @@
 
 > test:orders
-> node --test tests/Frontend/order-location.test.js tests/Frontend/order-labels.test.js
+> node --test tests/Frontend/order-location.test.js tests/Frontend/order-labels.test.js tests/Frontend/quote-lines.test.js
 
-✔ transfer completed is a transfer event even when the order itself remains pending (0.6437ms)
-✔ fulfillment actions never inherit order completion or payment labels (0.1088ms)
-✔ completed transfer summary closes the approval prompt and explains the completed move (0.1982ms)
-✔ ready delivery is described as handoff while pickup remains ready to collect (0.754ms)
-✔ receipt and support use order B snapshot while the customer browses branch A (0.8165ms)
-✔ unknown historical pickup address stays unverified and support falls back to current contact of order B (0.2104ms)
-✔ missing order contact gives an explicit unknown location instead of a selected-store fallback (0.1489ms)
-ℹ tests 7
+✔ transfer completed is a transfer event even when the order itself remains pending (0.6161ms)
+✔ fulfillment actions never inherit order completion or payment labels (0.0997ms)
+✔ completed transfer summary closes the approval prompt and explains the completed move (0.1842ms)
+✔ ready delivery is described as handoff while pickup remains ready to collect (0.5783ms)
+✔ receipt and support use order B snapshot while the customer browses branch A (0.6007ms)
+✔ unknown historical pickup address stays unverified and support falls back to current contact of order B (0.1609ms)
+✔ missing order contact gives an explicit unknown location instead of a selected-store fallback (0.0908ms)
+✔ quote rows pair by stable cart line key when the target list has a different order (0.9975ms)
+✔ unknown target data stays unknown rather than inferring zero price or out-of-stock (0.1399ms)
+ℹ tests 9
 ℹ suites 0
-ℹ pass 7
+ℹ pass 9
 ℹ fail 0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 76.8918
+ℹ duration_ms 63.9854

@@ -8,15 +8,15 @@
 
 vite v8.3.8 building ssr environment for production...
 transforming...
-✓ 8 modules transformed.
+✓ 9 modules transformed.
 rendering chunks...
 computing gzip size...
-bootstrap/ssr/ssr-manifest.json                0.46 kB │ gzip:  0.18 kB
+bootstrap/ssr/ssr-manifest.json                0.55 kB │ gzip:  0.19 kB
 bootstrap/ssr/assets/public-info-fyhQ2XUj.js   5.55 kB │ gzip:  1.64 kB
 bootstrap/ssr/ssr.js                           7.40 kB │ gzip:  2.63 kB
 bootstrap/ssr/assets/ui-CVj7nUcc.js           17.84 kB │ gzip:  5.11 kB
-bootstrap/ssr/assets/locations-DfmLkAsu.js    46.83 kB │ gzip: 10.54 kB
 bootstrap/ssr/assets/storefront-DpPnxmg1.js   47.86 kB │ gzip: 10.62 kB
+bootstrap/ssr/assets/locations-CMsTphwo.js    52.37 kB │ gzip: 11.77 kB
 
-✓ built in 29ms
+✓ built in 30ms
 SSR smoke passed for seven public pages; private pages refused.

@@ -1,5 +1,5 @@
 {
-  "source_commit": "f85f603dca447d8240a05161ffc0a59f1cd86fce",
+  "source_commit": "c5cb8ca45b5108b13749756a964615f7f3588f1b",
   "tested_on": "2026-11-27",
   "tester": "Codex",
   "public_deployed": false,
@@ -29,8 +29,8 @@
     "result": "passed"
   },
   "javascript": {
-    "tests": 7,
-    "passed": 7
+    "tests": 9,
+    "passed": 9
   },
   "browser": {
     "scenario": "guest delivery COD, branch quote consent, guest transfer approval, atomic B to A, failed delivery, retry, handoff, separate COD payment, completion and old tracking; addressbook consent/update; courier TOTP/minimum projection",
@@ -42,7 +42,8 @@
       1440
     ],
     "database": "tiembanh_locations_demo_test",
-    "intake_after_test": "paused A+B"
+    "intake_after_test": "paused A+B",
+    "additional_scenario": "5 units in cart A versus B stock 4; item price and subtotal comparison; keep blocked; original cart and resources retained; no new order; 320/390/768/1440 no overflow"
   },
   "not_verified": [
     "real GPS or physical phone",
@@ -50,5 +51,8 @@
     "external HTTPS staging and SMTP",
     "real bank/money movements",
     "external deployment rollback candidate"
-  ]
+  ],
+  "backend_test_commit": "f85f603dca447d8240a05161ffc0a59f1cd86fce",
+  "frontend_test_commit": "c5cb8ca45b5108b13749756a964615f7f3588f1b",
+  "backend_identical_to_tested_commit": true
 }

@@ -1,6 +1,6 @@
 # Biên bản local: vị trí, chuyển cơ sở và giao nhận
 
-Ngày 27/11/2026, người triển khai/thử: Codex. Nguồn nghiệm thu: **`f85f603dca447d8240a05161ffc0a59f1cd86fce`**. Nối tiếp nền nhiều cơ sở `9443442`; không triển khai public, không push GitHub trong công việc này.
+Ngày 27/11/2026, người triển khai/thử: Codex. Nguồn kiểm thử backend đầy đủ: **`f85f603dca447d8240a05161ffc0a59f1cd86fce`**; giao diện cuối: **`c5cb8ca45b5108b13749756a964615f7f3588f1b`**. Bổ sung sau chỉ đổi JS/CSS và bài JS, đã đối chiếu Git xác nhận backend/migration/route/bài PHP giữ nguyên. Nối tiếp nền nhiều cơ sở `9443442`; không triển khai public, không push GitHub trong công việc này.
 
 ## Môi trường và giới hạn
 
@@ -33,6 +33,7 @@ Quy tắc chi tiết: [xếp hạng và riêng tư](locations-ranking.md), [chuy
 | Khách vãng lai chọn bánh tại A | Trình duyệt 390 px: Bánh Kem Dâu 16 cm, lời chúc phí 15.000₫, không tạo tài khoản. |
 | Địa chỉ tay, không cấp vị trí | Trình duyệt: vùng cấu hình + địa chỉ thử; chọn “khoảng cách gần nhất” khi chưa có provider → hiển thị chưa có ước tính và xếp theo giờ sớm nhất. Không mở hộp cấp quyền vị trí của máy. |
 | Đổi giỏ A → B | Trình duyệt: tổng dự kiến 400.000₫ → 530.000₫, phí 25.000₫ → 55.000₫; checkbox xác nhận, giữ bánh/lời chúc/địa chỉ, kiểm lại tại checkout. |
+| Từng món chưa đáp ứng khi đổi cơ sở | Trình duyệt trên nguồn UI `c5cb8ca`: giỏ A có 5 Bánh Kem Dâu 16 cm, B còn 4; hiển thị đúng dòng chưa đáp ứng, giá 360.000₫ → 460.000₫, thành tiền 1.800.000₫ → 2.300.000₫. Không cho giữ giỏ, không tự đổi/xóa giỏ, không đoán tồn bằng 0 hoặc hứa tổng chưa báo được. Panel không tràn ngang ở cả bốn kích thước. Không tạo thêm đơn hay giữ kho/khung. |
 | Tạo đơn giao COD tại B | Trình duyệt: tạo đúng 1 đơn mới, id 8; tổng 530.000₫, giờ 28/11 10:00. Tra cứu vãng lai không lộ địa chỉ chi tiết. |
 | Chuyển đơn B → A | Trình duyệt quản trị 1440 px: đề nghị tổng 400.000₫, giờ 28/11 16:00, khách xác nhận trên link mail local ở 390 px; quản lý thực hiện thành công. Giữ mã/link cũ, cập nhật cơ sở/giờ/tổng cho khách. |
 | Đối chiếu kho/khung | DB: B `4→3` lúc đặt, A `15→14` giữ đích, B `3→4` giải phóng nguồn; đúng 3 movement. Mirror cũ của A=14. Khung B cũ=0, A mới=1. Không trừ thêm khi giao lại. |
@@ -52,9 +53,11 @@ Các ảnh chỉ chứa dữ liệu giả, không có password, secret TOTP ho�
 
 ![Chọn cơ sở trên desktop](evidence/locations-20261127/desktop-locations.jpg)
 
-[Chọn cơ sở mobile](evidence/locations-20261127/mobile-locations.jpg) · [Checkout mobile](evidence/locations-20261127/mobile-checkout.jpg) · [Người giao mobile](evidence/locations-20261127/mobile-courier.jpg).
+[Chọn cơ sở mobile](evidence/locations-20261127/mobile-locations.jpg) · [Checkout mobile](evidence/locations-20261127/mobile-checkout.jpg) · [Người giao mobile](evidence/locations-20261127/mobile-courier.jpg) · [Món thiếu tại cơ sở đích](evidence/locations-20261127/mobile-unavailable-line.jpg).
 
-## Kết quả kiểm tra đúng nguồn f85f603
+## Kết quả kiểm tra theo phiên bản nguồn
+
+PHP/Pint/MySQL/SQLite chạy tại `f85f603`; mã backend ở `c5cb8ca` trùng hoàn toàn với bản đó. Lint/build/SSR/JS đã chạy lại tại `c5cb8ca`, cùng ca trình duyệt bổ sung. Không chạy lại SQL chỉ vì thay phần trình bày.
 
 | Lệnh | Kết quả |
 | --- | --- |
@@ -62,7 +65,7 @@ Các ảnh chỉ chứa dữ liệu giả, không có password, secret TOTP ho�
 | `npm run lint` | Đạt. |
 | `npm run build` | Đạt. |
 | `npm run test:ssr` | Đạt, 7 trang công khai; trang riêng bị từ chối. |
-| `npm run test:orders` | 7/7 bài JS đạt. |
+| `npm run test:orders` | 9/9 bài JS đạt, gồm ghép dòng theo khóa giỏ và phân biệt dữ liệu chưa biết với hết khả dụng. |
 | PHPUnit SQLite | 226 bài: 203 đạt, 23 bỏ qua do yêu cầu MySQL; 3.457 assertions. |
 | PHPUnit MySQL `--fail-on-skipped` | 226/226 đạt, 3.659 assertions, không skip. |
 
