@@ -1,0 +1,22 @@
+[
+  {
+    "content": 305,
+    "hasHorizontalOverflow": false,
+    "viewport": 320
+  },
+  {
+    "content": 375,
+    "hasHorizontalOverflow": false,
+    "viewport": 390
+  },
+  {
+    "content": 753,
+    "hasHorizontalOverflow": false,
+    "viewport": 768
+  },
+  {
+    "content": 1425,
+    "hasHorizontalOverflow": false,
+    "viewport": 1440
+  }
+]

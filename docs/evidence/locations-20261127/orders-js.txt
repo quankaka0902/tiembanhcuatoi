@@ -1,0 +1,19 @@
+
+> test:orders
+> node --test tests/Frontend/order-location.test.js tests/Frontend/order-labels.test.js
+
+✔ transfer completed is a transfer event even when the order itself remains pending (0.6437ms)
+✔ fulfillment actions never inherit order completion or payment labels (0.1088ms)
+✔ completed transfer summary closes the approval prompt and explains the completed move (0.1982ms)
+✔ ready delivery is described as handoff while pickup remains ready to collect (0.754ms)
+✔ receipt and support use order B snapshot while the customer browses branch A (0.8165ms)
+✔ unknown historical pickup address stays unverified and support falls back to current contact of order B (0.2104ms)
+✔ missing order contact gives an explicit unknown location instead of a selected-store fallback (0.1489ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 76.8918

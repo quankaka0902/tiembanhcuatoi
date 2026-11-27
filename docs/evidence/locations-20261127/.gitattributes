@@ -1,0 +1,4 @@
+*.txt text eol=lf
+*.json text eol=lf
+*.jpg -text
+.gitattributes text eol=lf

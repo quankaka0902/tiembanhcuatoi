@@ -1,0 +1,3 @@
+
+> lint
+> eslint resources/js vite.config.js

@@ -1,5 +1,7 @@
 # Tiệm Bánh Nhà Mình
 
+Nghiệm thu mới nhất về chọn cơ sở, chuyển đơn có khách duyệt và giao nhận nội bộ: [biên bản local ngày 27/11/2026](docs/nghiem-thu-vi-tri-dieu-phoi.md). [Chính sách chuyển cơ sở](docs/branch-transfers.md) mặc định đóng; ca thử không mở bán public.
+
 Ứng dụng đặt bánh và quản trị cửa hàng bằng tiếng Việt. Giá dùng số nguyên VND. Lịch, bộ lọc ngày và thời điểm tạo đơn dùng múi giờ Asia/Ho_Chi_Minh.
 
 Trang công khai có sẵn HTML từ PHP, gồm nội dung chính, liên kết và metadata. React/Inertia tiếp tục xử lý tương tác; Node SSR là tùy chọn và có PHP fallback khi tắt hoặc lỗi. Giỏ, checkout, tài khoản, đơn riêng và quản trị giữ luồng bảo vệ hiện có.

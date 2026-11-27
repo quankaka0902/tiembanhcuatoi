@@ -1,0 +1,284 @@
+{
+    "fixture_only": true,
+    "schema": "tiembanh_locations_demo_test",
+    "port": 33317,
+    "url": "http:\/\/127.0.0.1:18946",
+    "demo_flags": {
+        "seed": true,
+        "seo_indexing": false
+    },
+    "baseline_orders": 7,
+    "orders_now": 8,
+    "browser_order": {
+        "id": 8,
+        "branch_id": 1,
+        "status": "completed",
+        "payment": "paid",
+        "subtotal": 375000,
+        "delivery_fee": 25000,
+        "total": 400000,
+        "scheduled_at": "2026-11-28 16:00:00",
+        "tracking_code_unchanged": true,
+        "delivery_snapshot_encrypted": true
+    },
+    "transfer": {
+        "id": 1,
+        "status": "completed",
+        "from_branch_id": 2,
+        "to_branch_id": 1,
+        "approved_at": "2026-11-27 12:52:06",
+        "executed_at": "2026-11-27 12:52:33"
+    },
+    "stock": [
+        {
+            "branch_id": 1,
+            "stock": 14
+        },
+        {
+            "branch_id": 2,
+            "stock": 4
+        }
+    ],
+    "legacy_stock_mirror": 14,
+    "stock_movements": [
+        {
+            "branch_id": 2,
+            "reason": "order",
+            "stock_before": 4,
+            "stock_after": 3,
+            "affected_quantity": 1
+        },
+        {
+            "branch_id": 1,
+            "reason": "transfer_hold",
+            "stock_before": 15,
+            "stock_after": 14,
+            "affected_quantity": 1
+        },
+        {
+            "branch_id": 2,
+            "reason": "transfer_release",
+            "stock_before": 3,
+            "stock_after": 4,
+            "affected_quantity": 1
+        }
+    ],
+    "slots": [
+        {
+            "branch_id": 1,
+            "scheduled_at": "2026-11-28 16:00:00",
+            "booked": 1
+        },
+        {
+            "branch_id": 2,
+            "scheduled_at": "2026-11-28 10:00:00",
+            "booked": 0
+        }
+    ],
+    "fulfillment": {
+        "branch_id": 1,
+        "kind": "delivery",
+        "status": "delivered",
+        "attempt_count": 2,
+        "version": 11
+    },
+    "attempts": [
+        {
+            "sequence": 1,
+            "outcome": "failed",
+            "started_at": "2026-11-27 12:53:40",
+            "finished_at": "2026-11-27 12:53:58"
+        },
+        {
+            "sequence": 2,
+            "outcome": "delivered",
+            "started_at": "2026-11-27 12:54:36",
+            "finished_at": "2026-11-27 12:54:43"
+        }
+    ],
+    "order_events": [
+        {
+            "kind": "status",
+            "value": "pending",
+            "previous_value": null,
+            "created_at": "2026-11-27 12:45:00"
+        },
+        {
+            "kind": "transfer",
+            "value": "proposed",
+            "previous_value": null,
+            "created_at": "2026-11-27 12:50:14"
+        },
+        {
+            "kind": "transfer",
+            "value": "customer_approved",
+            "previous_value": null,
+            "created_at": "2026-11-27 12:52:06"
+        },
+        {
+            "kind": "transfer",
+            "value": "completed",
+            "previous_value": null,
+            "created_at": "2026-11-27 12:52:33"
+        },
+        {
+            "kind": "status",
+            "value": "confirmed",
+            "previous_value": "pending",
+            "created_at": "2026-11-27 12:52:55"
+        },
+        {
+            "kind": "status",
+            "value": "preparing",
+            "previous_value": "confirmed",
+            "created_at": "2026-11-27 12:53:06"
+        },
+        {
+            "kind": "fulfillment",
+            "value": "assigned",
+            "previous_value": "pending",
+            "created_at": "2026-11-27 12:53:21"
+        },
+        {
+            "kind": "fulfillment",
+            "value": "start",
+            "previous_value": "ready",
+            "created_at": "2026-11-27 12:53:40"
+        },
+        {
+            "kind": "status",
+            "value": "shipping",
+            "previous_value": "preparing",
+            "created_at": "2026-11-27 12:53:40"
+        },
+        {
+            "kind": "fulfillment",
+            "value": "failed",
+            "previous_value": "in_transit",
+            "created_at": "2026-11-27 12:53:58"
+        },
+        {
+            "kind": "status",
+            "value": "delivery_failed",
+            "previous_value": "shipping",
+            "created_at": "2026-11-27 12:53:58"
+        },
+        {
+            "kind": "fulfillment",
+            "value": "assigned",
+            "previous_value": "pending",
+            "created_at": "2026-11-27 12:54:29"
+        },
+        {
+            "kind": "fulfillment",
+            "value": "start",
+            "previous_value": "ready",
+            "created_at": "2026-11-27 12:54:36"
+        },
+        {
+            "kind": "status",
+            "value": "shipping",
+            "previous_value": "delivery_failed",
+            "created_at": "2026-11-27 12:54:36"
+        },
+        {
+            "kind": "fulfillment",
+            "value": "delivered",
+            "previous_value": "in_transit",
+            "created_at": "2026-11-27 12:54:43"
+        },
+        {
+            "kind": "payment",
+            "value": "paid",
+            "previous_value": "unpaid",
+            "created_at": "2026-11-27 12:54:55"
+        },
+        {
+            "kind": "status",
+            "value": "completed",
+            "previous_value": "shipping",
+            "created_at": "2026-11-27 12:55:04"
+        }
+    ],
+    "notices": [
+        {
+            "type": "completed",
+            "count": 1,
+            "sent": "1"
+        },
+        {
+            "type": "confirmed",
+            "count": 1,
+            "sent": "1"
+        },
+        {
+            "type": "dispatch_assigned",
+            "count": 2,
+            "sent": "2"
+        },
+        {
+            "type": "dispatch_delivered",
+            "count": 1,
+            "sent": "1"
+        },
+        {
+            "type": "dispatch_failed",
+            "count": 1,
+            "sent": "1"
+        },
+        {
+            "type": "dispatch_started",
+            "count": 2,
+            "sent": "2"
+        },
+        {
+            "type": "payment_paid",
+            "count": 1,
+            "sent": "1"
+        },
+        {
+            "type": "pending",
+            "count": 1,
+            "sent": "1"
+        },
+        {
+            "type": "preparing",
+            "count": 1,
+            "sent": "1"
+        },
+        {
+            "type": "transfer_approval",
+            "count": 1,
+            "sent": "1"
+        },
+        {
+            "type": "transfer_approved",
+            "count": 1,
+            "sent": "1"
+        },
+        {
+            "type": "transfer_completed",
+            "count": 1,
+            "sent": "1"
+        }
+    ],
+    "queue_pending": 0,
+    "queue_failed": 0,
+    "privacy": {
+        "general_log_has_delivery_address": false,
+        "general_log_has_delivery_note": false,
+        "mail_log_is_private": true,
+        "saved_addresses": 1,
+        "saved_addresses_all_encrypted": true
+    },
+    "accepting_orders": [
+        {
+            "branch_id": 1,
+            "enabled": false
+        },
+        {
+            "branch_id": 2,
+            "enabled": false
+        }
+    ]
+}

@@ -1,0 +1,22 @@
+
+> build
+> vite build
+
+vite v8.3.8 building client environment for production...
+transforming...
+✓ 2492 modules transformed.
+rendering chunks...
+computing gzip size...
+public/build/manifest.json                     2.34 kB │ gzip:   0.46 kB
+public/build/assets/app-D_xshSd6.css          57.56 kB │ gzip:  12.53 kB
+public/build/assets/truck-DyqE0iP-.js          0.50 kB │ gzip:   0.31 kB
+public/build/assets/public-info-maifH3so.js    3.57 kB │ gzip:   1.36 kB
+public/build/assets/dispatch-B-tFEIK9.js       9.32 kB │ gzip:   3.25 kB
+public/build/assets/ui-BtoZqL6C.js            14.97 kB │ gzip:   5.81 kB
+public/build/assets/locations-CWIKyGZV.js     30.34 kB │ gzip:   8.97 kB
+public/build/assets/storefront-CW8F0ktO.js    30.83 kB │ gzip:   8.93 kB
+public/build/assets/checkout-BupHxUhX.js      47.56 kB │ gzip:  13.21 kB
+public/build/assets/admin-BY5c59-I.js         91.39 kB │ gzip:  22.47 kB
+public/build/assets/app-CoP6akfI.js          438.74 kB │ gzip: 140.40 kB
+
+✓ built in 538ms

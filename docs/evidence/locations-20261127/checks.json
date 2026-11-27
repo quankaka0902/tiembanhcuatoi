@@ -1,0 +1,54 @@
+{
+  "source_commit": "f85f603dca447d8240a05161ffc0a59f1cd86fce",
+  "tested_on": "2026-11-27",
+  "tester": "Codex",
+  "public_deployed": false,
+  "pushed": false,
+  "mysql": {
+    "exit_code": 0,
+    "tests": 226,
+    "skipped": 0,
+    "port": 33317,
+    "assertions": 3659,
+    "schema": "tiembanh_locations_phpunit_test"
+  },
+  "sqlite": {
+    "exit_code": 0,
+    "skipped": 23,
+    "database": ":memory:",
+    "passed": 203,
+    "assertions": 3457,
+    "tests": 226
+  },
+  "pint": "passed",
+  "lint": "passed",
+  "build": "passed",
+  "ssr": {
+    "private_refused": true,
+    "public_pages": 7,
+    "result": "passed"
+  },
+  "javascript": {
+    "tests": 7,
+    "passed": 7
+  },
+  "browser": {
+    "scenario": "guest delivery COD, branch quote consent, guest transfer approval, atomic B to A, failed delivery, retry, handoff, separate COD payment, completion and old tracking; addressbook consent/update; courier TOTP/minimum projection",
+    "url": "http://127.0.0.1:18946",
+    "viewports": [
+      320,
+      390,
+      768,
+      1440
+    ],
+    "database": "tiembanh_locations_demo_test",
+    "intake_after_test": "paused A+B"
+  },
+  "not_verified": [
+    "real GPS or physical phone",
+    "live geocoding/routing/carrier",
+    "external HTTPS staging and SMTP",
+    "real bank/money movements",
+    "external deployment rollback candidate"
+  ]
+}
