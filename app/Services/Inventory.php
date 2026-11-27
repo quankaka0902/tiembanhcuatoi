@@ -4,6 +4,7 @@ namespace App\Services;
 
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class Inventory
 {
@@ -15,6 +16,8 @@ class Inventory
         'cancel_unmade' => 'Giải phóng phần chưa làm',
         'return_checked' => 'Nhập lại bánh đã kiểm tra',
         'waste' => 'Bánh hỏng hoặc tiêu hao',
+        'transfer_hold' => 'Giữ tồn tại cơ sở đích',
+        'transfer_release' => 'Giải phóng tồn tại cơ sở nguồn',
     ];
 
     // Call within the same transaction as the order or catalog update.
@@ -67,6 +70,40 @@ class Inventory
         sort($variantIds);
         foreach ($variantIds as $id) {
             self::stockQuery($id, $branchId ?? Branches::id())->lockForUpdate()->first();
+        }
+    }
+
+    /** Caller locks both configurations, the order, slots and SKU rows in sorted order. */
+    public static function transferReservation(int $orderId, int $from, int $to, array $quantities, int $actorId, string $note): void
+    {
+        if (! Branches::enabled() || DB::transactionLevel() < 1 || $from === $to) {
+            throw new \LogicException('Chuyển giữ tồn cần transaction và hai cơ sở khác nhau.');
+        }
+        $order = DB::table('orders')->where('id', $orderId)->lockForUpdate()->first();
+        abort_unless($order && (int) $order->branch_id === $from && $order->payment === 'unpaid'
+            && in_array($order->status, ['pending', 'confirmed'], true) && ! Orders::productionStarted($order)
+            && ! $order->stock_restored_at, 409);
+        ksort($quantities);
+        foreach ($quantities as $variantId => $quantity) {
+            if ($quantity < 1 || (int) self::stockQuery((int) $variantId, $to)->lockForUpdate()->value('stock') < $quantity) {
+                throw ValidationException::withMessages(['transfer' => 'Cơ sở đích không còn đủ bánh; giữ nguyên đơn tại nguồn.']);
+            }
+        }
+        // These two scoped ledger entries deliberately straddle the order's branch update.
+        // Ordinary move()/record() cannot override an order's persisted branch.
+        foreach ([$to => -1, $from => 1] as $branchId => $direction) {
+            foreach ($quantities as $variantId => $quantity) {
+                $query = self::stockQuery((int) $variantId, $branchId);
+                $before = (int) (clone $query)->lockForUpdate()->value('stock');
+                $after = $before + $direction * $quantity;
+                $query->update(['stock' => $after]);
+                if ($branchId === 1) {
+                    DB::table('variants')->where('id', $variantId)->update(['stock' => $after]);
+                }
+                DB::table('stock_movements')->insert(['variant_id' => $variantId, 'order_id' => $orderId, 'actor_id' => $actorId,
+                    'branch_id' => $branchId, 'reason' => $direction < 0 ? 'transfer_hold' : 'transfer_release',
+                    'stock_before' => $before, 'stock_after' => $after, 'affected_quantity' => $quantity, 'note' => $note, 'created_at' => now()]);
+            }
         }
     }
 

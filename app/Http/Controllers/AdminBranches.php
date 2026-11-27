@@ -67,10 +67,10 @@ class AdminBranches extends Controller
         Branches::authorize($request->user(), 'manage_branches');
         $fields = $request->validate([
             'branch_id' => 'required|integer|exists:branches,id', 'user_id' => 'required|integer|exists:users,id',
-            'role' => 'required|in:manager,staff,kitchen,accountant', 'active' => 'required|boolean', 'can_reconcile' => 'required|boolean',
+            'role' => 'required|in:manager,staff,kitchen,accountant,courier', 'active' => 'required|boolean', 'can_reconcile' => 'required|boolean',
         ]);
-        if ($fields['role'] === 'kitchen' && $fields['can_reconcile']) {
-            throw ValidationException::withMessages(['can_reconcile' => 'Vai trò bếp không được đối soát hoặc xử lý hoàn tiền.']);
+        if (in_array($fields['role'], ['kitchen', 'courier'], true) && $fields['can_reconcile']) {
+            throw ValidationException::withMessages(['can_reconcile' => 'Vai trò bếp hoặc tài xế không được đối soát hoặc xử lý hoàn tiền.']);
         }
         DB::transaction(function () use ($request, $fields) {
             $ids = array_unique([$request->user()->id, (int) $fields['user_id']]);

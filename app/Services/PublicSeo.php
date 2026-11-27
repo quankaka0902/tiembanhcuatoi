@@ -161,6 +161,7 @@ class PublicSeo
             foreach (['address', 'phone', 'email', 'hours', 'maps_url'] as $key) {
                 $store[$key] = $settings[$key];
             }
+            $store['maps_url'] = self::safeMapsUrl(is_string($store['maps_url']) ? $store['maps_url'] : null);
         }
         $info = [
             'kind' => $kind, 'title' => $title, 'intro' => $intro, 'approved' => $approved,
@@ -278,14 +279,8 @@ class PublicSeo
             'faq_items' => 'sometimes|nullable|array|list|max:30', 'faq_items.*' => 'required|array:question,answer',
             'faq_items.*.question' => 'required|string|max:250', 'faq_items.*.answer' => 'required|string|max:2000',
             'maps_url' => ['sometimes', 'nullable', 'string', 'max:1000', function ($attribute, $value, $fail) {
-                $parts = parse_url($value);
-                $host = strtolower($parts['host'] ?? '');
-                $hosts = ['google.com', 'www.google.com', 'maps.google.com', 'www.google.com.vn', 'maps.google.com.vn',
-                    'maps.app.goo.gl', 'goo.gl', 'maps.apple.com', 'openstreetmap.org', 'www.openstreetmap.org'];
-                if (! filter_var($value, FILTER_VALIDATE_URL) || ($parts['scheme'] ?? null) !== 'https' || isset($parts['user']) || isset($parts['pass'])
-                    || ! in_array($host, $hosts, true) || (in_array($host, ['google.com', 'www.google.com', 'www.google.com.vn', 'goo.gl'], true)
-                        && ! str_starts_with($parts['path'] ?? '', '/maps'))) {
-                    $fail('Dùng liên kết HTTPS của Google Maps, Apple Maps hoặc OpenStreetMap đã được tiệm xác nhận.');
+                if (self::safeMapsUrl(is_string($value) ? $value : null) === null) {
+                    $fail('Dùng liên kết bản đồ HTTPS đã được tiệm xác nhận, không chứa khóa hoặc thông tin xác thực.');
                 }
             }],
             'business_street_address' => 'sometimes|nullable|string|max:250', 'business_locality' => 'sometimes|nullable|string|max:120',
@@ -295,6 +290,44 @@ class PublicSeo
             'business_opening_hours.*.days' => 'required|array|list|min:1|max:7', 'business_opening_hours.*.days.*' => 'required|integer|distinct|between:1,7',
             'business_opening_hours.*.opens' => 'required|date_format:H:i', 'business_opening_hours.*.closes' => 'required|date_format:H:i',
         ];
+    }
+
+    public static function safeMapsUrl(?string $url): ?string
+    {
+        if ($url === null || strlen($url) > 1000 || ! filter_var($url, FILTER_VALIDATE_URL)) {
+            return null;
+        }
+        $parts = parse_url($url);
+        $host = strtolower($parts['host'] ?? '');
+        $hosts = ['google.com', 'www.google.com', 'maps.google.com', 'www.google.com.vn', 'maps.google.com.vn',
+            'maps.app.goo.gl', 'goo.gl', 'maps.apple.com', 'openstreetmap.org', 'www.openstreetmap.org'];
+        if (($parts['scheme'] ?? '') !== 'https' || isset($parts['user']) || isset($parts['pass'])
+            || (isset($parts['port']) && $parts['port'] !== 443) || ! in_array($host, $hosts, true)
+            || (in_array($host, ['google.com', 'www.google.com', 'www.google.com.vn', 'goo.gl'], true)
+                && ! preg_match('~^/maps(?:/|$)~', $parts['path'] ?? ''))) {
+            return null;
+        }
+        foreach ([$parts['query'] ?? '', $parts['fragment'] ?? ''] as $query) {
+            foreach (preg_split('/[&;]/', $query) as $pair) {
+                $name = explode('=', $pair, 2)[0];
+                for ($depth = 0; $depth < 5; $depth++) {
+                    $decoded = urldecode($name);
+                    if ($decoded === $name) {
+                        break;
+                    }
+                    $name = $decoded;
+                }
+                if (preg_match('/%[0-9a-f]{2}/i', $name)) {
+                    return null;
+                }
+                $name = strtolower(preg_replace('/[^a-z0-9]+/i', '_', $name));
+                if (preg_match('/(?:^|_)(?:key|apikey|token|accesstoken|secret|signature|auth|authorization|password|credential|credentials)(?:_|$)/', $name)) {
+                    return null;
+                }
+            }
+        }
+
+        return $url;
     }
 
     public static function settingsFields(array $fields, array $current): array

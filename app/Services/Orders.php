@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -134,10 +135,12 @@ class Orders
         DB::transaction(function () use ($id, $actor, $fields) {
             $hint = self::query()->find($id);
             abort_unless($hint, 404);
-            $action = $fields['kind'] === 'payment'
+            $managed = $fields['kind'] === 'status' && in_array($fields['value'], ['shipping', 'delivery_failed'], true)
+                && Fulfillments::managing($id, $actor->id, $fields['value']);
+            $action = $managed ? (Branches::can($actor, 'dispatch') ? 'dispatch' : 'driver') : ($fields['kind'] === 'payment'
                 ? ($hint->method === 'cod' && $fields['value'] === 'paid' && Branches::can($actor, 'orders') ? 'orders' : 'reconcile')
                 : (in_array($fields['kind'], ['lead_time', 'prepay_exception'], true) ? 'configure'
-                    : (Branches::can($actor, 'orders') ? 'orders' : 'production'));
+                    : (Branches::can($actor, 'orders') ? 'orders' : 'production')));
             Branches::authorize($actor, $action);
             $settings = Store::settings(lock: true, shared: true);
             $actor = $actor->fresh();
@@ -145,6 +148,7 @@ class Orders
             $order = self::query()->lockForUpdate()->find($id);
             abort_unless($order, 404);
             $value = $fields['value'];
+            Fulfillments::assertTransition($order, $fields['kind'], $value);
             if (Branches::role($actor) === 'kitchen' && ($fields['kind'] !== 'status' || ! in_array($value, ['preparing', 'ready'], true))) {
                 abort(403);
             }
@@ -262,7 +266,11 @@ class Orders
             }
             $previous = $fields['kind'] === 'payment' ? $order->payment : $order->status;
             $event = self::event($id, $actor->id, $fields['kind'], $value, $fields['note'] ?? null, $previous);
-            OrderNotices::record($id, $fields['kind'] === 'payment' ? 'payment_'.$value : $value, [], $event);
+            Fulfillments::onOrderChanged($order, $fields['kind'], $value, $actor->id, $event);
+            $dispatchNotice = $managed || ($fields['kind'] === 'status' && $value === 'ready' && $order->fulfillment === 'pickup' && Fulfillments::publicData($order));
+            if (! $dispatchNotice) {
+                OrderNotices::record($id, $fields['kind'] === 'payment' ? 'payment_'.$value : $value, [], $event);
+            }
         }, 5);
     }
 
@@ -338,12 +346,21 @@ class Orders
     public static function detail(object $order, bool $internal = false, bool $owner = false): array
     {
         $data = (array) $order;
-        unset($data['tracking_token'], $data['request_key'], $data['user_id'], $data['stock_restored_at']);
+        unset($data['tracking_token'], $data['request_key'], $data['user_id'], $data['stock_restored_at'], $data['delivery_snapshot']);
+        if (($internal || $owner) && ($order->delivery_snapshot ?? null)) {
+            try {
+                $data['delivery_address'] = DeliveryAddress::open($order->delivery_snapshot);
+            } catch (DecryptException) {
+                $data['delivery_address'] = null;
+                $data['delivery_address_needs_review'] = true;
+            }
+        }
         if (! $internal) {
             $data = array_intersect_key($data, array_flip([
                 'code', 'fulfillment', 'address', 'region_label', 'scheduled_at',
                 'method', 'payment', 'status', 'subtotal', 'discount', 'delivery_fee', 'total', 'bank_due_at',
                 'branch_id', 'branch_snapshot',
+                ...($owner ? ['delivery_address', 'delivery_address_needs_review'] : []),
             ]));
             if (! $owner) {
                 unset($data['address']);

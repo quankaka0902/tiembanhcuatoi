@@ -66,6 +66,23 @@
                 <label class="field">Ghi chú cho tiệm<textarea name="note" maxlength="250"></textarea></label><button class="button" @disabled(!$initial || $initial['stock'] <= 0)>Thêm vào giỏ</button>
             </form><section class="sf-product-details"><h2>Trước khi bạn đặt bánh</h2><h3>Thành phần</h3><p>{{ $product['ingredients'] ?: 'Thông tin thành phần đang được tiệm cập nhật.' }}</p><h3>Bảo quản bánh</h3><p>{{ $product['storage_instructions'] ?: 'Hướng dẫn bảo quản chưa được tiệm xác nhận.' }}</p></section></section>
         </div></div>
+    @elseif(in_array($component, ['Locations', 'Location'], true))
+        @php
+            $locations = $component === 'Location' ? [$props['location']] : ($props['locations'] ?? []);
+        @endphp
+        <div class="wrap page locations-page"><div class="page-heading"><h1>{{ $component === 'Location' ? $props['location']['name'] : 'Nhận bánh ở đâu?' }}</h1><p>Kiểm tra toàn bộ giỏ, giá, phí và lịch nhận trước khi đổi cơ sở. Khoảng cách hoặc thời gian chưa có dữ liệu không được xem là cam kết giao.</p></div>
+            @if($component === 'Location')<p><a class="subtle-link" href="/co-so">So sánh cơ sở khác</a></p>@endif
+            <div class="form-stack">@forelse($locations as $location)<article class="panel form-stack"><h2><a href="/co-so/{{ $location['slug'] }}">{{ $location['name'] }}</a></h2>
+                <p>{{ $location['address'] ?: 'Địa chỉ đang chờ tiệm xác nhận.' }}</p><p>{{ $location['hours'] ?: 'Giờ mở cửa đang được cập nhật.' }}</p>
+                <p>{{ implode(' · ', array_map(fn($mode) => ['pickup' => 'Nhận tại tiệm', 'delivery' => 'Giao tận nơi'][$mode] ?? $mode, $location['fulfillments'] ?? [])) }}</p>
+                <p>{{ implode(' · ', array_map(fn($method) => ['cod' => 'Khi nhận bánh', 'bank' => 'Chuyển khoản'][$method] ?? $method, $location['payment_methods'] ?? [])) }}</p>
+                @if(empty($location['accepting_orders']))<p class="warning">Cơ sở đang tạm ngừng nhận đơn mới.</p>@endif
+                @if(!empty($location['earliest_slot']))<p>Khung nhận hiện có sớm nhất: {{ $location['earliest_slot'] }}. Kiểm tra lại khi đặt.</p>@else<p>{{ $location['availability_note'] ?? 'Chọn bánh để kiểm tra lịch nhận phù hợp.' }}</p>@endif
+                @if(!empty($location['phone']))<a class="subtle-link" href="tel:{{ preg_replace('/[^+\d]/', '', $location['phone']) }}">Gọi cơ sở {{ $location['phone'] }}</a>@endif
+                @if(!empty($location['maps_url']))<a class="subtle-link" href="{{ $location['maps_url'] }}" target="_blank" rel="noopener noreferrer">Mở bản đồ cơ sở</a>@endif
+                <p class="muted">Bật JavaScript để so sánh toàn bộ giỏ và xem trước thay đổi khi giữ giỏ. Biểu mẫu chọn cơ sở phía trên vẫn hỗ trợ bắt đầu lại giỏ sau khi xác nhận.</p>
+            </article>@empty<p class="panel muted">Tiệm chưa có cơ sở hoạt động.</p>@endforelse</div>
+        </div>
     @elseif($component === 'OrderPolicy')
         <div class="wrap page"><div class="page-heading"><h1>Chính sách đặt bánh</h1></div><section class="panel form-stack"><p class="policy-text">{{ $props['policy'] ?: 'Vui lòng liên hệ tiệm để hỏi về đổi giờ nhận, hủy đơn và hoàn tiền trước khi đặt bánh.' }}</p>@if(!empty($shop['phone']))<p><a class="subtle-link" href="tel:{{ preg_replace('/[^+\d]/', '', $shop['phone']) }}">Gọi tiệm {{ $shop['phone'] }}</a></p>@endif @if(!empty($shop['email']))<p><a class="subtle-link" href="mailto:{{ $shop['email'] }}">{{ $shop['email'] }}</a></p>@endif</section>@if(!empty($props['privacy']))<section class="panel form-stack"><h2>Xử lý dữ liệu khách hàng</h2><p class="policy-text">{{ $props['privacy'] }}</p></section>@endif</div>
     @elseif($component === 'PublicInfo')

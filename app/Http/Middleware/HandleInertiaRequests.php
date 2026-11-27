@@ -24,7 +24,7 @@ class HandleInertiaRequests extends Middleware
                 if (! $user || ! $request->is('quan-tri', 'quan-tri/*')) {
                     return null;
                 }
-                $actions = ['shared_catalog', 'branch_catalog', 'branch_settings', 'manage_branches', 'orders', 'production', 'reconcile', 'reports', 'export', 'view_orders', 'inventory'];
+                $actions = ['shared_catalog', 'branch_catalog', 'branch_settings', 'manage_branches', 'orders', 'production', 'reconcile', 'reports', 'export', 'view_orders', 'inventory', 'dispatch', 'driver'];
 
                 return [
                     'enabled' => Branches::enabled(), 'currentId' => Branches::id(), 'role' => Branches::role($user),

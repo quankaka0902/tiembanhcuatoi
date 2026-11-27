@@ -22,11 +22,13 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->trustProxies(headers: Request::HEADER_X_FORWARDED_PROTO);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        $exceptions->dontFlash(['code']);
+        $exceptions->dontFlash(['code', 'address', 'address_line', 'pin', 'delivery_note', 'bank_reference', 'quote_token']);
         $exceptions->report(function (Throwable $exception) {
             if (! app()->runningInConsole() && request()->is('tra-cuu', 'tra-cuu/*', 'dat-lai-mat-khau', 'dat-lai-mat-khau/*', 'quen-mat-khau',
                 'thao-tac-don/*', 'don-cua-toi', 'don-cua-toi/*', 'quan-tri/yeu-cau-don/*',
-                'dat-banh', 'dat-banh/*', 'dang-nhap', 'xac-thuc-hai-buoc', 'quan-tri/don-hang', 'quan-tri/don-hang/*')) {
+                'dat-banh', 'dat-banh/*', 'dang-nhap', 'xac-thuc-hai-buoc', 'quan-tri/don-hang', 'quan-tri/don-hang/*',
+                'co-so/goi-y', 'co-so/du-kien', 'co-so/xac-nhan', 'tai-khoan/dia-chi*', 'xac-nhan-chuyen-don/*',
+                'quan-tri/chuyen-co-so/*', 'quan-tri/giao-nhan*')) {
                 Log::error('Lỗi xử lý yêu cầu riêng tư.', [
                     'route' => request()->route()?->uri(),
                     'exception' => $exception::class,
@@ -37,7 +39,7 @@ return Application::configure(basePath: dirname(__DIR__))
         });
         $exceptions->respond(function (Response $response, Throwable $exception, Request $request) {
             $status = $response->getStatusCode();
-            if (! $request->expectsJson() && (in_array($status, [403, 404, 429], true) || ($status === 500 && ! config('app.debug')))) {
+            if (! $request->expectsJson() && (in_array($status, [403, 404, 410, 429], true) || ($status === 500 && ! config('app.debug')))) {
                 return Inertia::render('Error', ['status' => $status])
                     ->toResponse($request)->setStatusCode($status)
                     ->header('Cache-Control', 'private, no-store')->header('X-Robots-Tag', 'noindex, nofollow');

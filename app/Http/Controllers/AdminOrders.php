@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Jobs\SendOrderEmail;
 use App\Services\Branches;
 use App\Services\Checkout;
+use App\Services\Fulfillments;
 use App\Services\OrderRequests;
 use App\Services\Orders;
+use App\Services\OrderTransfers;
 use App\Services\Store;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Query\Builder;
@@ -172,7 +174,7 @@ class AdminOrders extends Controller
             unset($detail['refund_evidence']);
         }
         if (Branches::enabled() && Branches::role($request->user()) === 'accountant') {
-            foreach (['email', 'phone', 'address', 'note', 'inventory_dispositions'] as $private) {
+            foreach (['email', 'phone', 'address', 'delivery_address', 'delivery_address_needs_review', 'note', 'inventory_dispositions'] as $private) {
                 unset($detail[$private]);
             }
             $detail['items'] = $detail['items']->map(function ($item) {
@@ -189,6 +191,8 @@ class AdminOrders extends Controller
 
         return Inertia::render('AdminOrder', [
             'order' => $detail, 'statuses' => Orders::STATUSES, 'payments' => Orders::PAYMENTS,
+            'transfer' => OrderTransfers::adminData($row, $request->user()),
+            'dispatch' => Fulfillments::detail($row, $request->user()),
             'next' => $canProcess ? array_values(array_filter(Orders::next($row), fn ($next) => $next !== 'cancelled' || $manager || Orders::canCustomerRequest($row))) : [],
             'reconcile' => Orders::canReconcile($request->user()),
             'manager' => $manager, 'prepayRequired' => Orders::prepayRequired($row, $settings),

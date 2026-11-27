@@ -216,8 +216,8 @@ export function Product({ product, suggestedVariantId, selectionFilters }) {
 }
 
 export function Error({ status }) {
-    const titles = { 403: 'Bạn chưa có quyền truy cập', 404: 'Không tìm thấy trang', 429: 'Bạn thao tác quá nhanh', 500: 'Tiệm tạm thời gặp sự cố' };
-    return <Layout title={titles[status]}><div className="wrap page"><Empty title={titles[status]} text={status === 404 ? 'Nếu đang tra cứu đơn, hãy kiểm tra liên kết trong email xác nhận.' : 'Vui lòng thử lại sau hoặc trở về trang chủ.'} href="/" label="Về trang chủ" /></div></Layout>;
+    const titles = { 403: 'Bạn chưa có quyền truy cập', 404: 'Không tìm thấy trang', 410: 'Liên kết đã hết hạn', 429: 'Bạn thao tác quá nhanh', 500: 'Tiệm tạm thời gặp sự cố' };
+    return <Layout title={titles[status]}><div className="wrap page"><Empty title={titles[status]} text={status === 410 ? 'Hãy liên hệ tiệm để nhận đề nghị mới. Liên kết tra cứu cũ vẫn dùng để xem đơn.' : status === 404 ? 'Nếu đang tra cứu đơn, hãy kiểm tra liên kết trong email xác nhận.' : 'Vui lòng thử lại sau hoặc trở về trang chủ.'} href="/" label="Về trang chủ" /></div></Layout>;
 }
 
 function StaffChallenge() {

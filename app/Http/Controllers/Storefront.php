@@ -6,13 +6,18 @@ use App\Jobs\SendOrderEmail;
 use App\Services\Branches;
 use App\Services\Catalog;
 use App\Services\Checkout;
+use App\Services\DeliveryAddress;
+use App\Services\Fulfillments;
 use App\Services\OrderRequests;
 use App\Services\Orders;
+use App\Services\OrderTransfers;
 use App\Services\ProductMetadata;
 use App\Services\PublicSeo;
 use App\Services\Store;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -222,6 +227,9 @@ class Storefront extends Controller
             'privacy' => $settings['privacy_notice'],
             'fulfillments' => $settings['fulfillments'] ?? ['pickup', 'delivery'],
             'paymentMethods' => $settings['payment_methods'] ?? ['cod', 'bank'],
+            'areas' => array_map(fn ($region) => ['code' => $region['area_code'] ?? $region['key'], 'name' => $region['name']], $settings['regions']),
+            'mapConfigured' => false, 'deliveryDraft' => $this->deliveryDraft($request),
+            'savedAddresses' => $this->savedAddresses($request),
         ]);
     }
 
@@ -252,7 +260,7 @@ class Storefront extends Controller
             $fields = $request->validate([
                 ...$this->quoteRules(), 'key' => 'required|uuid', 'name' => 'required|string|max:120',
                 'email' => 'required|email|max:254', 'phone' => ['required', 'string', 'regex:/^(?:\+84|0)[0-9]{9,10}$/'],
-                'address' => 'nullable|required_if:fulfillment,delivery|string|max:250',
+                'address' => 'nullable|string|max:250',
                 'slot' => 'required|date_format:Y-m-d H:i', 'method' => 'required|in:cod,bank',
                 'quote_token' => ['required', 'string', 'regex:/^[a-f0-9]{64}$/D'],
             ], [
@@ -267,7 +275,7 @@ class Storefront extends Controller
         } catch (ValidationException $failure) {
             throw $failure->redirectTo('/dat-banh');
         }
-        $request->session()->forget(['cart', 'cart_branch_id']);
+        $request->session()->forget(['cart', 'cart_branch_id', 'delivery_draft']);
 
         return redirect(Orders::link($order));
     }
@@ -365,6 +373,8 @@ class Storefront extends Controller
         $props = Branches::run((int) ($order->branch_id ?? 1), fn () => [
             'order' => Orders::detail($order, owner: $canReorder), 'statuses' => Orders::STATUSES, 'payments' => Orders::PAYMENTS,
             'trackingLink' => Orders::link($order), 'canReorder' => $canReorder,
+            'transferSummary' => OrderTransfers::customerSummary($order, $canReorder ? request()->user() : null),
+            'fulfillmentSummary' => Fulfillments::publicData($order),
             ...OrderRequests::customerData($order, $canReorder ? request()->user() : null),
         ]);
 
@@ -393,6 +403,46 @@ class Storefront extends Controller
             'branch_id' => [Branches::enabled() ? 'required' : 'sometimes', 'integer', Rule::in([Branches::id()])],
             'method' => 'sometimes|required|in:cod,bank',
             'slot' => 'nullable|date_format:Y-m-d H:i',
+            'country_code' => 'nullable|in:VN', 'area_code' => 'nullable|string|max:80',
+            'address' => 'nullable|string|max:250', 'address_line' => 'nullable|string|max:250',
+            'province_code' => 'nullable|string|max:30', 'district_code' => 'nullable|string|max:30', 'ward_code' => 'nullable|string|max:30',
+            'delivery_note' => 'nullable|string|max:500', 'pin' => 'nullable|array',
         ];
+    }
+
+    private function deliveryDraft(Request $request): ?array
+    {
+        $draft = $request->session()->get('delivery_draft');
+        if (! is_array($draft) || ($draft['expires'] ?? 0) < now()->timestamp || (int) ($draft['branch_id'] ?? 0) !== Branches::id()) {
+            $request->session()->forget('delivery_draft');
+
+            return null;
+        }
+        try {
+            return json_decode(Crypt::decryptString($draft['encrypted']), true, flags: JSON_THROW_ON_ERROR);
+        } catch (Throwable) {
+            $request->session()->forget('delivery_draft');
+
+            return null;
+        }
+    }
+
+    private function savedAddresses(Request $request): array
+    {
+        if (! $request->user()?->fresh()?->active) {
+            return [];
+        }
+
+        return DB::table('customer_delivery_addresses')->where('user_id', $request->user()->id)->orderByDesc('updated_at')->get()->map(function ($row) {
+            try {
+                $address = DeliveryAddress::open($row->encrypted_payload);
+                $label = $address['label'] ?? 'Địa chỉ đã lưu';
+                unset($address['label']);
+
+                return ['id' => $row->id, 'label' => $label, 'address' => $address];
+            } catch (DecryptException) {
+                return null;
+            }
+        })->filter()->values()->all();
     }
 }

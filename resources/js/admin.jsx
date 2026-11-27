@@ -1,7 +1,8 @@
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
-import { ArrowLeft, ArrowUpRight, Banknote, CakeSlice, CalendarDays, ChartNoAxesCombined, ClipboardList, Download, LayoutDashboard, Package, Plus, Settings, Ticket, Users } from 'lucide-react';
+import { ArrowLeft, ArrowUpRight, Banknote, CakeSlice, CalendarDays, ChartNoAxesCombined, ClipboardList, Download, LayoutDashboard, Package, Plus, Settings, Ticket, Truck, Users } from 'lucide-react';
 import { Brand, BranchSelector, ButtonLink, date as formatDate, dateTime, ErrorList, Field, Image, money, Pagination, Pill } from './ui';
 import { ChangeRequestHistory, OrderEvents, OrderItems, Totals } from './checkout';
+import { TransferOrder } from './transfer';
 
 const root = '/quan-tri';
 const scheduleUrl = root + '/lich-lam-banh';
@@ -13,6 +14,7 @@ const mailUrl = root + '/email-don';
 const nav = [
     [root, 'Tổng quan', LayoutDashboard, 'view_orders'], [root + '/don-hang', 'Đơn hàng', ClipboardList, 'view_orders'],
     [inboxUrl, 'Đơn cần xử lý', Package, 'orders'], [scheduleUrl, 'Lịch làm bánh', CalendarDays, 'production'],
+    [root + '/giao-nhan', 'Giao nhận', Truck, 'dispatch'], [root + '/giao-nhan', 'Việc giao của tôi', Truck, 'driver'],
     [reconciliationUrl, 'Đối soát', Banknote, 'reconcile'], [reportsUrl, 'Báo cáo', ChartNoAxesCombined, 'reports'],
     [inventoryUrl, 'Nhật ký tồn kho', Package, 'inventory'], [root + '/thuc-don-co-so', 'Thực đơn cơ sở', CakeSlice, 'branch_catalog'],
     [root + '/san-pham', 'Danh mục bánh chung', CakeSlice, 'shared_catalog'], [root + '/ma-giam', 'Mã giảm giá', Ticket, 'branch_settings'],
@@ -20,7 +22,7 @@ const nav = [
     [root + '/co-so', 'Cơ sở và phân công', Users, 'manage_branches'],
 ];
 
-function Admin({ title, detail, action, children }) {
+export function Admin({ title, detail, action, children }) {
     const { auth, notice, shop, branchContext } = usePage().props;
     const path = usePage().url.split('?')[0];
     return <div className="admin-shell">
@@ -28,12 +30,12 @@ function Admin({ title, detail, action, children }) {
         <aside className="admin-sidebar">
             <Brand shop={shop} />
             <nav aria-label="Quản trị cửa hàng">
-                {nav.filter(([url, , , permission]) => (branchContext?.capabilities?.[permission] ?? auth.role === 'admin') && (branchContext?.enabled || url !== '/quan-tri/thuc-don-co-so')).map(([url, label, Icon]) => {
+                {nav.filter(([url, , , permission]) => (branchContext?.capabilities?.[permission] ?? auth.role === 'admin') && (permission !== 'driver' || branchContext?.role === 'courier') && (branchContext?.enabled || url !== '/quan-tri/thuc-don-co-so')).map(([url, label, Icon]) => {
                     const selected = path === url || (url !== root && path.startsWith(url + '/'));
                     return <Link key={url} className={selected ? 'selected' : ''} href={url} aria-current={selected ? 'page' : undefined}><Icon size={18} />{label}</Link>;
                 })}
             </nav>
-            <div className="admin-account"><strong>{auth.name}</strong><small>{{ chain_admin: 'Quản trị toàn chuỗi', manager: 'Quản lý cơ sở', kitchen: 'Bếp', accountant: 'Kế toán', staff: 'Nhân viên' }[branchContext?.role] || (auth.role === 'admin' ? 'Quản trị viên' : 'Nhân viên')}</small><Link as="button" method="post" href="/dang-xuat" className="text-action">Đăng xuất</Link></div>
+            <div className="admin-account"><strong>{auth.name}</strong><small>{{ chain_admin: 'Quản trị toàn chuỗi', manager: 'Quản lý cơ sở', kitchen: 'Bếp', courier: 'Nhân sự giao hàng', accountant: 'Kế toán', staff: 'Nhân viên' }[branchContext?.role] || (auth.role === 'admin' ? 'Quản trị viên' : 'Nhân viên')}</small><Link as="button" method="post" href="/dang-xuat" className="text-action">Đăng xuất</Link></div>
         </aside>
         <main className="admin-main">
             <div className="admin-top"><span>Quản trị cửa hàng</span><Link className="subtle-link" href="/">Xem cửa hàng <ArrowUpRight size={16} /></Link></div>
@@ -428,7 +430,7 @@ function LegacyLeadTime({ url }) {
     </section>;
 }
 
-export function AdminOrder({ order, statuses, payments, next, reconcile, rescheduleSlots, manager = false, prepayRequired = false, prepayExceptionAllowed = false, changeRequests = [] }) {
+export function AdminOrder({ order, statuses, payments, next, reconcile, rescheduleSlots, manager = false, prepayRequired = false, prepayExceptionAllowed = false, changeRequests = [], transfer = null }) {
     const transition = useForm({ kind: 'status', value: '', note: '' });
     const payment = useForm({ kind: 'payment', value: '', note: '', refund_method: order.method === 'bank' ? 'bank' : 'cash', refund_reference: '', refund_amount: order.total, refund_verified: false });
     const url = root + '/don-hang/' + order.id;
@@ -444,6 +446,8 @@ export function AdminOrder({ order, statuses, payments, next, reconcile, resched
             <div className="form-stack">
                 <section className="panel form-stack"><h2>Khách hàng</h2><strong>{order.name}</strong><p>{order.email} · {order.phone}</p>
                     <p>{order.fulfillment === 'delivery' ? 'Giao đến ' + order.address + ' · ' + order.region_label : 'Nhận tại tiệm'}</p><p>Giờ nhận {dateTime(order.scheduled_at)}</p>
+                    {order.delivery_address?.delivery_note && <p><strong>Chỉ dẫn giao:</strong> {order.delivery_address.delivery_note}</p>}
+                    {order.delivery_address_needs_review && <p className="warning">Bản chụp địa chỉ chưa đọc được. Kiểm tra với người phụ trách trước khi bàn giao; không suy đoán ghim hoặc địa chỉ mới.</p>}
                 </section>
                 <section className="panel form-stack"><h2>Bánh đã đặt</h2><OrderItems items={order.items} /><Totals {...order} />{order.coupon_code && <p>Mã đã sử dụng <b>{order.coupon_code}</b></p>}</section>
                 <section className="panel form-stack"><h2>Yêu cầu đổi / hủy của khách</h2>
@@ -474,6 +478,7 @@ export function AdminOrder({ order, statuses, payments, next, reconcile, resched
                 {manager && prepayExceptionAllowed && blockedByPayment && ['pending', 'confirmed'].includes(order.status) && <section className="panel form-stack"><h2>Ngoại lệ trả trước</h2><PrepaymentException url={url} /></section>}
                 {manager && order.prep_minutes_snapshot == null && ['pending', 'confirmed'].includes(order.status) && <LegacyLeadTime url={url} />}
                 {rescheduleSlots && <RescheduleOrder key={order.scheduled_at} schedule={order.scheduled_at} slots={rescheduleSlots} url={url} />}
+                {transfer && <TransferOrder transfer={transfer} order={order} />}
                 {order.status === 'cancelled' && order.inventory_review_required && !order.inventory_processed_at && (manager ? <ReviewCancelledInventory order={order} url={url} /> : <p className="warning">Bánh sau hủy đang chờ quản lý kiểm tra. Chưa có tồn nào tự được nhập lại.</p>)}
                 {order.inventory_dispositions?.length > 0 && <InventoryDispositionHistory order={order} />}
                 <section className="panel form-stack"><h2>Thanh toán</h2>
@@ -676,6 +681,9 @@ function PublicContentSettings({ form, businessChange, canEditBrand = true }) {
             <div className="two-fields"><Text form={form} field="business_postal_code" label="Mã bưu chính đã xác minh (nếu có)" maxLength={20} onChange={e => businessChange('business_postal_code', e.target.value)} />
                 <Text form={form} field="business_country_code" label="Mã quốc gia hai chữ cái" maxLength={2} placeholder="Điền VN nếu đã xác nhận" onChange={e => businessChange('business_country_code', e.target.value)} /></div>
             <Text form={form} field="maps_url" label="Liên kết bản đồ của đúng cơ sở" type="url" maxLength={1000} onChange={e => businessChange('maps_url', e.target.value)} />
+            <h3>Ghim cơ sở để tính ước lượng</h3><p className="muted">Chỉ nhập tọa độ do người phụ trách xác nhận. Không có tọa độ được duyệt thì khách vẫn chọn thủ công; không tự tạo khoảng cách hoặc thời gian di chuyển.</p>
+            <div className="two-fields"><Text form={form} field="latitude" label="Vĩ độ cơ sở" type="number" min="-90" max="90" step="any" onChange={event => form.setData(data => ({ ...data, latitude: event.target.value, coordinates_approved: false }))} /><Text form={form} field="longitude" label="Kinh độ cơ sở" type="number" min="-180" max="180" step="any" onChange={event => form.setData(data => ({ ...data, longitude: event.target.value, coordinates_approved: false }))} /></div>
+            <Flag form={form} field="coordinates_approved" label="Người phụ trách đã kiểm tra và duyệt ghim của cơ sở này" />
             <h3>Giờ mở cửa công khai</h3><p className="muted">Đây là giờ mở cửa của cơ sở. Lịch nhận bánh tiếp tục được cấu hình riêng phía trên. Để trống danh sách khi chưa có giờ được duyệt.</p>
             {form.data.business_opening_hours.map((row, index) => <fieldset className="form-stack" key={index}><legend>Khoảng mở cửa {index + 1}</legend>
                 <div className="weekdays">{[[1, 'T2'], [2, 'T3'], [3, 'T4'], [4, 'T5'], [5, 'T6'], [6, 'T7'], [7, 'CN']].map(([day, label]) => <label className="checkbox" key={day}>
@@ -698,6 +706,8 @@ export function AdminSettings({ settings, canEditBrand = true }) {
         faq_items: settings.faq_items ?? [], business_opening_hours: settings.business_opening_hours ?? [],
         slotRows: slots.map(time => ({ time, limit: slot_limits[time] ?? '' })),
         exceptionsText: JSON.stringify(settings.calendar_exceptions ?? [], null, 2),
+        latitude: settings.latitude ?? '', longitude: settings.longitude ?? '', coordinates_approved: Boolean(settings.coordinates_approved),
+        allow_branch_transfers: Boolean(settings.allow_branch_transfers), transfer_policy_version: 'v1-unpaid-before-production', transfer_policy_approval_reference: settings.transfer_policy_approval_reference ?? '',
     });
     const lines = value => value.split(/[\n,]+/).map(line => line.trim()).filter(Boolean);
     function slotChange(index, key, value) {
@@ -753,7 +763,7 @@ export function AdminSettings({ settings, canEditBrand = true }) {
                 <fieldset><legend>Hình thức nhận bánh của cơ sở</legend>{[['pickup', 'Nhận tại tiệm'], ['delivery', 'Giao tận nơi']].map(([key, label]) => <label className="checkbox" key={key}><input type="checkbox" checked={form.data.fulfillments.includes(key)} onChange={e => form.setData('fulfillments', e.target.checked ? [...form.data.fulfillments, key] : form.data.fulfillments.filter(item => item !== key))} />{label}</label>)}</fieldset>
                 <Text form={form} field="free_from" label="Miễn phí giao hàng từ (₫, sau giảm giá)" type="number" min="0" />
                 {form.data.regions.map((area, i) => <div className="variant-edit" key={i}>
-                    {[['key', 'Mã khu vực', 'text'], ['name', 'Tên khu vực', 'text'], ['fee', 'Phí giao (₫)', 'number']].map(([key, label, type]) => <Field label={label} key={key}><input required type={type} min={type === 'number' ? '0' : undefined} value={area[key]} onChange={e => regionChange(i, key, e.target.value)} /></Field>)}
+                    {[['key', 'Mã khu vực tại cơ sở', 'text'], ['area_code', 'Mã vùng giao chung (tùy chọn)', 'text'], ['name', 'Tên khu vực', 'text'], ['fee', 'Phí giao (₫)', 'number']].map(([key, label, type]) => <Field label={label} key={key}><input required={key !== 'area_code'} maxLength={key === 'area_code' ? 60 : undefined} type={type} min={type === 'number' ? '0' : undefined} value={area[key] ?? ''} onChange={e => regionChange(i, key, e.target.value)} /></Field>)}
                     <button type="button" className="text-action danger" onClick={() => form.setData('regions', form.data.regions.filter((_, index) => index !== i))}>Bỏ khu vực</button>
                 </div>)}
                 <button type="button" className="button secondary compact" onClick={() => form.setData('regions', [...form.data.regions, { key: '', name: '', fee: 0 }])}><Plus size={16} />Thêm khu vực</button>
@@ -770,6 +780,12 @@ export function AdminSettings({ settings, canEditBrand = true }) {
             <section className="panel form-stack"><h2>Hủy đơn và mã giảm giá</h2>
                 <Flag form={form} field="coupon_return_on_early_cancel" label="Trả lượt mã giảm khi hủy trước khi bắt đầu làm" />
                 <p className="muted">Lượt mã giảm được xử lý riêng với tồn. Hủy sau khi bắt đầu làm không tự nhập bánh vào tồn bán, quản lý phải kiểm tra và ghi rõ phần chưa làm, còn bán được hoặc hỏng.</p>
+            </section>
+            <section className="panel form-stack"><h2>Chính sách chuyển cơ sở của đơn</h2><p className="muted">Mặc định tắt. Chỉ áp dụng đơn chưa thu tiền, chưa làm/chưa xuất giao; cần quyền ở cả hai cơ sở, báo giá và khách đồng ý. Đơn đã thu hoặc đã làm dùng luồng hủy/hoàn hiện có.</p>
+                <Flag form={form} field="allow_branch_transfers" label="Cho phép đề xuất chuyển cơ sở theo chính sách đã duyệt" />
+                <Field label="Phiên bản chính sách"><input readOnly value="v1-unpaid-before-production" /></Field>
+                <Text form={form} field="transfer_policy_approval_reference" label="Tham chiếu phê duyệt của người phụ trách" required={form.data.allow_branch_transfers} minLength={3} maxLength={250} />
+                <p className="warning">Điền hồ sơ thật được duyệt trước khi vận hành. Bật cờ này không tự chuyển đơn hoặc tự thu/hoàn tiền.</p>
             </section>
             <PublicContentSettings form={form} businessChange={businessChange} canEditBrand={canEditBrand} />
             <ErrorList errors={form.errors} /><button className="button" disabled={form.processing}>{form.processing ? 'Đang lưu…' : 'Lưu cấu hình'}</button>
@@ -867,7 +883,7 @@ function MembershipEditor({ member, branches, staffUsers }) {
         <h3>{member ? member.name : 'Thêm phân công'}</h3><div className="three-fields">
             <Field label="Cơ sở" error={form.errors.branch_id}><select required disabled={Boolean(member)} value={form.data.branch_id} onChange={event => form.setData('branch_id', event.target.value)}><option value="">Chọn cơ sở</option>{branches.map(branch => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select></Field>
             <Field label="Nhân sự" error={form.errors.user_id}><select required disabled={Boolean(member)} value={form.data.user_id} onChange={event => form.setData('user_id', event.target.value)}><option value="">Chọn tài khoản</option>{staffUsers.map(user => <option key={user.id} value={user.id}>{user.name} · {user.email}{!user.active ? ' · Đã khóa' : ''}</option>)}</select></Field>
-            <Field label="Vai trò tại cơ sở" error={form.errors.role}><select value={form.data.role} onChange={event => form.setData(data => ({ ...data, role: event.target.value, can_reconcile: event.target.value === 'kitchen' ? false : data.can_reconcile }))}>{[['manager', 'Quản lý cơ sở'], ['staff', 'Nhân viên'], ['kitchen', 'Bếp'], ['accountant', 'Kế toán']].map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
-        </div><Flag form={form} field="active" label="Phân công đang hoạt động" /><Flag form={form} field="can_reconcile" disabled={form.data.role === 'kitchen'} label="Cho phép đối soát chuyển khoản và hoàn tiền" /><ErrorList errors={form.errors} /><button className="button secondary compact" disabled={form.processing}>Lưu phân công và yêu cầu xác thực lại</button>
+            <Field label="Vai trò tại cơ sở" error={form.errors.role}><select value={form.data.role} onChange={event => form.setData(data => ({ ...data, role: event.target.value, can_reconcile: ['kitchen', 'courier'].includes(event.target.value) ? false : data.can_reconcile }))}>{[['manager', 'Quản lý cơ sở'], ['staff', 'Nhân viên'], ['kitchen', 'Bếp'], ['courier', 'Nhân sự giao hàng'], ['accountant', 'Kế toán']].map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
+        </div><Flag form={form} field="active" label="Phân công đang hoạt động" /><Flag form={form} field="can_reconcile" disabled={['kitchen', 'courier'].includes(form.data.role)} label="Cho phép đối soát chuyển khoản và hoàn tiền" /><ErrorList errors={form.errors} /><button className="button secondary compact" disabled={form.processing}>Lưu phân công và yêu cầu xác thực lại</button>
     </form>;
 }

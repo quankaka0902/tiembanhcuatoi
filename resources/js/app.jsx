@@ -1,12 +1,15 @@
 import '../css/app.css';
 import '../css/storefront-mobile.css';
 import '../css/checkout-accessibility.css';
+import '../css/location-dispatch.css';
 import { createInertiaApp } from '@inertiajs/react';
 import { createRoot, hydrateRoot } from 'react-dom/client';
 import { RenderPage } from './seo-head';
 
 createInertiaApp({
     async resolve(name) {
+        if (name === 'AdminDispatch') return (await import('./dispatch'))[name];
+        if (['Locations', 'Location', 'AddressBook', 'TransferApproval'].includes(name)) return (await import('./locations'))[name];
         if (name.startsWith('Admin')) return (await import('./admin'))[name];
         if (['PublicInfo', 'OrderPolicy'].includes(name)) return (await import('./public-info'))[name];
         if (['Cart', 'Checkout', 'Tracking', 'Order', 'OrderAction', 'History'].includes(name)) return (await import('./checkout'))[name];

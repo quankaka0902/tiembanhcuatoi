@@ -19,7 +19,9 @@ class Store
     {
         $defaults = array_replace(config('bakery.defaults'), ['accepting_orders' => ! LaunchReadiness::required(),
             'timezone' => 'Asia/Ho_Chi_Minh', 'fulfillments' => ['pickup', 'delivery'],
-            'payment_methods' => ['cod', 'bank'], 'calendar_exceptions' => []]);
+            'payment_methods' => ['cod', 'bank'], 'calendar_exceptions' => [],
+            'allow_branch_transfers' => false, 'transfer_policy_version' => OrderTransfers::POLICY,
+            'transfer_policy_approval_reference' => '', 'latitude' => null, 'longitude' => null, 'coordinates_approved' => false]);
         if (! Branches::enabled()) {
             $query = DB::table('store_settings')->where('id', 1);
             $data = ($lock ? $query->lockForUpdate() : $query)->value('data');

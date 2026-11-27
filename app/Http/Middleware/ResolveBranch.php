@@ -19,7 +19,8 @@ class ResolveBranch
         abort_unless($user?->active && $user->isStaff(), 403);
         abort_unless(in_array((int) $fields['branch_id'], Branches::allowedIds($user), true), 403);
         Branches::use((int) $fields['branch_id']);
-        $target = Branches::can($user, 'view_orders') ? '/quan-tri' : '/quan-tri/lich-lam-banh';
+        $target = Branches::can($user, 'driver') && ! Branches::can($user, 'dispatch') ? '/quan-tri/giao-nhan'
+            : (Branches::can($user, 'view_orders') ? '/quan-tri' : '/quan-tri/lich-lam-banh');
         if (! empty($fields['order_id'])) {
             Branches::authorize($user, 'view_orders');
             abort_unless(Orders::query()->where('id', (int) $fields['order_id'])->exists(), 404);

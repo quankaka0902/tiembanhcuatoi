@@ -137,7 +137,7 @@ class Checkout
         }));
     }
 
-    public function quote(array $lines, array $fields, array $settings, bool $lock = false): array
+    public function quote(array $lines, array $fields, array $settings, bool $lock = false, ?int $reservedCouponId = null): array
     {
         if (! $settings['accepting_orders']) {
             $this->invalid('cart', Store::pauseMessage($settings));
@@ -163,11 +163,11 @@ class Checkout
 
         if ($code !== '') {
             $query = DB::table('coupons')->where('code', $code);
-            $coupon = ($lock ? $query->lockForUpdate() : $query)->first();
+            $coupon = ($lock ? $query->lockForUpdate() : (DB::transactionLevel() > 0 ? $query->sharedLock() : $query))->first();
             $today = now()->toDateString();
 
             if (! $coupon || ! $coupon->active || ($coupon->starts_on && $today < $coupon->starts_on)
-                || ($coupon->ends_on && $today > $coupon->ends_on) || ($coupon->usage_limit !== null && $coupon->used >= $coupon->usage_limit)
+                || ($coupon->ends_on && $today > $coupon->ends_on) || ($coupon->usage_limit !== null && $coupon->used - ((int) $coupon->id === $reservedCouponId ? 1 : 0) >= $coupon->usage_limit)
                 || $subtotal < $coupon->minimum) {
                 $this->invalid('coupon', 'Mã giảm giá không hợp lệ, đã hết lượt hoặc chưa đủ giá trị đơn tối thiểu.');
             }
@@ -206,7 +206,9 @@ class Checkout
         $binding = [];
         if (Branches::enabled()) {
             $settings = Store::settings();
-            $binding = [Branches::id(), [$context['fulfillment'] ?? null, $context['region'] ?? null, $context['method'] ?? null, $context['slot'] ?? null],
+            $delivery = $this->delivery($context, $settings, false);
+            $binding = [Branches::id(), [$context['fulfillment'] ?? null, $context['region'] ?? null, $context['method'] ?? null, $context['slot'] ?? null,
+                $delivery ? DeliveryAddress::fingerprint($delivery) : null],
                 array_intersect_key($settings, array_flip(['regions', 'free_from', 'slots', 'slot_limits', 'weekdays', 'closed_dates',
                     'calendar_exceptions', 'fulfillments', 'payment_methods', 'bank_prepay_required', 'bank_due_minutes', 'timezone']))];
         }
@@ -258,6 +260,7 @@ class Checkout
                 $this->invalid('method', 'Cửa hàng chưa mở thanh toán chuyển khoản.');
             }
 
+            $delivery = $this->delivery($fields, $settings, true);
             $createdAt = now();
             $code = 'NB-'.$createdAt->format('ymd').'-'.strtoupper(bin2hex(random_bytes(5)));
             $id = DB::table('orders')->insertGetId([
@@ -272,7 +275,8 @@ class Checkout
                 'bank_prepay_required' => $fields['method'] === 'bank' && $settings['bank_prepay_required'],
                 'code' => $code, 'request_key' => $requestKey, 'tracking_token' => bin2hex(random_bytes(32)),
                 'user_id' => $userId, 'name' => $fields['name'], 'email' => $fields['email'], 'phone' => $fields['phone'],
-                'fulfillment' => $fields['fulfillment'], 'address' => $fields['fulfillment'] === 'delivery' ? $fields['address'] : null,
+                'fulfillment' => $fields['fulfillment'], 'address' => $delivery['address_line'] ?? null,
+                'delivery_snapshot' => $delivery ? DeliveryAddress::seal($delivery) : null,
                 'scheduled_at' => $scheduledAt, 'method' => $fields['method'],
                 'bank_snapshot' => $bank ? json_encode($bank, JSON_THROW_ON_ERROR) : null,
                 'bank_due_at' => $bank ? Orders::bankDueAt($createdAt, $scheduledAt, $settings['bank_due_minutes']) : null,
@@ -295,6 +299,7 @@ class Checkout
                     'accessories_snapshot' => json_encode($line['accessories'], JSON_THROW_ON_ERROR),
                 ]);
             }
+            Fulfillments::createForOrder(DB::table('orders')->find($id));
             if ($quote['coupon_id']) {
                 DB::table('coupons')->where('id', $quote['coupon_id'])->increment('used');
             }
@@ -335,5 +340,22 @@ class Checkout
     private function invalid(string $field, string $message): never
     {
         throw ValidationException::withMessages([$field => $message]);
+    }
+
+    public function delivery(array $fields, array $settings, bool $requireLine = true): ?array
+    {
+        if (($fields['fulfillment'] ?? null) !== 'delivery') {
+            return null;
+        }
+        $region = collect($settings['regions'])->firstWhere('key', $fields['region'] ?? null);
+        if (isset($fields['area_code']) && DeliveryAddress::regionForArea($settings['regions'], $fields['area_code']) !== $region) {
+            $this->invalid('area_code', 'Khu vực và báo giá giao không khớp. Chọn lại khu vực.');
+        }
+
+        return DeliveryAddress::normalize([
+            ...$fields, 'country_code' => $fields['country_code'] ?? 'VN',
+            'area_code' => $fields['area_code'] ?? ($region['area_code'] ?? $region['key'] ?? ''),
+            'address_line' => $fields['address_line'] ?? $fields['address'] ?? '',
+        ], $settings['regions'], requireLine: $requireLine);
     }
 }

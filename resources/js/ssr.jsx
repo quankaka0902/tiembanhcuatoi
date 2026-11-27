@@ -5,7 +5,7 @@ import process from 'node:process';
 import { Buffer } from 'node:buffer';
 import { RenderPage } from './seo-head';
 
-const publicComponents = ['Home', 'Catalog', 'Product', 'OrderPolicy', 'PublicInfo'];
+const publicComponents = ['Home', 'Catalog', 'Product', 'OrderPolicy', 'PublicInfo', 'Locations', 'Location'];
 
 async function render(page) {
     if (!publicComponents.includes(page.component) || page.props?.auth || Number(page.props?.cartCount || 0) !== 0 || page.props?.notice || Object.keys(page.props?.errors || {}).length) throw new Error('Public anonymous pages only');
@@ -15,6 +15,7 @@ async function render(page) {
         title: value => value || 'Tiệm Bánh Nhà Mình',
         resolve: async name => {
             if (!publicComponents.includes(name)) throw new Error('Unsupported public page');
+            if (['Locations', 'Location'].includes(name)) return (await import('./locations'))[name];
             return ['PublicInfo', 'OrderPolicy'].includes(name) ? (await import('./public-info'))[name] : (await import('./storefront'))[name];
         },
         setup: ({ App, props }) => <App {...props}>{({ Component, key, props: pageProps }) => <RenderPage Component={Component} componentKey={key} pageProps={pageProps} />}</App>,
@@ -29,15 +30,19 @@ async function smoke() {
         ['Product', { product: { id: 1, name: 'Bánh kiểm thử SSR', slug: 'banh-kiem-thu', description: 'Dữ liệu thử', category: 'Kiểm thử', images: [], variants: [], accessories: [], prep_minutes: 60, customizable: false, ingredients: null, allergens: null, storage_instructions: null }, suggestedVariantId: null, selectionFilters: {} }],
         ['OrderPolicy', { policy: null, privacy: null }],
         ['PublicInfo', { info: { kind: 'about', title: 'Giới thiệu kiểm thử', approved: false, intro: null, store: {}, faqs: [] } }],
+        ['Locations', { locations: [], areas: [], current_branch_id: 1 }],
+        ['Location', { location: { id: 1, slug: 'thu', name: 'Cơ sở kiểm thử', address: '', hours: '', fulfillments: ['pickup'], payment_methods: ['cod'], accepting_orders: false }, areas: [], current_branch_id: 1 }],
     ];
     for (const [component, props] of pages) {
         const output = await render({ ...base, component, props: { ...base.props, ...props } });
         if (!output.body.includes('id="app"') || !output.body.includes('<h1') || !output.head.some(tag => tag.includes('noindex, nofollow'))) throw new Error('Public SSR smoke failed');
     }
-    let refused = false;
-    try { await render({ ...base, component: 'Order', props: base.props }); } catch { refused = true; }
-    if (!refused) throw new Error('Private SSR guard failed');
-    process.stdout.write('SSR smoke passed for five public pages; private pages refused.\n');
+    for (const component of ['Order', 'AddressBook', 'TransferApproval', 'AdminDispatch']) {
+        let refused = false;
+        try { await render({ ...base, component, props: base.props }); } catch { refused = true; }
+        if (!refused) throw new Error('Private SSR guard failed');
+    }
+    process.stdout.write('SSR smoke passed for seven public pages; private pages refused.\n');
 }
 
 if (process.argv.includes('--smoke')) {

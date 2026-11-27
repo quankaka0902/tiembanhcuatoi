@@ -1,0 +1,85 @@
+.locations-page, .location-detail, .address-book, .transfer-approval { --location-berry: #8b2b4d; }
+.locations-grid { display: grid; grid-template-columns: minmax(280px, 350px) minmax(0, 1fr); gap: 24px; align-items: start; }
+.locations-grid > *, .location-card, .location-preview, .dispatch-job, .transfer-panel { min-width: 0; }
+.location-search { position: sticky; top: 110px; }
+.location-results { outline: 0; }
+.location-card h2 { margin: 5px 0 0; }
+.location-card .section-head > div { min-width: 0; }
+.location-facts { display: grid; gap: 13px; margin-block: 18px; }
+.location-facts > p, .location-cart-note, .location-pin-confirm > p { display: flex; align-items: start; gap: 9px; line-height: 1.6; margin: 0; }
+.location-facts svg, .location-cart-note svg, .location-pin-confirm svg { flex: none; margin-top: 3px; color: #8b2b4d; }
+.location-tags { display: flex; flex-wrap: wrap; gap: 7px; }
+.location-tags > span { border: 1px solid #94727e; border-radius: 999px; padding: 5px 11px; background: #fffaf5; font-size: .82rem; }
+.location-cart-note { padding: 13px; border-radius: 12px; background: #f9eeeb; }
+.location-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; padding-block: 15px; margin-block: 12px; border-block: 1px solid #d2bdc0; }
+.location-metrics dt { font-size: .8rem; color: #735960; }
+.location-metrics dd { margin: 5px 0 0; font-weight: 600; overflow-wrap: anywhere; }
+.location-card > .row-actions { margin-top: 18px; }
+.location-unavailable { padding-block: 10px; border-top: 1px solid #d2bdc0; }
+.location-unavailable p { margin-block: 5px 9px; }
+.location-pin { padding: 14px; border: 1px solid #94727e; border-radius: 12px; background: #fffdf9; }
+.location-pin > .muted:empty { display: none; }
+.location-pin .two-fields { margin-top: 13px; }
+.location-pin-confirm { padding: 12px; background: #f8eeee; border-radius: 9px; }
+.location-pin-confirm .checkbox { margin-top: 10px; }
+.location-preview { margin-top: 24px; border: 2px solid #8b2b4d; scroll-margin-block: 100px; }
+.location-preview .checkbox, .transfer-approval .checkbox, .transfer-panel .checkbox, .dispatch-job .checkbox { align-items: start; line-height: 1.6; }
+.location-preview .checkbox input, .transfer-approval .checkbox input, .transfer-panel .checkbox input, .dispatch-job .checkbox input { flex: none; margin-top: 5px; }
+.location-comparison { border: 1px solid #d2bdc0; border-radius: 12px; overflow: hidden; }
+.location-comparison > div { display: grid; grid-template-columns: .85fr 1fr 1fr; gap: 12px; padding: 13px; border-top: 1px solid #d2bdc0; }
+.location-comparison > div:first-child { border-top: 0; }
+.location-comparison > div > * { min-width: 0; overflow-wrap: anywhere; }
+.location-comparison-head { background: #f9eeeb; font-size: .84rem; }
+.location-changes { margin: 0; padding-left: 22px; line-height: 1.7; }
+.location-detail > .location-preview { max-width: 900px; margin-inline: auto; }
+.branch-selector-public > div { display: grid; gap: 3px; flex: 1; }
+.branch-selector-public > div > small { color: #735960; }
+.branch-selector-public > div > span { font-size: .85rem; }
+.branch-selector-public > .button { margin-left: auto; }
+.dispatch-assignment { display: flex; align-items: end; flex-wrap: wrap; gap: 14px; }
+.dispatch-assignment .field { flex: 1 1 260px; }
+.dispatch-assignment > .error-list { flex-basis: 100%; }
+.dispatch-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.dispatch-grid .panel { margin: 0; }
+.dispatch-job { align-content: start; }
+.dispatch-job h2 { margin: 5px 0 0; }
+.dispatch-job .icon-text { align-items: start; }
+.dispatch-job .icon-text svg { flex: none; }
+.dispatch-actions { padding-top: 17px; border-top: 1px solid #d2bdc0; }
+.dispatch-cod { padding: 13px; background: #f9eeeb; border-radius: 10px; }
+.dispatch-note { padding: 12px; border-left: 3px solid #8b2b4d; background: #fffaf5; white-space: pre-wrap; }
+.dispatch-legacy { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; padding-top: 12px; border-top: 1px solid #d2bdc0; }
+.dispatch-legacy > div { display: grid; gap: 5px; }
+.dispatch-trips > summary { font-size: 1.1rem; font-weight: 600; cursor: pointer; }
+.dispatch-trip { display: grid; gap: 5px; padding-top: 13px; border-top: 1px solid #d2bdc0; }
+.transfer-preview, .transfer-proposal { padding: 17px; border: 1px solid #94727e; border-radius: 12px; background: #fffaf5; }
+.transfer-proposal > p { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.transfer-approval { max-width: 850px; }
+.transfer-approval h1 { font-size: clamp(1.7rem, 4vw, 2.5rem); }
+.state-in_transit, .state-assigned { background: #f8e6ed; color: #852446; }
+.state-delivered, .state-collected { background: #e5f0e7; color: #285737; }
+.state-failed { background: #fce8df; color: #8a3b18; }
+.locations-page input:not([type="checkbox"]):not([type="radio"]), .locations-page select, .locations-page textarea,
+.location-detail input:not([type="checkbox"]):not([type="radio"]), .location-detail select, .location-detail textarea,
+.address-book input:not([type="checkbox"]):not([type="radio"]), .address-book select, .address-book textarea,
+.transfer-panel input:not([type="checkbox"]):not([type="radio"]), .transfer-panel select, .transfer-panel textarea,
+.dispatch-job input:not([type="checkbox"]):not([type="radio"]), .dispatch-job select, .dispatch-job textarea { border-color: #94727e; }
+.locations-page :focus-visible, .location-detail :focus-visible, .address-book :focus-visible, .transfer-approval :focus-visible,
+.transfer-panel :focus-visible, .dispatch-job :focus-visible { outline: 3px solid #8b2b4d; outline-offset: 3px; }
+@media (max-width: 900px) {
+    .locations-grid { grid-template-columns: 1fr; }
+    .location-search { position: static; }
+    .location-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 600px) {
+    .dispatch-grid { grid-template-columns: 1fr; }
+    .location-card .row-actions > .button, .location-preview > .button, .location-preview fieldset, .dispatch-assignment > .button { width: 100%; }
+    .location-card .row-actions { align-items: start; gap: 14px; }
+    .location-comparison > div { gap: 8px; padding: 11px; font-size: .85rem; }
+    .branch-selector-public > svg { display: none; }
+    .branch-selector-public > div { flex-basis: 100%; }
+    .branch-selector-public > .button { width: 100%; }
+    .dispatch-assignment { align-items: stretch; }
+    .transfer-preview, .transfer-proposal { padding: 13px; }
+    .transfer-panel .row-actions > .button { width: 100%; }
+}

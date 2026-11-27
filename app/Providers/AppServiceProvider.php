@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Models\User;
 use App\Services\Branches;
+use App\Services\Fulfillments;
 use App\Services\PrivateStaging;
 use App\Services\PublicRenderingGateway;
 use App\Services\PublicSeo;
@@ -27,6 +28,7 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->bind(Gateway::class, PublicRenderingGateway::class);
         $this->app->scoped(Branches::class, fn () => new Branches);
+        $this->app->scoped(Fulfillments::class, fn () => new Fulfillments);
     }
 
     public function boot(): void

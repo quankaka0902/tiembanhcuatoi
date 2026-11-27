@@ -38,7 +38,7 @@ php artisan serve --host=127.0.0.1 --port=18842
 - Có thể chạy `npm run dev` trong terminal thứ hai khi sửa giao diện. Nếu đổi cổng Laravel, cập nhật `APP_URL` cho khớp.
 - Composer CLI đang được lưu ở `work/composer.phar` trong workspace đã thiết lập. Nếu máy chưa có lệnh `composer`, có thể dùng `php work/composer.phar install` tại đây.
 
-Chạy worker trong terminal riêng để gửi email báo nhận đơn, email trạng thái và gửi lại liên kết tra cứu. Nếu dùng cấu hình PHP riêng trên Windows, đặt `PHPRC` như ở ví dụ khởi động Laravel bên dưới. Với cấu hình local, email có trong `storage/logs/laravel.log`.
+Chạy worker trong terminal riêng để gửi email báo nhận đơn, email trạng thái và gửi lại liên kết tra cứu. Nếu dùng cấu hình PHP riêng trên Windows, đặt `PHPRC` như ở ví dụ khởi động Laravel bên dưới. Với cấu hình local mới, email ở `storage/app/private/mail.log` (`MAIL_LOG_CHANNEL=mail-private`), tách khỏi log ứng dụng chung. Khi dùng `LARAVEL_STORAGE_PATH`, đường dẫn tính từ kho riêng đó; không commit hoặc chia sẻ tệp thư chứa liên kết riêng.
 
 ```powershell
 php artisan queue:work order-mail --sleep=2
@@ -72,7 +72,7 @@ Tài khoản nội bộ cần khóa TOTP. Sau khi chạy migration, dùng `php a
 
 1. Chọn bánh, cỡ / phiên bản, số lượng, lời chúc và phụ kiện được tiệm duyệt nếu có. Mở giỏ để cập nhật món hoặc tiếp tục đặt bánh.
 2. Chọn giao hàng hoặc nhận tại tiệm và chọn giờ. Dùng thử `NHAMINH10` cho đơn từ 200.000 ₫ hoặc `NGOT30000` cho đơn từ 300.000 ₫.
-3. Đặt thử COD hoặc chuyển khoản mẫu. Lưu liên kết tra cứu từ trang xác nhận hoặc lấy trong `storage/logs/laravel.log`. Yêu cầu quên mật khẩu cũng ghi email vào tệp này.
+3. Đặt thử COD hoặc chuyển khoản mẫu. Lưu liên kết tra cứu từ trang xác nhận hoặc lấy trong `storage/app/private/mail.log`. Yêu cầu quên mật khẩu cũng ghi email vào tệp riêng này.
 4. Trong quản trị, tìm theo mã đơn, xác nhận, chuẩn bị rồi chuyển sang sẵn sàng nhận hoặc đang giao. Nhân viên ghi nhận COD sau khi giao/nhận. Người có quyền đối soát kiểm tra chuyển khoản và ghi nhận thanh toán. Sau khi đã thanh toán, đơn mới có thể chuyển sang hoàn tất.
 
 Nhân viên mở **Lịch làm bánh** trong quản trị để xem đơn theo ngày và giờ giao hoặc nhận. Mỗi khung tổng hợp số bánh theo phiên bản và hiển thị lời chúc, ghi chú của từng đơn. Trong **Cấu hình → Lịch nhận bánh**, quản trị viên có thể điền số đơn tối đa cho từng giờ. Giới hạn áp dụng riêng cho từng ngày và tính chung cả giao tận nơi lẫn nhận tại tiệm. Để trống ô giới hạn khi muốn nhận không giới hạn. Khi đơn bị hủy, số đơn đã đặt trong khung giảm một.
@@ -161,6 +161,8 @@ Migration giữ chế độ đọc một cơ sở. Trước khi chuyển, đọc
 Xem [kiến trúc, phạm vi dữ liệu, ma trận quyền và thứ tự khóa](docs/branches-architecture.md). Trang bổ sung gồm **Cơ sở và phân công**, **Thực đơn cơ sở**, phạm vi tại **Tổng quan**, **Báo cáo**, **Mã giảm giá**. Đổi quyền nội bộ yêu cầu đăng nhập/TOTP lại. Dữ liệu thật và mở nhận phải được nghiệm thu riêng từng cơ sở; phần này không tự triển khai public.
 
 ## Kiểm thử
+
+Luồng chọn cơ sở theo cả giỏ, địa chỉ thủ công/ghim opt-in, sổ địa chỉ, đề xuất chuyển cơ sở có khách xác nhận và điều phối giao nhận nội bộ được mô tả tại [hướng dẫn vị trí và giao nhận](docs/location-dispatch-ui.md). Chưa tự cấu hình dịch vụ bản đồ/vận chuyển thật; thiếu dữ liệu hiển thị chưa có ước tính. Chính sách chuyển đơn mặc định tắt.
 
 Chạy từ thư mục repo sau khi build frontend và tạo khóa ứng dụng.
 

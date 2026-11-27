@@ -3,6 +3,9 @@ import { ArrowLeft, ArrowRight, Banknote, CalendarClock, Check, Clipboard, Credi
 import { useEffect, useRef, useState } from 'react';
 import { Breadcrumb, ButtonLink, date as formatDate, dateTime, Empty, ErrorList, Field, Image, Layout, money, Pagination, Pill } from './ui';
 import { orderLocation } from './order-location';
+import { AddressInputs } from './locations';
+import { confirmedPin } from './location-input';
+import { fulfillmentReadyLabel, orderEventTitle, transferSummaryCopy } from './order-labels';
 
 function CartLine({ line }) {
     const { shop } = usePage().props;
@@ -81,7 +84,8 @@ function focusCheckout(id) {
 
 const checkoutFieldIds = {
     name: 'checkout-name', phone: 'checkout-phone', email: 'checkout-email',
-    fulfillment: 'checkout-fulfillment', region: 'checkout-region', address: 'checkout-address',
+    fulfillment: 'checkout-fulfillment', region: 'checkout-area', area_code: 'checkout-area', address: 'checkout-address', address_line: 'checkout-address',
+    delivery_note: 'checkout-note', pin: 'checkout-pin',
     slot: 'checkout-schedule', method: 'checkout-method', coupon: 'checkout-coupon',
     cart: 'checkout-items', quote_token: 'checkout-feedback', key: 'checkout-feedback',
 };
@@ -109,10 +113,15 @@ function CheckoutSchedule({ slots, form, selectedSlot, refreshing, onRefresh, on
     </fieldset>;
 }
 
-export function Checkout({ lines, slots, regions, bankEnabled, keyToken, policy, privacy, fulfillments = ['pickup', 'delivery'], paymentMethods = ['cod', 'bank'] }) {
+export function Checkout({ lines, slots, regions, bankEnabled, keyToken, policy, privacy, fulfillments = ['pickup', 'delivery'], paymentMethods = ['cod', 'bank'], areas = [], deliveryDraft = null, savedAddresses = [] }) {
     const { auth, shop } = usePage().props;
     const subtotal = lines.reduce((sum, line) => sum + Number(line.subtotal), 0);
-    const form = useForm({ key: keyToken, branch_id: shop.branch?.id ?? 1, name: auth?.name ?? '', email: auth?.email ?? '', phone: '', fulfillment: fulfillments[0] ?? 'pickup', region: '', address: '', slot: '', method: paymentMethods.includes('cod') ? 'cod' : 'bank', coupon: '' });
+    const draft = deliveryDraft ?? {};
+    const initialArea = draft.area_code ?? '';
+    const currentAreas = areas.length ? areas : regions.map(item => ({ code: item.area_code || item.key, name: item.name }));
+    const form = useForm({ key: keyToken, branch_id: shop.branch?.id ?? 1, name: auth?.name ?? '', email: auth?.email ?? '', phone: '', fulfillment: fulfillments.includes(draft.fulfillment) ? draft.fulfillment : fulfillments[0] ?? 'pickup',
+        region: regions.find(item => (item.area_code || item.key) === initialArea)?.key ?? '', address: draft.address_line ?? '', slot: draft.slot ?? '', method: paymentMethods.includes(draft.method) ? draft.method : paymentMethods.includes('cod') ? 'cod' : 'bank', coupon: '',
+        country_code: 'VN', area_code: initialArea, address_line: draft.address_line ?? '', province_code: draft.province_code ?? '', district_code: draft.district_code ?? '', ward_code: draft.ward_code ?? '', delivery_note: draft.delivery_note ?? '', pin: draft.pin ?? null });
     const { fulfillment, region } = form.data;
     const [appliedCode, setAppliedCode] = useState('');
     const [quoteAttempt, setQuoteAttempt] = useState(0);
@@ -122,9 +131,10 @@ export function Checkout({ lines, slots, regions, bankEnabled, keyToken, policy,
     const [submissionError, setSubmissionError] = useState('');
     const submissionActive = useRef(false);
     const scheduleRefreshActive = useRef(false);
-    const quoteKey = JSON.stringify({ branch_id: form.data.branch_id, fulfillment, region, coupon: appliedCode, method: form.data.method, slot: form.data.slot || null });
+    const quoteKey = JSON.stringify({ branch_id: form.data.branch_id, fulfillment, region, coupon: appliedCode, method: form.data.method, slot: form.data.slot || null,
+        ...(fulfillment === 'delivery' ? { country_code: 'VN', area_code: form.data.area_code, address_line: form.data.address_line, province_code: form.data.province_code, district_code: form.data.district_code, ward_code: form.data.ward_code, delivery_note: form.data.delivery_note, pin: confirmedPin(form.data.pin) } : {}) });
     const attemptKey = JSON.stringify([keyToken, quoteKey, quoteAttempt]);
-    const waitingForRegion = fulfillment === 'delivery' && !region;
+    const waitingForRegion = fulfillment === 'delivery' && !form.data.area_code;
     const displayed = quoteResult?.key === attemptKey ? quoteResult : null;
     const availableSlots = Array.isArray(displayed?.data?.slots) ? displayed.data.slots : slots;
     const selectedSlot = availableSlots.includes(form.data.slot) ? form.data.slot : '';
@@ -157,7 +167,7 @@ export function Checkout({ lines, slots, regions, bankEnabled, keyToken, policy,
             setQuoteResult({ key: attemptKey, error: connectionError });
         }, 12000);
         const cookie = document.cookie.split('; ').find(entry => entry.startsWith('XSRF-TOKEN='));
-        fetch('/dat-banh/bao-gia', {
+        const request = setTimeout(() => fetch('/dat-banh/bao-gia', {
             method: 'POST', signal: abort.signal,
             headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-XSRF-TOKEN': decodeURIComponent(cookie?.slice(11) ?? '') },
             body: quoteKey,
@@ -165,7 +175,7 @@ export function Checkout({ lines, slots, regions, bankEnabled, keyToken, policy,
             if (response.status !== 422 && !response.ok) return { error: connectionError };
             const data = await response.json();
             if (response.ok && typeof data.quote_token === 'string') return { data };
-            const field = ['coupon', 'cart', 'branch_id', 'region', 'fulfillment', 'method', 'slot'].find(name => data.errors?.[name]);
+            const field = ['coupon', 'cart', 'branch_id', 'region', 'area_code', 'address_line', 'pin', 'fulfillment', 'method', 'slot'].find(name => data.errors?.[name]);
             const error = field && data.errors[field];
             return { field, error: (Array.isArray(error) ? error[0] : error) || connectionError };
         }).then(result => {
@@ -175,8 +185,9 @@ export function Checkout({ lines, slots, regions, bankEnabled, keyToken, policy,
             }
         }).catch(() => {
             if (!abort.signal.aborted) setQuoteResult({ key: attemptKey, error: connectionError });
-        }).finally(() => clearTimeout(timeout));
+        }).finally(() => clearTimeout(timeout)), 300);
         return () => {
+            clearTimeout(request);
             clearTimeout(timeout);
             abort.abort();
         };
@@ -210,7 +221,7 @@ export function Checkout({ lines, slots, regions, bankEnabled, keyToken, policy,
         if (!canPlace) return;
         submissionActive.current = true;
         setSubmissionError('');
-        form.transform(fields => ({ ...fields, coupon: appliedCode, quote_token: displayed.data.quote_token }));
+        form.transform(fields => ({ ...fields, pin: confirmedPin(fields.pin), coupon: appliedCode, quote_token: displayed.data.quote_token }));
         form.post('/dat-banh', {
             preserveScroll: true, preserveState: true,
             onError: errors => {
@@ -255,9 +266,16 @@ export function Checkout({ lines, slots, regions, bankEnabled, keyToken, policy,
                     </fieldset>
                     {fulfillment === 'pickup' && shop.address && <p className="muted">Địa chỉ nhận bánh: {shop.address}</p>}
                     {!regions.length && <p className="muted">Tiệm hiện nhận bánh tại cửa hàng.</p>}
-                    {fulfillment === 'delivery' && <div className="two-fields">
-                        <Field label="Khu vực giao" error={fieldErrors.region}><select id="checkout-region" name="region" required value={region} onChange={e => { form.setData('region', e.target.value); form.clearErrors('region'); }}><option value="">Chọn khu vực</option>{regions.map(area => <option key={area.key} value={area.key}>{area.name}</option>)}</select></Field>
-                        <Field label="Địa chỉ giao bánh" error={form.errors.address}><input id="checkout-address" name="address" autoComplete="street-address" maxLength={250} required value={form.data.address} onChange={e => { form.setData('address', e.target.value); form.clearErrors('address'); }} /></Field>
+                    {fulfillment === 'delivery' && <div className="form-stack">
+                        {savedAddresses.length > 0 && <Field label="Dùng địa chỉ đã lưu (tùy chọn)"><select defaultValue="" onChange={event => {
+                            const selected = savedAddresses.find(item => String(item.id) === event.target.value && item.readable !== false);
+                            if (selected?.address) form.setData(data => ({ ...data, ...selected.address, pin: selected.address.pin ? { ...selected.address.pin, confirmed: false } : null, address: selected.address.address_line ?? '', region: regions.find(item => (item.area_code || item.key) === selected.address.area_code)?.key ?? '' }));
+                        }}><option value="">Nhập địa chỉ mới</option>{savedAddresses.filter(item => item.readable !== false).map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select></Field>}
+                        <AddressInputs address={form.data} onChange={address => {
+                            form.setData(data => ({ ...data, ...address, address: address.address_line ?? '', region: regions.find(item => (item.area_code || item.key) === address.area_code)?.key ?? '' }));
+                            form.clearErrors('region', 'area_code', 'address', 'address_line', 'delivery_note', 'pin');
+                        }} areas={currentAreas} errors={fieldErrors} required prefix="checkout" />
+                        <p className="muted">Địa chỉ này dùng cho đơn đang đặt. Tiệm không tự lưu vào sổ địa chỉ; bạn có thể lưu riêng trong tài khoản nếu đồng ý.</p>
                     </div>}
                     <CheckoutSchedule slots={availableSlots} form={form} selectedSlot={selectedSlot} refreshing={refreshingSlots} onRefresh={refreshSchedule} onChoose={() => setScheduleNotice('')} />
                     <p className="schedule-status" role="status" aria-live="polite" aria-atomic="true">{scheduleNotice || (staleSlot ? 'Khung giờ đã chọn không còn chỗ hoặc không còn phù hợp. Hãy chọn lại giờ; các thông tin khác vẫn được giữ.' : selectedSlot ? 'Giờ đang chọn: ' + dateTime(selectedSlot) : '')}</p>
@@ -350,25 +368,9 @@ export function OrderItems({ items }) {
     </div><strong>{money(item.line_total ?? (Number(item.unit_price) + Number(item.option_fee) + Number(item.accessory_fee ?? 0)) * item.quantity)}</strong></li>)}</ul>;
 }
 
-function eventTitle(event, statuses, payments) {
-    if (event.label) return event.label;
-    if (event.kind === 'schedule') return 'Đổi giờ sang ' + dateTime(event.value);
-    if (event.kind === 'payment') return payments[event.value] ?? event.value;
-    if (event.kind === 'status') return statuses[event.value] ?? event.value;
-    if (event.kind === 'request') return { reschedule: 'Khách yêu cầu đổi giờ', cancel: 'Khách yêu cầu hủy đơn', approved: 'Tiệm chấp nhận yêu cầu', rejected: 'Tiệm không chấp nhận yêu cầu' }[event.value] ?? 'Yêu cầu thay đổi đơn';
-    const labels = {
-        request: 'Yêu cầu thay đổi đơn', request_created: 'Khách gửi yêu cầu',
-        request_approved: 'Đã duyệt yêu cầu', request_rejected: 'Đã từ chối yêu cầu',
-        prepay_exception: 'Quản lý duyệt ngoại lệ trả trước', lead_time: 'Xác nhận thời gian chuẩn bị',
-        inventory: 'Kiểm tra bánh sau hủy', inventory_disposition: 'Đã phân loại bánh sau hủy',
-        coupon: 'Xử lý lượt mã giảm giá',
-    };
-    return labels[event.kind] ?? statuses[event.value] ?? payments[event.value] ?? 'Cập nhật đơn';
-}
-
 export function OrderEvents({ events, statuses, payments }) {
     return <ol className="timeline">{events.map((event, i) => <li key={event.id ?? i}><span></span><div>
-        <strong>{eventTitle(event, statuses, payments)}</strong>
+        <strong>{orderEventTitle(event, { statuses, payments, formatDateTime: dateTime })}</strong>
         {event.kind === 'schedule' && event.previous_value && <small>Giờ cũ: {dateTime(event.previous_value)}</small>}
         <small>{dateTime(event.created_at)}{event.actor ? ' · ' + event.actor : ''}</small>{event.note && <p>{event.note}</p>}
     </div></li>)}</ol>;
@@ -464,9 +466,11 @@ export function OrderAction({ expired, ...props }) {
     return <Order {...props} actionMode />;
 }
 
-export function Order({ order, statuses, payments, trackingLink, canReorder, changeRequest, changeRequests = [], expiresAt, actionMode = false }) {
+export function Order({ order, statuses, payments, trackingLink, canReorder, changeRequest, changeRequests = [], expiresAt, actionMode = false, transferSummary = null, fulfillmentSummary = null }) {
     const { shop } = usePage().props;
     const location = orderLocation(order);
+    const fulfillment = fulfillmentSummary;
+    const transferCopy = transferSummary ? transferSummaryCopy(transferSummary.status) : null;
     const reorder = useForm({ branch_id: shop.branch?.id ?? 1 });
     const awaitingTransfer = order.bank_snapshot && order.payment === 'unpaid' && order.status !== 'cancelled';
     const nextStep = {
@@ -505,6 +509,8 @@ export function Order({ order, statuses, payments, trackingLink, canReorder, cha
                     </div>}
                 </section>
                 {order.status === 'cancelled' && order.payment === 'paid' && <p className="warning" role="status">Đơn đã hủy và đang chờ tiệm xử lý hoàn tiền. Tiệm chỉ ghi nhận đã hoàn sau khi xác minh việc hoàn trả.</p>}
+                {fulfillment && <section className="panel form-stack"><h2>Tiến độ giao nhận</h2><strong>{fulfillment.label || fulfillment.status_label || 'Tiệm đang cập nhật việc giao nhận'}</strong>{fulfillment.ready_at && <p>{fulfillmentReadyLabel(fulfillment.kind)} {dateTime(fulfillment.ready_at)}</p>}{fulfillment.collected_at && <p>Đã nhận bánh lúc {dateTime(fulfillment.collected_at)}</p>}{fulfillment.delivered_at && <p>Đã bàn giao lúc {dateTime(fulfillment.delivered_at)}</p>}<p className="muted">{fulfillment.eta_label || 'Chưa có ước tính di chuyển. Tiệm sẽ cập nhật khi có thông tin phù hợp.'}</p></section>}
+                {transferSummary && <section className="panel form-stack"><h2>Đề xuất chuyển cơ sở</h2><strong>{transferCopy.title}</strong><p>{transferSummary.from?.name} → {transferSummary.to?.name}</p><p>Tổng trước đề xuất {money(transferSummary.old_total)} → <strong>{money(transferSummary.new_total)}</strong> · Chênh lệch {money(transferSummary.delta)}</p><p className="muted">{transferCopy.description}</p>{transferCopy.needsResponse && (transferSummary.approval_url ? <ButtonLink href={transferSummary.approval_url} secondary>Xem và phản hồi đề xuất</ButtonLink> : <p>Kiểm tra email đặt đơn để mở liên kết xác nhận riêng còn hiệu lực.</p>)}</section>}
                 {order.payment === 'refunded' && <p className="warning" role="status">Tiệm đã ghi nhận hoàn tiền. Nếu chưa nhận được khoản hoàn, vui lòng liên hệ tiệm kèm mã đơn.</p>}
                 {changeRequest && <section className="panel form-stack"><h2>{actionMode ? 'Gửi yêu cầu thay đổi đơn' : 'Đổi giờ hoặc hủy đơn'}</h2>
                     {changeRequest.canRequest && changeRequest.eligible && changeRequest.submitUrl ?

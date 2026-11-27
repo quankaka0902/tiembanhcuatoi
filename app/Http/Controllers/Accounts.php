@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Services\Branches;
 use App\Services\Totp;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\Request;
@@ -106,7 +107,16 @@ class Accounts extends Controller
         $request->session()->regenerate();
         $request->session()->put('staff_mfa_verified', $user->staffProof());
 
-        return redirect()->intended('/quan-tri');
+        $allowed = Branches::allowedIds($user);
+        $selected = (int) $request->session()->get('admin_branch_id', $allowed[0] ?? 1);
+        if ($allowed && ! in_array($selected, $allowed, true)) {
+            $selected = $allowed[0];
+        }
+        $request->session()->put('admin_branch_id', $selected);
+        $landing = Branches::run($selected, fn () => Branches::can($user, 'driver') && ! Branches::can($user, 'dispatch')
+            ? '/quan-tri/giao-nhan' : (Branches::can($user, 'view_orders') ? '/quan-tri' : '/quan-tri/lich-lam-banh'));
+
+        return redirect()->intended($landing);
     }
 
     public function logout(Request $request)

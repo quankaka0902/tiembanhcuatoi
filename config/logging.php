@@ -51,6 +51,10 @@ return [
     */
 
     'channels' => [
+        'mail-private' => [
+            'driver' => 'single', 'path' => storage_path('app/private/mail.log'),
+            'level' => 'debug', 'permission' => 0600,
+        ],
 
         'stack' => [
             'driver' => 'stack',

@@ -12,6 +12,8 @@ class PublicRendering
         'Product' => ['product', 'suggestedVariantId', 'selectionFilters'],
         'OrderPolicy' => ['policy', 'privacy'],
         'PublicInfo' => ['info'],
+        'Locations' => ['locations', 'areas', 'current_branch_id'],
+        'Location' => ['location', 'areas', 'current_branch_id'],
     ];
 
     public function isPublic(array $page): bool
@@ -24,6 +26,8 @@ class PublicRendering
             'Product' => (bool) preg_match('~^/banh/[a-z0-9-]+$~D', (string) $path),
             'OrderPolicy' => $path === '/chinh-sach-dat-banh',
             'PublicInfo' => in_array($path, ['/gioi-thieu', '/lien-he', '/cau-hoi-thuong-gap', '/cua-hang'], true),
+            'Locations' => $path === '/co-so',
+            'Location' => (bool) preg_match('~^/co-so/[a-z0-9-]+$~D', (string) $path),
             default => false,
         };
     }

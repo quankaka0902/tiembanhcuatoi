@@ -129,6 +129,20 @@ class OrderNotices
                     ."\n\nNếu bạn không yêu cầu, hãy bỏ qua thư này. Liên kết tra cứu thông thường chỉ cho phép xem đơn.",
             ],
             'payment_required' => ['Đơn cần thanh toán · '.$order->code, 'Vui lòng chuyển đúng số tiền và nội dung trước hạn để tiệm xử lý đơn.'],
+            'transfer_approval' => ['Cần xác nhận chuyển cơ sở · '.$order->code,
+                self::transferText($payload)."\nChưa chuyển kho hoặc khung giờ. Chỉ thực hiện sau khi bạn đồng ý và tiệm kiểm tra lại tài nguyên."
+                ."\nLiên kết xác nhận riêng hết hạn lúc ".$time($payload['expires_at'] ?? null).":\n"
+                .rtrim(config('app.url'), '/').'/xac-nhan-chuyen-don/'.$payload['token']],
+            'transfer_approved' => ['Đã nhận xác nhận chuyển cơ sở · '.$order->code, 'Bạn đã đồng ý báo giá chuyển cơ sở. Tiệm còn cần kiểm tra và thực hiện; đơn tại cơ sở cũ vẫn được giữ cho đến khi chuyển thành công.'],
+            'transfer_rejected', 'transfer_cancelled' => ['Đã đóng đề nghị chuyển cơ sở · '.$order->code, 'Đề nghị chuyển cơ sở đã đóng. Chưa thay đổi đơn, kho và khung giờ của bạn.'],
+            'transfer_completed' => ['Đã chuyển cơ sở · '.$order->code, self::transferText($payload)."\nĐơn đã chuyển thành công. Giữ nguyên mã đơn và liên kết tra cứu. Vui lòng kiểm tra tổng tiền mới trước khi thanh toán."],
+            'dispatch_assigned' => ['Đã phân công giao bánh · '.$order->code, 'Tiệm đã phân công chuyến giao nội bộ. Chưa có ước tính thời gian đến được xác minh.'],
+            'dispatch_started' => ['Bánh đang được giao · '.$order->code, 'Bánh đã được bàn giao cho người giao. Vui lòng sẵn sàng nhận và liên hệ tiệm khi cần hỗ trợ.'],
+            'dispatch_delivered' => ['Đã ghi nhận giao bánh · '.$order->code, 'Tiệm đã ghi nhận bàn giao bánh. Việc thu tiền và hoàn tất đơn được đối chiếu riêng. Nếu chưa nhận được bánh, hãy liên hệ tiệm.'],
+            'dispatch_failed' => ['Cần thống nhất giao lại · '.$order->code, 'Chuyến giao chưa thành công. Vui lòng liên hệ tiệm để thống nhất lịch giao lại hoặc phương án xử lý.'],
+            'dispatch_cancelled' => ['Đã dừng công việc giao · '.$order->code, 'Tiệm đã dừng công việc giao hiện tại để xử lý lại. Đây chưa phải xác nhận hủy đơn hoặc hoàn tiền. Vui lòng liên hệ tiệm.'],
+            'pickup_ready' => ['Bánh sẵn sàng nhận · '.$order->code, 'Bánh đã sẵn sàng tại cơ sở xử lý đơn. Giờ nhận: '.$schedule.'.'],
+            'pickup_collected' => ['Đã ghi nhận nhận bánh · '.$order->code, 'Tiệm đã ghi nhận khách nhận bánh tại tiệm. Việc thanh toán được đối chiếu riêng. Nếu có sai sót, hãy liên hệ tiệm.'],
             default => self::statusContent($order, $type),
         };
         if (in_array($type, ['pending', 'payment_required'], true) && $order->method === 'bank' && $order->payment === 'unpaid') {
@@ -182,5 +196,14 @@ class OrderNotices
         }
 
         return [$label.' · Đơn '.$order->code, $body];
+    }
+
+    private static function transferText(array $payload): string
+    {
+        $money = fn ($value) => number_format((int) $value, 0, ',', '.').' ₫';
+
+        return 'Cơ sở: '.($payload['from']['name'] ?? '').' → '.($payload['to']['name'] ?? '')
+            ."\nTổng tiền cũ: ".$money($payload['old']['total'] ?? 0).'; mới: '.$money($payload['new']['total'] ?? 0)
+            ."\nGiờ mới: ".($payload['new']['slot'] ?? '').'.';
     }
 }

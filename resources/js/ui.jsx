@@ -37,7 +37,8 @@ export function Layout({ title, children }) {
                     <details className="mobile-menu">
                         <summary aria-label="Mở điều hướng"><Menu size={22} /></summary>
                         <nav aria-label="Điều hướng điện thoại">
-                            <Link href="/">Trang chủ</Link><Link href="/thuc-don">Thực đơn</Link><Link href="/tra-cuu">Tra cứu đơn</Link>
+                            <Link href="/">Trang chủ</Link><Link href="/thuc-don">Thực đơn</Link>{shop.branch_mode && <Link href="/co-so">Chọn cơ sở</Link>}<Link href="/tra-cuu">Tra cứu đơn</Link>
+                            {auth?.role === 'customer' && <Link href="/tai-khoan/dia-chi">Địa chỉ của tôi</Link>}
                             <Link href={internal ? '/quan-tri' : auth ? '/don-cua-toi' : '/dang-nhap'}>{internal ? 'Quản trị' : auth ? 'Đơn của tôi' : 'Đăng nhập'}</Link>
                             {auth && <Link as="button" method="post" href="/dang-xuat">Đăng xuất</Link>}
                         </nav>
@@ -74,6 +75,10 @@ export function BranchSelector({ admin = false }) {
     const cartAtAnotherBranch = !admin && cartCount > 0 && Number(cartBranchId) !== current;
     const needsConfirmation = !admin && cartCount > 0 && (selected !== current || cartAtAnotherBranch);
     if (!(admin ? branchContext?.enabled : shop.branch_mode)) return null;
+    if (!admin) return <section className="branch-selector branch-selector-public" aria-label="Cơ sở đang phục vụ">
+        <MapPin size={22} aria-hidden="true" /><div><small>Cơ sở đang chọn</small><strong>{shop.branch?.name || 'Chọn nơi nhận bánh'}</strong><span>So sánh giá, phí và lịch theo toàn bộ giỏ.</span></div>
+        <Link className="button secondary compact" href="/co-so">Chọn cơ sở phù hợp<ArrowRight size={16} aria-hidden="true" /></Link>
+    </section>;
     return <form className="branch-selector" onSubmit={event => {
         event.preventDefault();
         form.post(admin ? '/quan-tri/chon-co-so' : '/co-so/chon', { preserveState: false });

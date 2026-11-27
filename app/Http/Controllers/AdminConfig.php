@@ -84,9 +84,16 @@ class AdminConfig extends Controller
             'slots' => 'required|array|min:1|max:48', 'slots.*' => 'required|date_format:H:i|distinct',
             'slot_limits' => 'nullable|array|max:48', 'slot_limits.*' => 'nullable|integer|min:1|max:1000',
             'closed_dates' => 'nullable|array|max:100', 'closed_dates.*' => 'required|date_format:Y-m-d|distinct',
-            'regions' => 'nullable|array|max:50', 'regions.*' => 'required|array:key,name,fee',
+            'regions' => 'nullable|array|max:50', 'regions.*' => 'required|array:key,name,fee,area_code',
             'regions.*.key' => 'required|alpha_dash:ascii|max:60|distinct', 'regions.*.name' => 'required|string|max:100',
             'regions.*.fee' => 'required|integer|min:0|max:10000000', 'free_from' => 'nullable|integer|min:0|max:100000000',
+            'regions.*.area_code' => 'nullable|string|max:60|alpha_dash:ascii',
+            'latitude' => 'sometimes|nullable|numeric|between:-90,90|required_with:longitude',
+            'longitude' => 'sometimes|nullable|numeric|between:-180,180|required_with:latitude',
+            'coordinates_approved' => 'sometimes|boolean',
+            'allow_branch_transfers' => 'sometimes|boolean',
+            'transfer_policy_version' => 'sometimes|required|in:v1-unpaid-before-production',
+            'transfer_policy_approval_reference' => 'sometimes|nullable|string|min:3|max:250|required_if:allow_branch_transfers,true',
             'bank_name' => 'nullable|required_with:bank_holder,bank_account|string|max:100',
             'bank_account' => 'nullable|required_with:bank_name,bank_holder|string|max:40',
             'bank_holder' => 'nullable|required_with:bank_name,bank_account|string|max:100', 'bank_demo' => 'required|boolean',
@@ -114,6 +121,14 @@ class AdminConfig extends Controller
         DB::transaction(function () use ($fields, $catalog, $slotTimes, $request) {
             Branches::authorize($request->user(), 'branch_settings');
             $current = Store::settings(lock: true);
+            $coordinatesChanged = (array_key_exists('latitude', $fields) && $fields['latitude'] != ($current['latitude'] ?? null))
+                || (array_key_exists('longitude', $fields) && $fields['longitude'] != ($current['longitude'] ?? null));
+            $fields['coordinates_approved'] = array_key_exists('coordinates_approved', $fields)
+                ? (bool) $fields['coordinates_approved'] : (! $coordinatesChanged && (bool) ($current['coordinates_approved'] ?? false));
+            $coordinateSettings = array_replace($current, $fields);
+            if ($fields['coordinates_approved'] && (($coordinateSettings['latitude'] ?? null) === null || ($coordinateSettings['longitude'] ?? null) === null)) {
+                throw ValidationException::withMessages(['coordinates_approved' => 'Điền và đối chiếu đủ tọa độ của cơ sở trước khi duyệt.']);
+            }
             $fields = PublicSeo::settingsFields($fields, $current);
             if ($request->user()->role !== 'admin') {
                 foreach (['name', 'logo', 'logo_approved', 'privacy_notice', 'about_text', 'faq_items', 'public_content_approved', 'order_policy'] as $key) {

@@ -90,6 +90,9 @@ class Branches
 
     public static function can(User $user, string $action, ?int $branchId = null): bool
     {
+        if (in_array($action, ['dispatch', 'driver'], true) && ! self::enabled()) {
+            return false;
+        }
         $user = self::freshUser($user);
         $role = $user ? self::role($user, $branchId) : null;
         if ($role === 'chain_admin') {
@@ -102,7 +105,7 @@ class Branches
             return false;
         }
         if ($action === 'reconcile') {
-            if ($role === 'kitchen') {
+            if (in_array($role, ['kitchen', 'courier'], true)) {
                 return false;
             }
             if (! self::enabled()) {
@@ -118,6 +121,12 @@ class Branches
         }
         if ($action === 'production') {
             return in_array($role, ['manager', 'staff', 'kitchen'], true);
+        }
+        if ($action === 'dispatch') {
+            return in_array($role, ['manager', 'staff'], true);
+        }
+        if ($action === 'driver') {
+            return $role === 'courier';
         }
         if (in_array($action, ['reports', 'export', 'view_orders'], true)) {
             return in_array($role, ['manager', 'staff', 'accountant'], true);
