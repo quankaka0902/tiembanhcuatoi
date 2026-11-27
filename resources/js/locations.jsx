@@ -3,6 +3,7 @@ import { ArrowRight, Check, Clock3, MapPin, Phone, ShieldCheck, Store } from 'lu
 import { useRef, useState } from 'react';
 import { Breadcrumb, ButtonLink, dateTime, Empty, ErrorList, Field, Layout, money } from './ui';
 import { confirmedPin, LocationPin, postLocationJson } from './location-input';
+import { compareQuoteLines } from './quote-lines';
 
 const modes = { pickup: 'Nhận tại tiệm', delivery: 'Giao tận nơi' };
 const methods = { cod: 'Khi nhận bánh', bank: 'Chuyển khoản' };
@@ -41,6 +42,26 @@ function QuoteComparison({ preview }) {
     </div>;
 }
 
+function QuoteLineComparison({ preview }) {
+    const lines = compareQuoteLines(preview.old?.lines, preview.new?.lines);
+    const value = amount => amount == null ? 'Chưa xác định' : money(amount);
+    return lines.length > 0 ? <section className="quote-lines form-stack" aria-label="Từng dòng bánh trước và sau khi đổi cơ sở">
+        <h3>Kiểm tra từng dòng bánh</h3><p className="muted">Giá và thành tiền dưới đây do tiệm tính cho đúng giỏ đang chọn. Dòng chưa đáp ứng không thể giữ nguyên tại cơ sở mới.</p>
+        <ul className="quote-line-list">{lines.map(line => <li className="quote-line-card" key={line.key}>
+            <div className="quote-line-heading"><div><strong>{line.quantity != null ? line.quantity + ' × ' : ''}{line.productName}</strong>{line.variantName && <small>{line.variantName}</small>}</div>
+                <span className={'pill state-' + (line.availability === 'available' ? 'completed' : line.availability === 'unavailable' ? 'pending' : 'unknown')}>{line.availability === 'available' ? 'Đáp ứng dòng này' : line.availability === 'unavailable' ? 'Chưa đáp ứng tại cơ sở mới' : 'Chưa đủ thông tin'}</span>
+            </div>
+            <dl className="quote-line-prices">
+                <div><dt>Giá bánh</dt><dd>{value(line.before?.unitPrice)} <span aria-hidden="true">→</span><span className="visually-hidden">sang</span> <strong>{value(line.after?.unitPrice)}</strong></dd></div>
+                {['optionFee', 'accessoryFee'].filter(key => Number(line.before?.[key] ?? 0) > 0 || Number(line.after?.[key] ?? 0) > 0).map(key => <div key={key}><dt>{key === 'optionFee' ? 'Phí lời chúc / bánh' : 'Phí phụ kiện / bánh'}</dt><dd>{value(line.before?.[key])} <span aria-hidden="true">→</span><span className="visually-hidden">sang</span> <strong>{value(line.after?.[key])}</strong></dd></div>)}
+                <div><dt>Thành tiền dòng</dt><dd>{value(line.before?.subtotal)} <span aria-hidden="true">→</span><span className="visually-hidden">sang</span> <strong>{value(line.after?.subtotal)}</strong></dd></div>
+            </dl>
+            {line.availability === 'unavailable' && <p className="warning">Cơ sở mới chưa đáp ứng dòng này với số lượng hoặc tùy chọn đang chọn. Cả giỏ chưa thể giữ nguyên; hãy giữ cơ sở cũ hoặc chọn lại bánh.</p>}
+            {line.availability === 'unknown' && <p className="muted">Chưa xác định đủ thông tin của dòng này tại cơ sở mới. Hãy kiểm tra lại báo giá trước khi tiếp tục.</p>}
+        </li>)}</ul>
+    </section> : null;
+}
+
 export function BranchPreview({ branchId, context, onClose }) {
     const [preview, setPreview] = useState(null);
     const [error, setError] = useState('');
@@ -67,6 +88,7 @@ export function BranchPreview({ branchId, context, onClose }) {
         <ErrorList errors={previewErrors} />
         {preview && !loading && <>
             <QuoteComparison preview={preview} />
+            <QuoteLineComparison preview={preview} />
             {preview.changes?.length > 0 && <ul className="location-changes">{preview.changes.map((change, index) => <li key={index}>{typeof change === 'string' ? change : change.label || change.message || 'Giá, lịch hoặc phí đã được cập nhật trong bảng trên.'}</li>)}</ul>}
             {!preview.can_keep_cart && <p className="warning">{preview.blocked_reason || 'Cơ sở này chưa đáp ứng đủ giỏ hiện tại.'} Bạn có thể giữ cơ sở cũ hoặc xác nhận bỏ giỏ để chọn lại bánh.</p>}
             <fieldset className="form-stack"><legend>Cách xử lý giỏ</legend>

@@ -31,6 +31,17 @@
 .location-comparison > div > * { min-width: 0; overflow-wrap: anywhere; }
 .location-comparison-head { background: #f9eeeb; font-size: .84rem; }
 .location-changes { margin: 0; padding-left: 22px; line-height: 1.7; }
+.quote-lines { min-width: 0; }
+.quote-line-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 14px; }
+.quote-line-card { min-width: 0; padding: 15px; border: 1px solid #94727e; border-radius: 12px; background: #fffaf5; }
+.quote-line-heading { display: flex; align-items: start; flex-wrap: wrap; justify-content: space-between; gap: 10px; }
+.quote-line-heading > div { min-width: 0; flex: 1 1 180px; display: grid; gap: 5px; overflow-wrap: anywhere; }
+.quote-line-heading .pill { max-width: 100%; white-space: normal; line-height: 1.5; }
+.quote-line-prices { display: grid; gap: 10px; margin: 15px 0 0; }
+.quote-line-prices > div { display: flex; align-items: start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.quote-line-prices dt { color: #735960; }
+.quote-line-prices dd { margin: 0; overflow-wrap: anywhere; }
+.quote-line-card > .warning, .quote-line-card > .muted { margin: 14px 0 0; line-height: 1.6; }
 .location-detail > .location-preview { max-width: 900px; margin-inline: auto; }
 .branch-selector-public > div { display: grid; gap: 3px; flex: 1; }
 .branch-selector-public > div > small { color: #735960; }

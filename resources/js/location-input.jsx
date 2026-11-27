@@ -47,8 +47,6 @@ export function LocationPin({ pin, onChange, error, id = 'location-pin' }) {
     }
     return <div className="location-pin form-stack" id={id} tabIndex={-1}>
         <button type="button" className="button secondary compact" disabled={finding} onClick={locate}><LocateFixed size={17} aria-hidden="true" />{finding ? 'Đang lấy vị trí…' : 'Dùng vị trí của tôi (tùy chọn)'}</button>
-        <p className="muted" role="status" aria-live="polite">{status}</p>
-        {error && <p className="field-error" role="alert">{error}</p>}
         <p className="muted">Không bắt buộc cấp vị trí. Ghim chỉ được gửi khi bạn xác nhận và bấm tiếp tục; không thay địa chỉ giao bánh.</p>
         <details className="fold"><summary>Nhập tọa độ ghim thủ công</summary><div className="two-fields">
             <Field label="Vĩ độ"><input inputMode="decimal" type="number" min="-90" max="90" step="any" value={coordinates.lat ?? ''} onChange={event => onChange({ ...coordinates, lat: event.target.value, confirmed: false })} /></Field>
